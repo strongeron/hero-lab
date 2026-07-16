@@ -1,0 +1,358 @@
+/* ─── Google Fonts (must precede all other @import) ─── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Satoshi:wght@400;500;700;900&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;0,9..144,900;1,9..144,400;1,9..144,600;1,9..144,700;1,9..144,800;1,9..144,900&family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,700;0,6..96,800;0,6..96,900&family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Outfit:wght@300;400;500;600;700;800&family=Source+Sans+3:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Nunito+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Literata:ital,opsz,wght@0,7..72,300;0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;0,7..72,800;1,7..72,400;1,7..72,500;1,7..72,700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Special+Gothic+Expanded+One&family=Anybody:ital,wdth,wght@0,50..150,100..900;1,50..150,100..900&family=Georama:ital,wdth,wght@0,62.5..150,100..900;1,62.5..150,100..900&family=Science+Gothic:slnt,wdth,wght@-10..0,50..200,100..900&display=swap');
+
+/* ─── Google Fonts — Handwritten (Founder Letter) ─── */
+@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap');
+
+/* ─── Google Fonts — New research picks (hero font pairing) ─── */
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500;1,6..72,600;1,6..72,700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Piazzolla:ital,opsz,wght@0,8..30,400;0,8..30,500;0,8..30,600;0,8..30,700;1,8..30,400;1,8..30,500;1,8..30,600;1,8..30,700&family=Geist+Mono:wght@400;500;600;700;800;900&family=Martian+Mono:wght@400;500;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,500;1,8..60,600;1,8..60,700&display=swap');
+
+/* ─── Google Fonts — V4 panel extras ─── */
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Syne:wght@400;500;600;700;800&family=Chakra+Petch:wght@400;500;600;700&family=Dela+Gothic+One&family=Orbitron:wght@400;500;600;700;800;900&family=Lexend:wght@400;500;600;700;800&family=Familjen+Grotesk:wght@400;500;600;700&family=Fira+Mono:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inconsolata:wght@400;500;600;700&display=swap');
+
+/* ─── Google Fonts — V4 handwriting panel extras ─── */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Kalam:wght@300;400;700&family=Indie+Flower&family=Shadows+Into+Light&family=Gloria+Hallelujah&family=Architects+Daughter&family=Permanent+Marker&family=Rock+Salt&family=Reenie+Beanie&family=Dancing+Script:wght@400;500;600;700&family=Pacifico&family=Sacramento&family=Great+Vibes&family=Satisfy&display=swap');
+
+/* ─── Fontshare (General Sans, Cabinet Grotesk, Switzer) ─── */
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@200,300,400,500,600,700&f[]=cabinet-grotesk@400,500,700,800,900&f[]=switzer@300,400,500,600,700&display=swap');
+@import "tailwindcss";
+
+/* ─── Design Tokens ─── */
+@theme {
+  /* Primary — Azure Blue */
+  --color-primary: #1B44DA;
+  --color-primary-hover: #1539B8;
+  --color-primary-light: #2456EA;
+  --color-primary-glow: rgba(27, 68, 218, 0.15);
+  --color-primary-soft: #4A6FEF;
+
+  /* Feature accents (NOT primary) */
+  --color-orange: #FF6B2B;
+  --color-orange-glow: rgba(255, 107, 43, 0.15);
+  --color-orange-soft: #FF8F5C;
+  --color-green: #22C55E;
+  --color-red: #EF4444;
+  --color-teal: #0D9488;
+  --color-purple: #7C3AED;
+
+  /* Backgrounds */
+  --color-navy: #13141F;
+  --color-navy-light: #1A1B2F;
+  --color-warm-dark: #1A1A2E;
+  --color-warm-surface: #242442;
+  --color-surface-dark: #0D0F14;
+  --color-surface-black: #000000;
+
+  /* Text */
+  --color-text-primary: #E8E9ED;
+  --color-text-secondary: #8B8FA3;
+  --color-text-muted: #5C5F73;
+
+  /* Header */
+  --color-header-bg: #1B1E2B;
+  --color-header-line: rgba(99, 130, 255, 0.25);
+  --color-indigo: #4F46E5;
+  --color-indigo-hover: #4338CA;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Satoshi', 'Inter', sans-serif;
+
+  /* ── Palette tokens (defaults = cream) ── */
+  --color-t-headline: #1A120B;
+  --color-t-body: #6E5C4E;
+  --color-t-muted: #8C7B6B;
+  --color-t-eyebrow: #FF5500;
+  --color-t-accent: #FF5500;
+  --color-t-cta-bg: #1B44DA;
+  --color-t-cta-text: #FFFFFF;
+  --color-t-cta2-border: rgba(26, 18, 11, 0.1);
+  --color-t-cta2-text: #1A120B;
+  --color-t-metric-value: #1A120B;
+  --color-t-metric-label: #8C7B6B;
+  --color-t-metric-divider: rgba(26, 18, 11, 0.08);
+  --color-t-border: rgba(26, 18, 11, 0.08);
+  --color-t-border-strong: #C8C4BE;
+  --color-t-bg: #FBF6F0;
+  --color-t-bg-surface: #FAFAF8;
+}
+
+/* ─── Base (Tailwind v4 preflight handles reset) ─── */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html.lenis-active {
+    scroll-behavior: auto;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-navy);
+    color: var(--color-text-primary);
+    overflow-x: hidden;
+  }
+}
+
+/* ── Palette overrides ── */
+
+[data-palette="cream"] {
+  --color-t-headline: #1A120B;
+  --color-t-body: #6E5C4E;
+  --color-t-muted: #8C7B6B;
+  --color-t-eyebrow: #FF5500;
+  --color-t-accent: #FF5500;
+  --color-t-cta-bg: #1B44DA;
+  --color-t-cta-text: #FFFFFF;
+  --color-t-cta2-border: rgba(26, 18, 11, 0.1);
+  --color-t-cta2-text: #1A120B;
+  --color-t-metric-value: #1A120B;
+  --color-t-metric-label: #8C7B6B;
+  --color-t-metric-divider: rgba(26, 18, 11, 0.08);
+  --color-t-border: rgba(26, 18, 11, 0.08);
+  --color-t-border-strong: #C8C4BE;
+  --color-t-bg: #FBF6F0;
+  --color-t-bg-surface: #FAFAF8;
+  --color-t-tube: #C8B8A8;
+  --color-t-tube-text: #FF5500;
+  --ill-filter: sepia(0.3) saturate(0.7);
+}
+
+[data-palette="dark"] {
+  --color-t-headline: #FFFFFF;
+  --color-t-body: #8B8FA3;
+  --color-t-muted: #5C5F73;
+  --color-t-eyebrow: #2456EA;
+  --color-t-accent: #FF6B2B;
+  --color-t-cta-bg: #1B44DA;
+  --color-t-cta-text: #FFFFFF;
+  --color-t-cta2-border: rgba(255, 255, 255, 0.15);
+  --color-t-cta2-text: #E8E9ED;
+  --color-t-metric-value: #FFFFFF;
+  --color-t-metric-label: rgba(255, 255, 255, 0.4);
+  --color-t-metric-divider: rgba(255, 255, 255, 0.08);
+  --color-t-border: rgba(255, 255, 255, 0.08);
+  --color-t-border-strong: rgba(255, 255, 255, 0.15);
+  --color-t-bg: #0D0F14;
+  --color-t-bg-surface: #13141F;
+  --color-t-tube: #1B2D6B;
+  --color-t-tube-text: #FF6B2B;
+  --ill-filter: brightness(0.8) hue-rotate(200deg) saturate(0.8);
+}
+
+[data-palette="nature"] {
+  --color-t-headline: #1E3A2F;
+  --color-t-body: #4A6B5E;
+  --color-t-muted: #7A9B8E;
+  --color-t-eyebrow: #1D5D58;
+  --color-t-accent: #1D5D58;
+  --color-t-cta-bg: #1D5D58;
+  --color-t-cta-text: #FFFFFF;
+  --color-t-cta2-border: #C8C4BE;
+  --color-t-cta2-text: #1D5D58;
+  --color-t-metric-value: #1D5D58;
+  --color-t-metric-label: #7A9B8E;
+  --color-t-metric-divider: rgba(29, 93, 88, 0.2);
+  --color-t-border: rgba(29, 93, 88, 0.12);
+  --color-t-border-strong: #C8C4BE;
+  --color-t-bg: #FBF6F0;
+  --color-t-bg-surface: #F5F0EA;
+  --color-t-tube: #2E7D70;
+  --color-t-tube-text: #8FBC8F;
+  --ill-filter: hue-rotate(90deg) saturate(0.6);
+}
+
+[data-palette="warm"] {
+  --color-t-headline: #FFFFFF;
+  --color-t-body: #8B8FA3;
+  --color-t-muted: #5C5F73;
+  --color-t-eyebrow: #FF6B2B;
+  --color-t-accent: #FF6B2B;
+  --color-t-cta-bg: #FF6B2B;
+  --color-t-cta-text: #FFFFFF;
+  --color-t-cta2-border: rgba(255, 255, 255, 0.15);
+  --color-t-cta2-text: #E8E9ED;
+  --color-t-metric-value: #FFFFFF;
+  --color-t-metric-label: rgba(255, 255, 255, 0.4);
+  --color-t-metric-divider: rgba(255, 255, 255, 0.08);
+  --color-t-border: rgba(255, 255, 255, 0.08);
+  --color-t-border-strong: rgba(255, 255, 255, 0.15);
+  --color-t-bg: #1A1A2E;
+  --color-t-bg-surface: #242442;
+  --color-t-tube: #3D2266;
+  --color-t-tube-text: #FF6B2B;
+  --ill-filter: hue-rotate(260deg) saturate(0.8);
+}
+
+[data-palette="glass"] {
+  --color-t-headline: #FFFFFF;
+  --color-t-body: rgba(255, 255, 255, 0.65);
+  --color-t-muted: rgba(255, 255, 255, 0.4);
+  --color-t-eyebrow: rgba(255, 176, 136, 0.7);
+  --color-t-accent: #FFB088;
+  --color-t-cta-bg: #1A8A70;
+  --color-t-cta-text: #FFFFFF;
+  --color-t-cta2-border: rgba(255, 255, 255, 0.15);
+  --color-t-cta2-text: rgba(255, 255, 255, 0.8);
+  --color-t-metric-value: #FFFFFF;
+  --color-t-metric-label: rgba(255, 255, 255, 0.4);
+  --color-t-metric-divider: rgba(255, 255, 255, 0.08);
+  --color-t-border: rgba(255, 255, 255, 0.08);
+  --color-t-border-strong: rgba(255, 255, 255, 0.2);
+  --color-t-bg: #0A1714;
+  --color-t-bg-surface: #0F1F1A;
+  --color-t-tube: #1A4A3F;
+  --color-t-tube-text: #FFB088;
+  --ill-filter: hue-rotate(150deg) saturate(0.6) brightness(0.9);
+}
+
+[data-palette="unicorn"] {
+  --color-t-headline: #7EDDD6;
+  --color-t-body: rgba(126, 221, 214, 0.8);
+  --color-t-muted: rgba(126, 221, 214, 0.45);
+  --color-t-eyebrow: #5ECDC4;
+  --color-t-accent: #5ECDC4;
+  --color-t-cta-bg: #2A8F87;
+  --color-t-cta-text: #FFFFFF;
+  --color-t-cta2-border: rgba(126, 221, 214, 0.2);
+  --color-t-cta2-text: #7EDDD6;
+  --color-t-metric-value: #7EDDD6;
+  --color-t-metric-label: rgba(126, 221, 214, 0.45);
+  --color-t-metric-divider: rgba(126, 221, 214, 0.15);
+  --color-t-border: rgba(126, 221, 214, 0.1);
+  --color-t-border-strong: rgba(126, 221, 214, 0.2);
+  --color-t-bg: #0A1714;
+  --color-t-bg-surface: #0F1F1A;
+  --color-t-tube: #1A5E58;
+  --color-t-tube-text: #7EDDD6;
+  --ill-filter: hue-rotate(150deg) saturate(0.7) brightness(1.1);
+}
+
+[data-palette="agent"] {
+  --color-t-headline: #1C1917;
+  --color-t-body: #57534E;
+  --color-t-muted: #A8A29E;
+  --color-t-eyebrow: #FF6B2B;
+  --color-t-accent: #FF6B2B;
+  --color-t-cta-bg: #1B44DA;
+  --color-t-cta-text: #FFFFFF;
+  --color-t-cta2-border: #E7E5E4;
+  --color-t-cta2-text: #57534E;
+  --color-t-metric-value: #1C1917;
+  --color-t-metric-label: #A8A29E;
+  --color-t-metric-divider: #E7E5E4;
+  --color-t-border: #E7E5E4;
+  --color-t-border-strong: #D6D3D1;
+  --color-t-bg: #FAFAF8;
+  --color-t-bg-surface: #F5F4F0;
+  --color-t-tube: #D6D3D1;
+  --color-t-tube-text: #FF6B2B;
+  --ill-filter: saturate(0) brightness(1.2);
+}
+
+/* ── Inspector slider styling ── */
+[data-inspector-panel] input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 20px;
+  cursor: pointer;
+}
+
+[data-inspector-panel] input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-inspector-panel] input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  margin-top: -5.5px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+[data-inspector-panel] input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+
+[data-inspector-panel] input[type="range"]::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+}
+
+[data-inspector-panel] input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-palette="concept2"] {
+  /* oklch — P3-wide chroma on yellows for vivid rendering on wide-gamut displays */
+  --color-t-headline: oklch(0.87 0.165 85);
+  --color-t-body: oklch(0.97 0.073 122);
+  --color-t-muted: oklch(0.97 0.073 122 / 0.5);
+  --color-t-eyebrow: oklch(0.87 0.165 85);
+  --color-t-accent: oklch(0.87 0.165 85);
+  --color-t-cta-bg: oklch(0.87 0.165 85);
+  --color-t-cta-text: oklch(0.17 0 0);
+  --color-t-cta2-border: oklch(1 0 0 / 0.1);
+  --color-t-cta2-text: oklch(0.97 0.073 122);
+  --color-t-metric-value: oklch(0.87 0.165 85);
+  --color-t-metric-label: oklch(0.97 0.073 122 / 0.5);
+  --color-t-metric-divider: oklch(1 0 0 / 0.08);
+  --color-t-border: oklch(1 0 0 / 0.1);
+  --color-t-border-strong: oklch(1 0 0 / 0.15);
+  --color-t-bg: oklch(0.1957 0 0);
+  --color-t-bg-surface: oklch(0.22 0 0);
+  --color-t-tube: oklch(0.2894 0.0974 325.17);
+  --color-t-tube-text: oklch(0.6416 0.1674 27.89);
+  --color-t-ill: oklch(0.40 0.02 130);
+  --ill-filter: none;
+
+  /* Override global tokens so DesignPanel matches concept2 */
+  --color-primary: oklch(0.87 0.165 85);
+  --color-primary-hover: oklch(0.82 0.14 84);
+  --color-primary-light: oklch(0.90 0.14 89);
+  --color-primary-glow: oklch(0.87 0.165 85 / 0.15);
+  --color-primary-soft: oklch(0.87 0.165 85);
+  --color-text-primary: oklch(0.97 0.073 122);
+  --color-text-secondary: oklch(0.97 0.073 122 / 0.6);
+  --color-text-muted: oklch(0.97 0.073 122 / 0.35);
+}
+
+[data-palette="chaos"] {
+  --color-t-headline: #000000;
+  --color-t-body: rgba(0, 0, 0, 0.6);
+  --color-t-muted: rgba(0, 0, 0, 0.35);
+  --color-t-eyebrow: #000000;
+  --color-t-accent: #5C7A00;
+  --color-t-cta-bg: rgba(27, 68, 218, 0.9);
+  --color-t-cta-text: #FFFFFF;
+  --color-t-cta2-border: rgba(0, 0, 0, 0.1);
+  --color-t-cta2-text: #000000;
+  --color-t-metric-value: #000000;
+  --color-t-metric-label: rgba(0, 0, 0, 0.4);
+  --color-t-metric-divider: rgba(0, 0, 0, 0.08);
+  --color-t-border: rgba(0, 0, 0, 0.08);
+  --color-t-border-strong: rgba(0, 0, 0, 0.15);
+  --color-t-bg: #FFFFFF;
+  --color-t-bg-surface: #F9F9F9;
+  --color-t-tube: #B8B8B8;
+  --color-t-tube-text: #5C7A00;
+  --ill-filter: saturate(1.2) hue-rotate(30deg);
+}
