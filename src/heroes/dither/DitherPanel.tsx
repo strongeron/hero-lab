@@ -19,6 +19,7 @@ import {
   setCopyVariant,
   setCopyFont,
   setLayoutConfig,
+  setButtonConfig,
   setWtfTitlePos,
   resetWtfTitlePositions,
   defaultWtfTitlePositions,
@@ -136,6 +137,7 @@ export default function DitherPanel() {
   const pg = state.pixelGrid
   const a = state.animation
   const hap = state.haptic
+  const btn = state.button
   const hasChanges =
     state.headerBg !== 'solid' ||
     state.copyVariant !== 'provocateur' ||
@@ -497,7 +499,9 @@ export default function DitherPanel() {
               </div>
               <p className="text-[8px] text-white/25 leading-relaxed">
                 {pg.snap
-                  ? 'Axis-aligns the dither and sizes one dot per tile — clean edges. Use Align to phase-lock onto the dots.'
+                  ? a.tileDisplay === 'color'
+                    ? 'One stable sample per tile — scene color and alpha flow continuously without hard WebGL threshold flashes.'
+                    : 'Axis-aligns the dither and sizes one dot per tile — clean edges. Use Align to phase-lock onto the dots.'
                   : 'Off = free overlay (tiles cut across the dither — ragged edges).'}
               </p>
               <Slider label="Tile Size" value={pg.cell} min={8} max={160} step={1} suffix="px" onChange={(v) => setPixelGridConfig({ cell: v })} />
@@ -514,7 +518,9 @@ export default function DitherPanel() {
               <div className="flex flex-wrap gap-1">
                 {([
                   { value: 'color' as TileDisplayMode, label: 'Color / alpha' },
-                  { value: 'size' as TileDisplayMode, label: 'Mask size' },
+                  // 'Mask size' removed: it produced the same size-modulated-dot
+                  // look as Point sizes, but via a flicker-prone 12fps async blob
+                  // mask over the WebGL layers. Point sizes is the clean version.
                   { value: 'points' as TileDisplayMode, label: 'Point sizes' },
                 ]).map((opt) => (
                   <button
@@ -526,14 +532,12 @@ export default function DitherPanel() {
                   </button>
                 ))}
               </div>
-              {a.tileDisplay !== 'color' && (() => {
+              {a.tileDisplay === 'points' && (() => {
                 const r = tileSizeRangeFromGrid(pg, a.tileSizeSpread * TILE_SIZE_EFFECT_STRENGTH)
                 return (
                 <>
                   <p className="text-[8px] text-white/25 leading-relaxed">
-                    {a.tileDisplay === 'points'
-                      ? `Direct point renderer: ${r.pitch}px pitch, ${r.gap}px gap -> visible pieces ${r.minPiece}-${r.maxPiece}px.`
-                      : `Shader mask: ${r.pitch}px pitch, ${r.gap}px gap -> visible pieces ${r.minPiece}-${r.maxPiece}px.`}
+                    {`Direct point renderer: ${r.pitch}px pitch, ${r.gap}px gap -> visible pieces ${r.minPiece}-${r.maxPiece}px.`}
                   </p>
                   <Slider label="Size spread" value={a.tileSizeSpread} min={0} max={1} step={0.05} onChange={(v) => setAnimationConfig({ tileSizeSpread: v })} />
                   <Slider label="Size speed" value={a.tileSizeSpeed} min={0.02} max={0.3} step={0.01} suffix=" Hz" onChange={(v) => setAnimationConfig({ tileSizeSpeed: v })} />
@@ -633,6 +637,16 @@ export default function DitherPanel() {
                 the <span className="text-white/45">Point sizes</span> tile animation.
               </p>
               <Slider label="Text padding" value={e.fullPadding} min={8} max={72} step={2} suffix="px" onChange={(v) => setEdgeConfig({ fullPadding: v })} />
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[9px] text-white/40">Clearance follows</span>
+                <div className="flex gap-1">
+                  {(['lines', 'box'] as const).map((m) => (
+                    <button key={m} onClick={() => setEdgeConfig({ textRectMode: m })} className={pill(e.textRectMode === m)}>
+                      {m === 'lines' ? 'Text lines' : 'Block box'}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <Slider label="Rim depth" value={e.dissolveDepth} min={1} max={20} step={1} suffix=" rows" onChange={(v) => setEdgeConfig({ dissolveDepth: v })} />
               <Slider label="Rim motion" value={e.textBlendMotion} min={0} max={1} step={0.05} onChange={(v) => setEdgeConfig({ textBlendMotion: v })} />
               {e.textBlendMotion > 0 && (
@@ -647,23 +661,8 @@ export default function DitherPanel() {
               </button>
             </>
           )}
-          {(e.mode === 'dissolve' || e.mode === 'overlap') && (
+          {e.mode !== 'full' && (
             <>
-              <Slider
-                label="Section extend"
-                value={e.shaderExtend}
-                min={0}
-                max={600}
-                step={8}
-                suffix="px"
-                onChange={(v) => setEdgeConfig({
-                  shaderExtend: v,
-                  ...(v > 0 && !e.textBlend ? { textBlend: true } : {}),
-                })}
-              />
-              <p className="text-[8px] text-white/25 leading-relaxed">
-                Controls how far the scene can overflow below Position into the copy area. Point sizes fade and dissolve as they enter text.
-              </p>
               <div className="flex items-center justify-between pt-1">
                 <span className="text-[9px] text-white/40">Scene behind text</span>
                 <button
@@ -678,9 +677,44 @@ export default function DitherPanel() {
               </div>
               <p className="text-[8px] text-white/25 leading-relaxed">
                 {e.textBlend
-                  ? 'Transparent text bg — extended dots can pass behind the headline with edge falloff.'
-                  : 'Solid text bg hides tiles underneath. Turn on to see the extended shader.'}
+                  ? 'The scene passes into the copy area but keeps a clear zone around every text block — whole shapes only, never cut. Works with any edge style.'
+                  : 'Solid text bg hides tiles underneath. Turn on to let the scene flow around the text.'}
               </p>
+              {e.textBlend && (
+                <>
+                  <Slider
+                    label="Section extend"
+                    value={e.shaderExtend}
+                    min={0}
+                    max={600}
+                    step={8}
+                    suffix="px"
+                    onChange={(v) => setEdgeConfig({ shaderExtend: v })}
+                  />
+                  <p className="text-[8px] text-white/25 leading-relaxed">
+                    How far the scene can overflow below Position into the copy area.
+                  </p>
+                  <Slider label="Text clearance" value={e.textPadding} min={0} max={96} step={2} suffix="px" onChange={(v) => setEdgeConfig({ textPadding: v })} />
+                  <p className="text-[8px] text-white/25 leading-relaxed">
+                    Free space kept around the headline, copy, and CTAs. A shape that would
+                    enter this zone is dropped whole — no clipped tiles at the text boundary.
+                  </p>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[9px] text-white/40">Clearance follows</span>
+                    <div className="flex gap-1">
+                      {(['lines', 'box'] as const).map((m) => (
+                        <button key={m} onClick={() => setEdgeConfig({ textRectMode: m })} className={pill(e.textRectMode === m)}>
+                          {m === 'lines' ? 'Text lines' : 'Block box'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-[8px] text-white/25 leading-relaxed">
+                    Text lines hugs every rendered line — shapes fill in beside short lines.
+                    Block box clears the whole text rectangle for calmer negative space.
+                  </p>
+                </>
+              )}
             </>
           )}
           {e.mode === 'dissolve' && (
@@ -780,6 +814,10 @@ export default function DitherPanel() {
               {a.playing ? 'Playing' : 'Paused'}
             </button>
           </div>
+          <p className="text-[8px] text-white/25 leading-relaxed">
+            Scenes drive motion only — drift, pulse, scan, breathing, loop-break.
+            Your shapes, pixel grid, scale, and colors stay exactly as you set them.
+          </p>
 
           {/* Template buttons */}
           <div className="grid grid-cols-2 gap-1">
@@ -805,42 +843,8 @@ export default function DitherPanel() {
             })}
           </div>
 
-          {/* Tile animation mode — color/alpha vs per-tile size */}
-          <div className="space-y-1 pt-1">
-            <span className="text-[9px] font-semibold tracking-wide uppercase text-white/40">Tile animation</span>
-            <div className="flex flex-wrap gap-1">
-              {([
-                { value: 'color' as TileDisplayMode, label: 'Color / alpha' },
-                { value: 'size' as TileDisplayMode, label: 'Mask size' },
-                { value: 'points' as TileDisplayMode, label: 'Point sizes' },
-              ]).map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setAnimationConfig({ tileDisplay: opt.value })}
-                  className={pill(a.tileDisplay === opt.value)}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[8px] text-white/25 leading-relaxed">
-              {a.tileDisplay !== 'color'
-                ? (() => {
-                    const r = tileSizeRangeFromGrid(pg, a.tileSizeSpread * TILE_SIZE_EFFECT_STRENGTH)
-                    return a.tileDisplay === 'points'
-                      ? `Point sizes — direct proportional dots ${r.minPiece}-${r.maxPiece}px from Pixel Grid (${r.pitch}px pitch, ${r.gap}px gap).`
-                      : `Mask size — clips shader into proportional ${r.minPiece}-${r.maxPiece}px pieces from Pixel Grid.`
-                  })()
-                : 'Default — dither color, opacity, and gap pulse. Switch to Point sizes for direct proportional dot-size motion.'}
-            </p>
-            {a.tileDisplay !== 'color' && (
-              <>
-                <Slider label="Size spread" value={a.tileSizeSpread} min={0} max={1} step={0.05} onChange={(v) => setAnimationConfig({ tileSizeSpread: v })} />
-                <Slider label="Size speed" value={a.tileSizeSpeed} min={0.02} max={0.3} step={0.01} suffix=" Hz" onChange={(v) => setAnimationConfig({ tileSizeSpeed: v })} />
-                <Slider label="Map scale" value={a.tileSizeNoise} min={0.4} max={3} step={0.1} onChange={(v) => setAnimationConfig({ tileSizeNoise: v })} />
-              </>
-            )}
-          </div>
+          {/* Tile animation controls live with Pixel Grid because mask/point
+              modes derive their geometry from that grid. */}
 
           {/* Break Loop — non-looping motion layered on top of the scene */}
           <div className="space-y-1 pt-1">
@@ -1588,6 +1592,38 @@ export default function DitherPanel() {
                 {opt.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* ─── Buttons / CTA ─── */}
+        <div className="space-y-1.5">
+          <span className="text-[9px] font-semibold tracking-wide uppercase text-white/40 block pt-1">
+            Buttons
+          </span>
+          <p className="text-[8px] text-white/25 leading-relaxed">
+            Corner radius &amp; caps for the header and hero CTAs.
+          </p>
+          <div className="flex gap-1">
+            {([
+              { label: 'Square', r: 0 },
+              { label: 'Rounded', r: 12 },
+              { label: 'Pill', r: 999 },
+            ]).map((opt) => (
+              <button
+                key={opt.label}
+                onClick={() => setButtonConfig({ radius: opt.r })}
+                className={pill(btn.radius === opt.r)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <Slider label="Corner radius" value={btn.radius > 40 ? 40 : btn.radius} min={0} max={40} step={1} suffix="px" onChange={(v) => setButtonConfig({ radius: v })} />
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-[9px] text-white/40">Uppercase label</span>
+            <button onClick={() => setButtonConfig({ uppercase: !btn.uppercase })} className={pill(btn.uppercase)}>
+              {btn.uppercase ? 'On' : 'Off'}
+            </button>
           </div>
         </div>
 

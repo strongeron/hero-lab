@@ -1,0 +1,1301 @@
+<meta charset="utf-8">
+<title>Design Panel — Control Taxonomy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    color-scheme: dark;
+    --ground: #080c0b;
+    --surface: #0f1417;
+    --raised: #151c20;
+    --line: #223034;
+    --line-soft: #1a2529;
+    --ink: #e9efec;
+    --muted: #8b9a94;
+    --faint: #5c6b66;
+    --pink: #e6307a;
+    --green: #2dd4a8;
+    --emerald: #34d399;
+    --sky: #38bdf8;
+    --amber: #fbbf24;
+    --core: #2dd4a8;
+    --situ: #fbbf24;
+    --redun: #fb7185;
+    --dead: #6b7472;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --maxw: 1180px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(45,212,168,0.05), transparent 60%),
+      radial-gradient(900px 500px at 0% 0%, rgba(230,48,122,0.05), transparent 55%),
+      var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* ── Masthead ── */
+  header.masthead { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--green); margin: 0 0 18px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .eyebrow::before {
+    content: ""; width: 28px; height: 28px; flex: none; border-radius: 5px;
+    background:
+      radial-gradient(circle at 6px 6px, var(--pink) 2px, transparent 2.6px),
+      radial-gradient(circle at 16px 10px, var(--green) 2px, transparent 2.6px),
+      radial-gradient(circle at 10px 18px, var(--pink) 1.6px, transparent 2.2px),
+      radial-gradient(circle at 21px 20px, var(--green) 1.6px, transparent 2.2px),
+      #0a1714;
+    border: 1px solid var(--line);
+  }
+  h1 {
+    font-family: var(--mono); font-weight: 600;
+    font-size: clamp(30px, 4.4vw, 52px); line-height: 1.05;
+    letter-spacing: -0.02em; margin: 0 0 20px; text-wrap: balance;
+  }
+  h1 .fix { color: var(--green); }
+  .lede { font-size: 18px; color: var(--muted); max-width: 68ch; margin: 0; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  /* ── Sticky nav ── */
+  nav.toc {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(8,12,11,0.86); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line); margin-bottom: 8px;
+  }
+  nav.toc .wrap { padding-top: 10px; padding-bottom: 6px; }
+  .tocrow { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 8px; }
+  nav.toc a {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em;
+    color: var(--muted); text-decoration: none; padding: 6px 11px; border-radius: 7px;
+    border: 1px solid transparent; transition: background .15s, color .15s, border-color .15s;
+  }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--ink); background: var(--raised); border-color: var(--line); outline: none; }
+
+  section { padding: 52px 0; border-bottom: 1px solid var(--line-soft); }
+  .grouphead { display: flex; align-items: baseline; gap: 14px; margin: 0 0 6px; }
+  .grouphead h2 {
+    font-family: var(--mono); font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0;
+  }
+  .grouphead .tag {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 999px; border: 1px solid;
+  }
+  .g-scene { color: var(--emerald); border-color: color-mix(in oklch, var(--emerald) 40%, transparent); background: color-mix(in oklch, var(--emerald) 10%, transparent); }
+  .g-grid { color: #a78bfa; border-color: color-mix(in oklch, #a78bfa 40%, transparent); background: color-mix(in oklch, #a78bfa 10%, transparent); }
+  .g-edge { color: var(--pink); border-color: color-mix(in oklch, var(--pink) 40%, transparent); background: color-mix(in oklch, var(--pink) 10%, transparent); }
+  .g-anim { color: var(--sky); border-color: color-mix(in oklch, var(--sky) 40%, transparent); background: color-mix(in oklch, var(--sky) 10%, transparent); }
+  .g-hover { color: var(--amber); border-color: color-mix(in oklch, var(--amber) 40%, transparent); background: color-mix(in oklch, var(--amber) 10%, transparent); }
+  .g-chrome { color: var(--green); border-color: color-mix(in oklch, var(--green) 40%, transparent); background: color-mix(in oklch, var(--green) 10%, transparent); }
+  .groupsub { color: var(--muted); margin: 0 0 30px; max-width: 70ch; }
+
+  /* ── Control row ── */
+  .ctrl {
+    display: grid; grid-template-columns: 220px 1fr; gap: 26px;
+    padding: 22px; margin-bottom: 14px;
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 14px;
+    align-items: start;
+  }
+  .ctrl.wide-example { grid-template-columns: 300px 1fr; }
+  @media (max-width: 720px) { .ctrl, .ctrl.wide-example { grid-template-columns: 1fr; gap: 16px; } }
+
+  .example {
+    aspect-ratio: 16 / 10; border-radius: 10px; overflow: hidden; position: relative;
+    background: #0a1714; border: 1px solid var(--line);
+    display: grid; place-items: center;
+  }
+  .example.tall { aspect-ratio: 4 / 3; }
+  .caption { font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-top: 8px; letter-spacing: 0.03em; }
+
+  .meta h3 { font-family: var(--mono); font-size: 15px; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.01em; }
+  .meta .path { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .meta p { margin: 10px 0 0; color: var(--muted); font-size: 14.5px; }
+  .meta p strong { color: var(--ink); font-weight: 600; }
+  .rowtop { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+  .verdict {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 999px; border: 1px solid; white-space: nowrap; flex: none;
+  }
+  .v-core { color: var(--core); border-color: color-mix(in oklch, var(--core) 45%, transparent); background: color-mix(in oklch, var(--core) 12%, transparent); }
+  .v-situ { color: var(--situ); border-color: color-mix(in oklch, var(--situ) 45%, transparent); background: color-mix(in oklch, var(--situ) 12%, transparent); }
+  .v-redun { color: var(--redun); border-color: color-mix(in oklch, var(--redun) 45%, transparent); background: color-mix(in oklch, var(--redun) 12%, transparent); }
+  .v-dead { color: var(--dead); border-color: color-mix(in oklch, var(--dead) 55%, transparent); background: color-mix(in oklch, var(--dead) 14%, transparent); }
+
+  .range {
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+    margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line);
+    display: flex; flex-wrap: wrap; gap: 6px 18px;
+  }
+  .range b { color: var(--ink); font-weight: 600; }
+
+  /* ── Dot-grid concept primitives (all static) ── */
+  .dotfield { width: 88%; height: 82%; display: grid; gap: var(--dg, 3px); }
+  .dot { border-radius: var(--dr, 1px); background: var(--pink); }
+  .dot.g { background: var(--green); }
+  .dot.o { background: #ff6b2b; }
+  .dot.off { background: transparent; }
+  .dot.dim { opacity: 0.35; }
+
+  /* label chips inside examples */
+  .exlabel {
+    position: absolute; left: 8px; bottom: 8px; font-family: var(--mono);
+    font-size: 9.5px; letter-spacing: 0.06em; color: var(--ink);
+    background: rgba(8,12,11,0.72); padding: 2px 7px; border-radius: 5px; border: 1px solid var(--line);
+  }
+
+  /* ── Summary blocks ── */
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 14px; padding: 22px;
+  }
+  .card h3 { font-family: var(--mono); font-size: 14px; margin: 0 0 10px; letter-spacing: 0.02em; }
+  .card.core h3 { color: var(--core); }
+  .card.cut h3 { color: var(--redun); }
+  .card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+  .card li { margin-bottom: 8px; }
+  .card li b { color: var(--ink); font-weight: 600; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 26px 0 0; }
+  .legend .item { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--muted); }
+  .legend .dotk { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+
+  .statbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 28px; }
+  .stat { background: var(--raised); border: 1px solid var(--line-soft); border-radius: 12px; padding: 16px 18px; }
+  .stat .n { font-family: var(--mono); font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+  .stat .l { font-size: 12px; color: var(--muted); margin-top: 7px; }
+  .stat.core .n { color: var(--core); }
+  .stat.situ .n { color: var(--situ); }
+  .stat.cut .n { color: var(--redun); }
+
+  footer { padding: 44px 0 80px; color: var(--faint); font-family: var(--mono); font-size: 12px; }
+
+  .callout {
+    background: color-mix(in oklch, var(--pink) 8%, var(--surface));
+    border: 1px solid color-mix(in oklch, var(--pink) 30%, transparent);
+    border-radius: 14px; padding: 22px 24px; margin-top: 8px;
+  }
+  .callout h3 { font-family: var(--mono); margin: 0 0 6px; font-size: 14px; color: var(--pink); letter-spacing: 0.04em; }
+  .callout p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+  /* ── Tab bar ── */
+  .tabbar { display: flex; gap: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--line-soft); margin-bottom: 8px; }
+  .tab {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em;
+    color: var(--muted); background: transparent; border: 1px solid transparent;
+    padding: 7px 14px; border-radius: 8px; cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+  }
+  .tab:hover { color: var(--ink); background: var(--raised); }
+  .tab.is-active { color: var(--ink); background: var(--raised); border-color: var(--line); }
+  .tab .k { color: var(--faint); }
+  .tabpanel { display: none; }
+  .tabpanel.is-active { display: block; }
+  #tocrow.hidden { display: none; }
+
+  /* ── Layer stack ── */
+  .stack-wrap { display: grid; grid-template-columns: 1fr 320px; gap: 26px; align-items: start; }
+  @media (max-width: 860px) { .stack-wrap { grid-template-columns: 1fr; } }
+  .stage { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: #0a1714; }
+  .stage canvas { display: block; width: 100%; height: auto; }
+  .stage .stagelabel { position: absolute; top: 10px; left: 12px; font-family: var(--mono); font-size: 11px; color: var(--muted); background: rgba(8,12,11,.6); padding: 3px 9px; border-radius: 6px; border: 1px solid var(--line); }
+  .layerlist { display: flex; flex-direction: column; gap: 8px; }
+  .layerlist h3 { font-family: var(--mono); font-size: 13px; margin: 0 0 4px; letter-spacing: 0.02em; }
+  .layer {
+    display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start;
+    padding: 12px 14px; background: var(--surface); border: 1px solid var(--line-soft);
+    border-radius: 11px; cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .layer:hover { border-color: var(--line); }
+  .layer.on { border-color: color-mix(in oklch, var(--green) 35%, transparent); background: color-mix(in oklch, var(--green) 6%, var(--surface)); }
+  .layer .sw {
+    width: 34px; height: 20px; border-radius: 999px; background: var(--line); position: relative;
+    transition: background .15s; margin-top: 2px; flex: none;
+  }
+  .layer.on .sw { background: var(--green); }
+  .layer .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #04110c; transition: transform .15s; }
+  .layer.on .sw::after { transform: translateX(14px); }
+  .layer .lt { font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
+  .layer .ld { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .layer .lk { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; margin-top: 6px; display: inline-block; padding: 2px 7px; border-radius: 999px; border: 1px solid; }
+
+  .playbar { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; }
+  .playbtn {
+    font-family: var(--mono); font-size: 12px; color: var(--ink); background: var(--raised);
+    border: 1px solid var(--line); border-radius: 8px; padding: 7px 14px; cursor: pointer;
+  }
+  .playbtn:hover { border-color: var(--green); }
+  .playhint { font-size: 12.5px; color: var(--faint); }
+
+  /* ── Scene reel ── */
+  .scene-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .scene-card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 13px; overflow: hidden; }
+  .scene-card canvas { display: block; width: 100%; height: auto; background: #0a1714; border-bottom: 1px solid var(--line-soft); }
+  .scene-body { padding: 12px 14px 14px; }
+  .scene-body .st { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .scene-body h3 { font-family: var(--mono); font-size: 14px; margin: 0; }
+  .scene-body p { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); }
+  .vv { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .vv-keep { color: var(--core); border-color: color-mix(in oklch, var(--core) 45%, transparent); background: color-mix(in oklch, var(--core) 12%, transparent); }
+  .vv-merge { color: var(--situ); border-color: color-mix(in oklch, var(--situ) 45%, transparent); background: color-mix(in oklch, var(--situ) 12%, transparent); }
+
+  /* ── Scene reel real-preview controls ── */
+  .reel-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin: 0 0 22px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px; }
+  .rc-group { display: flex; align-items: center; gap: 6px; }
+  .rc-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-right: 2px; }
+  .rc-btn { font-family: var(--mono); font-size: 11px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 7px; padding: 5px 11px; cursor: pointer; transition: all .15s; }
+  .rc-btn:hover { color: var(--ink); border-color: var(--line); }
+  .rc-btn.is-on { color: var(--ink); background: var(--raised); border-color: color-mix(in oklch, var(--green) 40%, transparent); }
+  .scene-card iframe { display: block; width: 100%; border: 0; background: #0a1714; border-bottom: 1px solid var(--line-soft); }
+  .scene-card .ph { display: grid; place-items: center; color: var(--faint); font-family: var(--mono); font-size: 11px; background: #0a1714; border-bottom: 1px solid var(--line-soft); }
+</style>
+
+<nav class="toc"><div class="wrap">
+  <div class="tabbar" role="tablist">
+    <button class="tab is-active" data-tab="taxonomy" role="tab" aria-selected="true">Taxonomy</button>
+    <button class="tab" data-tab="stack" role="tab" aria-selected="false">Layer Stack <span class="k">— live</span></button>
+    <button class="tab" data-tab="scenes" role="tab" aria-selected="false">Scene Reel <span class="k">— live</span></button>
+  </div>
+  <div class="tocrow" id="tocrow">
+    <a href="#top">Overview</a>
+    <a href="#scene">Scene</a>
+    <a href="#grid">Pixel Grid</a>
+    <a href="#edge">Section Edge</a>
+    <a href="#anim">Animation</a>
+    <a href="#hover">Hover</a>
+    <a href="#chrome">Chrome</a>
+    <a href="#verdict">Cuts &amp; Verdict</a>
+  </div>
+</div></nav>
+
+<header class="masthead" id="top"><div class="wrap">
+  <p class="eyebrow">Hero Lab · Design Panel</p>
+  <h1>Control taxonomy —<br>what each knob <span class="fix">actually</span> does</h1>
+  <p class="lede">Every control in the Design Panel, grouped as the panel groups them, each with a static concept diagram, a plain-English description, its range, and a verdict — <strong>Core, Situational, Redundant, or Dead</strong>. Typography controls are out of scope for this pass. The goal: find the load-bearing controls, retire the dead weight, and see the real reach of the system.</p>
+
+  <div class="statbar">
+    <div class="stat core"><div class="n">31</div><div class="l">Core controls</div></div>
+    <div class="stat situ"><div class="n">24</div><div class="l">Situational</div></div>
+    <div class="stat cut"><div class="n">9</div><div class="l">Redundant / dead</div></div>
+    <div class="stat"><div class="n">6</div><div class="l">Control groups</div></div>
+  </div>
+
+  <div class="legend">
+    <span class="item"><span class="dotk" style="background:var(--core)"></span> <b style="color:var(--ink)">Core</b>&nbsp;— defines the identity; keep</span>
+    <span class="item"><span class="dotk" style="background:var(--situ)"></span> <b style="color:var(--ink)">Situational</b>&nbsp;— real power, niche use</span>
+    <span class="item"><span class="dotk" style="background:var(--redun)"></span> <b style="color:var(--ink)">Redundant</b>&nbsp;— duplicated elsewhere</span>
+    <span class="item"><span class="dotk" style="background:var(--dead)"></span> <b style="color:var(--ink)">Dead</b>&nbsp;— no real effect here</span>
+  </div>
+</div></header>
+
+<main>
+<div id="panel-taxonomy" class="tabpanel is-active">
+<!-- ═══════════════ SCENE ═══════════════ -->
+<section id="scene"><div class="wrap">
+  <div class="grouphead"><h2>Scene</h2><span class="tag g-scene">Resting effect</span></div>
+  <p class="groupsub">What you see at rest — the dither pattern, its colors and shapes, motion speed, and how the whole field is sized and placed. This is the base layer everything else sits on.</p>
+
+  <!-- Initial State -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="display:flex; width:88%; height:82%; gap:6px">
+          <div style="flex:1; display:grid; grid-template-columns:repeat(5,1fr); gap:4px">
+            <span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot"></span><span class="dot off"></span>
+            <span class="dot off"></span><span class="dot"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span>
+            <span class="dot"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot"></span>
+            <span class="dot off"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot off"></span>
+          </div>
+          <div style="flex:1; display:grid; grid-template-columns:repeat(5,1fr); gap:4px">
+            <span class="dot g"></span><span class="dot g off"></span><span class="dot g"></span><span class="dot g"></span><span class="dot g off"></span>
+            <span class="dot g off"></span><span class="dot g"></span><span class="dot g"></span><span class="dot g off"></span><span class="dot g"></span>
+            <span class="dot g"></span><span class="dot g"></span><span class="dot g off"></span><span class="dot g"></span><span class="dot g"></span>
+            <span class="dot g off"></span><span class="dot g"></span><span class="dot g"></span><span class="dot g"></span><span class="dot g off"></span>
+          </div>
+        </div>
+        <span class="exlabel">pink = rest · green = hover reveal</span>
+      </div>
+      <div class="caption">Problem ⇄ Fix</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Initial State</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">problem · fix</div>
+      <p>Picks which named state rests on screen — <strong>Problem</strong> (pink error dither) or <strong>Fix</strong> (green "caught it" waves). The other state becomes the hover reveal automatically. This toggle is the whole narrative premise of the hero; everything else decorates it.</p>
+      <div class="range"><span><b>Type</b> 2-way toggle</span><span><b>Default</b> Problem</span><span><b>Swaps</b> base colors + shapes + hover pool</span></div>
+    </div>
+  </div>
+
+  <!-- Back + Alpha -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="display:flex; width:88%; height:70%; gap:8px; align-items:stretch">
+          <div style="flex:1; border-radius:6px; background:#0a1714; border:1px solid var(--line); display:grid; place-items:center"><span style="font-family:var(--mono); font-size:9px; color:var(--muted)">solid bg</span></div>
+          <div style="flex:1; border-radius:6px; background:repeating-conic-gradient(#1a1a1a 0% 25%, #0d0d0d 0% 50%) 50%/10px 10px; display:grid; place-items:center"><span style="font-family:var(--mono); font-size:9px; color:var(--ink)">alpha</span></div>
+        </div>
+        <span class="exlabel">Alpha = dots float over the page</span>
+      </div>
+      <div class="caption">Back color · transparency</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Back color + Alpha</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">colorBack · transparentBg</div>
+      <p>The canvas ground color, and a toggle that makes the shader background transparent so the dots float over whatever section sits behind. <strong>Alpha on</strong> is what lets the field blend into the page and the "scene behind text" feature work. Alpha off gives a solid framed panel.</p>
+      <div class="range"><span><b>Back</b> color picker</span><span><b>Alpha</b> on/off</span><span><b>Default</b> #0A1714, alpha on</span></div>
+    </div>
+  </div>
+
+  <!-- Alpha Layers -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div class="dotfield" style="grid-template-columns:repeat(8,1fr); --dg:4px">
+          <span class="dot"></span><span class="dot o"></span><span class="dot off"></span><span class="dot"></span><span class="dot off"></span><span class="dot o"></span><span class="dot"></span><span class="dot off"></span>
+          <span class="dot o"></span><span class="dot"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot off"></span><span class="dot o"></span><span class="dot"></span>
+          <span class="dot off"></span><span class="dot"></span><span class="dot o"></span><span class="dot"></span><span class="dot o"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span>
+          <span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot o"></span><span class="dot"></span><span class="dot"></span><span class="dot off"></span><span class="dot o"></span>
+        </div>
+        <span class="exlabel">3 colors · 3 shapes · 3 opacities</span>
+      </div>
+      <div class="caption">Alpha Layers (×3)</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Alpha Layers</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">alphaLayers[] · color · shape · opacity</div>
+      <p>Three stacked dither layers, screen-blended. Each has its own <strong>color</strong>, <strong>shape</strong> (click the name to cycle: simplex, warp, dots, wave, ripple, swirl, sphere), and <strong>opacity</strong>. This is the multi-color identity of the field — the pink/orange/magenta error scatter comes from here.</p>
+      <div class="range"><span><b>Layers</b> 3</span><span><b>Shape</b> 7 options</span><span><b>Opacity</b> 0.1–1.0</span></div>
+    </div>
+  </div>
+
+  <!-- Color Cycle -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div class="dotfield" style="grid-template-columns:repeat(8,1fr); --dg:4px">
+          <span class="dot"></span><span class="dot o"></span><span class="dot g"></span><span class="dot"></span><span class="dot o"></span><span class="dot g"></span><span class="dot"></span><span class="dot o"></span>
+          <span class="dot o"></span><span class="dot g"></span><span class="dot"></span><span class="dot o"></span><span class="dot g"></span><span class="dot"></span><span class="dot o"></span><span class="dot g"></span>
+          <span class="dot g"></span><span class="dot"></span><span class="dot o"></span><span class="dot g"></span><span class="dot"></span><span class="dot o"></span><span class="dot g"></span><span class="dot"></span>
+          <span class="dot"></span><span class="dot o"></span><span class="dot g"></span><span class="dot"></span><span class="dot o"></span><span class="dot g"></span><span class="dot"></span><span class="dot o"></span>
+        </div>
+        <span class="exlabel">hue drifts across layers over time</span>
+      </div>
+      <div class="caption">Color Cycle</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Color Cycle</h3><span class="verdict v-situ">Situational</span></div>
+      <div class="path">colorCycleSpeed</div>
+      <p>Rotates the color source across the alpha layers over time, so hues drift. Reads clearly in Color/alpha tile mode; subtle in Points mode where size is the dominant signal. Worth keeping as a mood dial, but not load-bearing.</p>
+      <div class="range"><span><b>Range</b> 0–2</span><span><b>Default</b> 0.15</span><span><b>Unit</b> cycles/sec</span></div>
+    </div>
+  </div>
+
+  <!-- Front + Shape (non-alpha) -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div class="dotfield" style="grid-template-columns:repeat(8,1fr); --dg:4px">
+          <span class="dot"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot"></span><span class="dot off"></span>
+          <span class="dot off"></span><span class="dot"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot"></span>
+          <span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot off"></span><span class="dot off"></span><span class="dot"></span>
+          <span class="dot"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot"></span><span class="dot off"></span>
+        </div>
+        <span class="exlabel">single color — only when Alpha is off</span>
+      </div>
+      <div class="caption">Front color · Shape</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Front color + Shape</h3><span class="verdict v-situ">Situational</span></div>
+      <div class="path">colorFront · shape</div>
+      <p>Single-color dither controls that only appear when <strong>Alpha is off</strong>. Since Alpha-on (with 3 layers) is the default and far richer, this path is rarely visited — kept for the solid single-tone look.</p>
+      <div class="range"><span><b>Shown</b> alpha off only</span><span><b>Shape</b> 7 options</span></div>
+    </div>
+  </div>
+
+  <!-- Type -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; width:88%; height:80%">
+          <div style="border-radius:5px; border:1px solid var(--line); display:grid; place-items:center; background:#0a1714"><div style="display:grid;grid-template-columns:repeat(4,4px);gap:3px">
+            <i class="dot" style="width:4px;height:4px;display:block"></i><i class="dot off" style="width:4px;height:4px;display:block"></i><i class="dot" style="width:4px;height:4px;display:block"></i><i class="dot off" style="width:4px;height:4px;display:block"></i>
+            <i class="dot off" style="width:4px;height:4px;display:block"></i><i class="dot" style="width:4px;height:4px;display:block"></i><i class="dot off" style="width:4px;height:4px;display:block"></i><i class="dot" style="width:4px;height:4px;display:block"></i></div></div>
+          <div style="border-radius:5px; border:1px solid var(--line); display:grid; place-items:center; background:#0a1714"><div style="display:grid;grid-template-columns:repeat(4,4px);gap:2px">
+            <i class="dot" style="width:4px;height:4px;display:block"></i><i class="dot" style="width:4px;height:4px;display:block"></i><i class="dot off" style="width:4px;height:4px;display:block"></i><i class="dot" style="width:4px;height:4px;display:block"></i>
+            <i class="dot" style="width:4px;height:4px;display:block"></i><i class="dot off" style="width:4px;height:4px;display:block"></i><i class="dot" style="width:4px;height:4px;display:block"></i><i class="dot" style="width:4px;height:4px;display:block"></i></div></div>
+        </div>
+        <span class="exlabel">2×2 · 4×4 · 8×8 · random</span>
+      </div>
+      <div class="caption">Dither Type</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Type</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">type: random · 2x2 · 4x4 · 8x8</div>
+      <p>The dithering matrix — how the shader quantizes brightness into dots. <strong>8×8</strong> is the smoothest gradient, <strong>2×2</strong> the chunkiest, <strong>random</strong> the noisiest. Defines the grain of the whole texture.</p>
+      <div class="range"><span><b>Options</b> 4</span><span><b>Default</b> 8×8</span></div>
+    </div>
+  </div>
+
+  <!-- Cell Size (DEAD) -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="width:88%;height:80%;display:grid;place-items:center;color:var(--dead);font-family:var(--mono);font-size:11px;text-align:center;line-height:1.5">
+          locked → Pixel Grid<br>Tile Size
+        </div>
+        <span class="exlabel">no effect while Pixel Grid is on</span>
+      </div>
+      <div class="caption">Cell Size</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Cell Size</h3><span class="verdict v-dead">Dead</span></div>
+      <div class="path">shader.size</div>
+      <p>Shader dot pitch — but the panel itself notes it's <strong>locked to Pixel Grid → Tile Size</strong> whenever the grid is on (one dot per tile). Since the grid is on in every template, this slider is inert in practice. <strong>Recommendation:</strong> hide it when the grid is enabled, or drop it.</p>
+      <div class="range"><span><b>Range</b> 0.5–20</span><span><b>Live effect</b> none (grid on)</span></div>
+    </div>
+  </div>
+
+  <!-- Motion: Speed + Frame -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="width:88%">
+          <div style="height:6px;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--pink));margin-bottom:6px"></div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">Speed — drives the shader clock</div>
+          <div style="height:6px;border-radius:3px;background:var(--line);margin-top:14px"></div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--faint);margin-top:6px">Frame — manual scrub (static)</div>
+        </div>
+      </div>
+      <div class="caption">Motion</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Speed <span style="color:var(--faint);font-weight:400">·</span> Frame</h3><span class="verdict v-situ">Split</span></div>
+      <div class="path">shader.speed · shader.frame</div>
+      <p><strong>Speed</strong> drives the shader's internal clock — the noise churn — and is genuinely core. <strong>Frame</strong> is a manual frame-scrubber, only useful for freezing a specific still (e.g. export); in a live playground it's effectively dead weight.</p>
+      <div class="range"><span><b>Speed</b> 0–2 · Core</span><span><b>Frame</b> 0–100 · Dead</span></div>
+    </div>
+  </div>
+
+  <!-- Sizing -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="position:relative;width:82%;height:78%;border:1px dashed var(--line);border-radius:6px">
+          <div style="position:absolute;inset:18% 22%;border:1px solid var(--green);border-radius:4px;background:color-mix(in oklch,var(--green) 12%,transparent)"></div>
+          <div style="position:absolute;left:50%;top:50%;width:5px;height:5px;border-radius:50%;background:var(--pink);transform:translate(-50%,-50%)"></div>
+        </div>
+        <span class="exlabel">scale · rotation · offset · origin</span>
+      </div>
+      <div class="caption">Sizing &amp; placement</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Sizing (Fit / Scale / Rotation / Offset / Origin / World)</h3><span class="verdict v-situ">Situational</span></div>
+      <div class="path">fit · scale · rotation · offsetX/Y · originX/Y · worldWidth/Height</div>
+      <p><strong>Scale</strong> is core — it sets pattern zoom (0.81 exposes fine scene structure; 0.21 reads broad). <strong>Fit, Rotation, Offset, Origin</strong> are real but niche knobs: rotation is zeroed by snap, origin mostly matters for hover mouse-influence. <strong>World Width/Height</strong> (pattern aspect) is the weakest of the group — a genuine candidate to retire.</p>
+      <div class="range"><span><b>Scale</b> 0.01–4 · Core</span><span><b>Rotation</b> 0–360°</span><span><b>Offset</b> ±1</span><span><b>World W/H</b> 0.1–10 · Dead-ish</span></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══════════════ PIXEL GRID ═══════════════ -->
+<section id="grid"><div class="wrap">
+  <div class="grouphead"><h2>Pixel Grid</h2><span class="tag g-grid">Mosaic mask</span></div>
+  <p class="groupsub">Overlays the shader with a repeating grid of tiles — the "LED panel" mosaic look. This is the single most identity-defining system in the lab: it turns a smooth shader into crisp discrete tiles.</p>
+
+  <!-- Grid on/off -->
+  <div class="ctrl wide-example">
+    <div>
+      <div class="example">
+        <div style="display:flex;width:90%;height:80%;gap:8px">
+          <div style="flex:1;border-radius:6px;background:radial-gradient(circle at 40% 40%, var(--pink), transparent 70%),#0a1714;border:1px solid var(--line)"></div>
+          <div style="flex:1;border-radius:6px;overflow:hidden;border:1px solid var(--line);background:#0a1714;display:grid;grid-template-columns:repeat(6,1fr);gap:3px;padding:6px">
+            <span class="dot"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span>
+            <span class="dot off"></span><span class="dot"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot"></span>
+            <span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot off"></span>
+            <span class="dot"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span><span class="dot off"></span><span class="dot"></span>
+          </div>
+        </div>
+        <span class="exlabel">smooth shader → discrete tiles</span>
+      </div>
+      <div class="caption">Grid off vs on</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Pixel Grid On/Off + Snap to dither</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">pixelGrid.enabled · pixelGrid.snap</div>
+      <p><strong>On</strong> masks the shader through a tile grid — the mosaic identity. <strong>Snap</strong> axis-aligns the dither and locks one dot per tile for crisp edges. Important nuance discovered in testing: <strong>snap flattens scene motion in Color/alpha mode</strong> (dots lock to grid, so drift/scan only flip tiles on/off). Turn snap <em>off</em> when you want scenes to visibly flow in Color/alpha.</p>
+      <div class="range"><span><b>Grid</b> on/off · Core</span><span><b>Snap</b> on/off · Core (with caveat)</span></div>
+    </div>
+  </div>
+
+  <!-- Tile size / divide / gap / radius -->
+  <div class="ctrl wide-example">
+    <div>
+      <div class="example">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:82%;height:78%">
+          <span style="background:var(--pink);border-radius:0"></span><span style="background:var(--pink);border-radius:3px"></span><span style="background:var(--pink);border-radius:50%"></span>
+          <span style="background:var(--pink);border-radius:0"></span><span style="background:var(--pink);border-radius:3px"></span><span style="background:var(--pink);border-radius:50%"></span>
+        </div>
+        <span class="exlabel">radius 0 → 40 · square to dot</span>
+      </div>
+      <div class="caption">Tile geometry</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Tile Size · Divide into · Gap · Corner Radius</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">cell · divisions · gap · radius</div>
+      <p>The tile geometry. <strong>Tile Size</strong> is the master pitch; <strong>Divide into</strong> splits each tile into N pieces; <strong>Gap</strong> is the grout between pieces; <strong>Corner Radius</strong> takes tiles from sharp squares (0) to full dots (40). Together these define whether the field reads as pixels, LEDs, or dots — the highest-leverage look controls in the lab.</p>
+      <div class="range"><span><b>Tile</b> 8–160px</span><span><b>Divide</b> 1–8</span><span><b>Gap</b> 0–pitch</span><span><b>Radius</b> 0–40px</span></div>
+    </div>
+  </div>
+
+  <!-- Align X/Y -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="position:relative;width:80%;height:76%;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#0a1714">
+          <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(6,1fr);gap:3px;padding:4px;transform:translate(3px,3px)">
+            <span class="dot dim"></span><span class="dot dim"></span><span class="dot dim"></span><span class="dot dim"></span><span class="dot dim"></span><span class="dot dim"></span>
+            <span class="dot dim"></span><span class="dot dim"></span><span class="dot dim"></span><span class="dot dim"></span><span class="dot dim"></span><span class="dot dim"></span>
+          </div>
+        </div>
+        <span class="exlabel">phase-nudge the grid onto the dots</span>
+      </div>
+      <div class="caption">Align X / Y</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Align X / Y</h3><span class="verdict v-situ">Situational</span></div>
+      <div class="path">alignX · alignY</div>
+      <p>Sub-pitch phase nudges to lock the tile grid precisely onto the dither dots (avoids sliver artifacts). A fine-tuning tool for perfectionists — real, but almost never needed once snap is doing its job.</p>
+      <div class="range"><span><b>Range</b> 0–pitch px</span><span><b>Shown</b> snap on</span></div>
+    </div>
+  </div>
+
+  <!-- Tile animation (the big lever) -->
+  <div class="ctrl wide-example">
+    <div>
+      <div class="example">
+        <div style="display:flex;width:92%;height:80%;gap:6px">
+          <div style="flex:1;border-radius:5px;border:1px solid var(--line);background:#0a1714;display:grid;grid-template-columns:repeat(4,1fr);gap:3px;padding:5px;place-content:center">
+            <span class="dot"></span><span class="dot dim"></span><span class="dot"></span><span class="dot dim"></span><span class="dot dim"></span><span class="dot"></span><span class="dot dim"></span><span class="dot"></span></div>
+          <div style="flex:1;border-radius:5px;border:1px solid var(--line);background:#0a1714;display:grid;grid-template-columns:repeat(4,1fr);gap:3px;padding:5px;place-content:center;align-items:center;justify-items:center">
+            <i class="dot" style="width:9px;height:9px"></i><i class="dot" style="width:5px;height:5px"></i><i class="dot" style="width:7px;height:7px"></i><i class="dot" style="width:4px;height:4px"></i><i class="dot" style="width:5px;height:5px"></i><i class="dot" style="width:9px;height:9px"></i><i class="dot" style="width:4px;height:4px"></i><i class="dot" style="width:7px;height:7px"></i></div>
+          <div style="flex:1;border-radius:5px;border:1px solid var(--line);background:#0a1714;display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:5px;place-content:center;align-items:center;justify-items:center">
+            <i class="dot" style="width:8px;height:8px;border-radius:50%"></i><i class="dot" style="width:4px;height:4px;border-radius:50%"></i><i class="dot" style="width:6px;height:6px;border-radius:50%"></i><i class="dot" style="width:9px;height:9px;border-radius:50%"></i><i class="dot" style="width:3px;height:3px;border-radius:50%"></i><i class="dot" style="width:7px;height:7px;border-radius:50%"></i><i class="dot" style="width:5px;height:5px;border-radius:50%"></i><i class="dot" style="width:8px;height:8px;border-radius:50%"></i></div>
+        </div>
+        <span class="exlabel">Color/alpha · Mask size · Point sizes</span>
+      </div>
+      <div class="caption">Tile animation — 3 renderers</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Tile Animation (Color/alpha · Mask size · Point sizes)</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">animation.tileDisplay + tileSizeSpread · tileSizeSpeed · tileSizeNoise</div>
+      <p>The single biggest visual lever after the grid itself — three completely different renderers. <strong>Color/alpha</strong>: tiles change color/opacity (WebGL dither). <strong>Mask size</strong>: shader masked by animated tile sizes. <strong>Point sizes</strong>: dots drawn directly, breathing in size — the most dramatic and scene-distinct. Note: this control is <strong>duplicated</strong> in the Animation group (see Cuts).</p>
+      <div class="range"><span><b>Modes</b> 3</span><span><b>Spread</b> 0–1</span><span><b>Speed</b> 0.02–0.3 Hz</span><span><b>Map scale</b> 0.4–3</span></div>
+    </div>
+  </div>
+
+  <!-- Multi-color (redundant) -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div class="dotfield" style="grid-template-columns:repeat(7,1fr);--dg:4px">
+          <span class="dot o"></span><span class="dot" style="background:#ffb800"></span><span class="dot" style="background:#9b59b6"></span><span class="dot o"></span><span class="dot" style="background:#ffb800"></span><span class="dot" style="background:#9b59b6"></span><span class="dot o"></span>
+          <span class="dot" style="background:#ffb800"></span><span class="dot" style="background:#9b59b6"></span><span class="dot o"></span><span class="dot" style="background:#ffb800"></span><span class="dot" style="background:#9b59b6"></span><span class="dot o"></span><span class="dot" style="background:#ffb800"></span>
+        </div>
+        <span class="exlabel">extra color layers — Alpha Layers already do this</span>
+      </div>
+      <div class="caption">Multi-color</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Multi-Color</h3><span class="verdict v-redun">Redundant</span></div>
+      <div class="path">multiColor.enabled · colors · layerSpread · blend</div>
+      <p>Adds extra stacked color layers with organic offsets. The problem: <strong>Alpha Layers already provide three independent colors and shapes</strong> with more control. Multi-Color is a second, weaker path to the same outcome — a strong candidate to remove or fold into Alpha Layers.</p>
+      <div class="range"><span><b>Colors</b> 3</span><span><b>Spread</b> 0.02–0.5</span><span><b>Blend</b> 4 modes</span><span><b>Overlaps</b> Alpha Layers</span></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══════════════ SECTION EDGE ═══════════════ -->
+<section id="edge"><div class="wrap">
+  <div class="grouphead"><h2>Section Edge</h2><span class="tag g-edge">Field ↔ text</span></div>
+  <p class="groupsub">How the dot field meets the copy below it. Six modes, from a hard cut to shapes flowing all the way around every text line. This group is where the hero stops being a background and becomes a layout.</p>
+
+  <div class="ctrl wide-example">
+    <div>
+      <div class="example tall">
+        <div style="width:88%;height:84%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px">
+          <div style="border:1px solid var(--line);border-radius:5px;overflow:hidden;background:#0a1714;position:relative"><div style="position:absolute;inset:0 0 55% 0;background:repeating-linear-gradient(0deg,var(--pink) 0 2px,transparent 2px 5px)"></div><span style="position:absolute;bottom:3px;left:4px;font-family:var(--mono);font-size:8px;color:var(--muted)">Sharp</span></div>
+          <div style="border:1px solid var(--line);border-radius:5px;overflow:hidden;background:#0a1714;position:relative"><div style="position:absolute;inset:0 0 45% 0;background:repeating-linear-gradient(0deg,var(--pink) 0 2px,transparent 2px 5px);-webkit-mask:linear-gradient(#000,transparent);mask:linear-gradient(#000,transparent)"></div><span style="position:absolute;bottom:3px;left:4px;font-family:var(--mono);font-size:8px;color:var(--muted)">Fade</span></div>
+          <div style="border:1px solid var(--line);border-radius:5px;overflow:hidden;background:#0a1714;position:relative"><div style="position:absolute;inset:0 0 50% 0;background:repeating-linear-gradient(0deg,var(--pink) 0 2px,transparent 2px 5px);clip-path:polygon(0 0,100% 0,100% 70%,85% 55%,70% 75%,55% 55%,40% 78%,25% 58%,10% 76%,0 60%)"></div><span style="position:absolute;bottom:3px;left:4px;font-family:var(--mono);font-size:8px;color:var(--muted)">Ripple</span></div>
+          <div style="border:1px solid var(--line);border-radius:5px;overflow:hidden;background:#0a1714;position:relative;display:grid;grid-template-columns:repeat(6,1fr);gap:2px;padding:4px;align-content:start"><span class="dot" style="height:5px"></span><span class="dot" style="height:5px"></span><span class="dot off" style="height:5px"></span><span class="dot" style="height:5px"></span><span class="dot" style="height:5px"></span><span class="dot off" style="height:5px"></span><span class="dot" style="height:5px"></span><span class="dot off" style="height:5px"></span><span class="dot" style="height:5px"></span><span class="dot off" style="height:5px"></span><span class="dot off" style="height:5px"></span><span class="dot" style="height:5px"></span><span class="dot off" style="height:5px"></span><span class="dot off" style="height:5px"></span><span class="dot off" style="height:5px"></span><span class="dot" style="height:5px"></span><span class="dot off" style="height:5px"></span><span class="dot off" style="height:5px"></span><span style="position:absolute;bottom:3px;left:4px;font-family:var(--mono);font-size:8px;color:var(--muted)">Dissolve</span></div>
+        </div>
+        <span class="exlabel">6 modes: Full · Ripple · Dissolve · Sharp · Fade · Overlap</span>
+      </div>
+      <div class="caption">Edge modes</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Edge Mode + Position + Top start</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">edge.mode · position · topInset</div>
+      <p><strong>Mode</strong> chooses the field↔text transition: <strong>Sharp</strong> (hard line), <strong>Fade</strong> (gradient), <strong>Ripple</strong> (wave edge), <strong>Dissolve</strong> (tiles scatter out), <strong>Overlap</strong> (extends past), <strong>Full</strong> (fills everything, flows around text). <strong>Position</strong> sets where it meets the copy; <strong>Top start</strong> clears the fixed header. Core layout controls.</p>
+      <div class="range"><span><b>Modes</b> 6</span><span><b>Position</b> 30–95%</span><span><b>Top start</b> 0–160px</span></div>
+    </div>
+  </div>
+
+  <!-- Full / scene-behind-text -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="position:relative;width:86%;height:80%;border-radius:6px;overflow:hidden;background:#0a1714;border:1px solid var(--line);display:grid;grid-template-columns:repeat(9,1fr);gap:3px;padding:6px;align-content:center">
+          <span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span>
+          <span class="dot" style="height:6px"></span><span class="dot off" style="height:6px"></span><span class="dot off" style="height:6px"></span><span class="dot off" style="height:6px"></span><span class="dot off" style="height:6px"></span><span class="dot off" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span>
+          <span class="dot" style="height:6px"></span><span class="dot off" style="height:6px"></span><span class="dot off" style="height:6px"></span><span class="dot off" style="height:6px"></span><span class="dot off" style="height:6px"></span><span class="dot off" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span>
+          <span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span>
+          <span style="position:absolute;left:14%;top:38%;font-family:var(--mono);font-size:10px;color:var(--ink)">headline</span>
+        </div>
+        <span class="exlabel">whole tiles cleared around text</span>
+      </div>
+      <div class="caption">Full · Scene behind text</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Full mode &amp; Scene-behind-text</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">fullPadding · textRectMode · textPadding · shaderExtend · dissolveDepth · textBlendMotion/Speed</div>
+      <p>The most sophisticated part of the group. Shapes fill the whole hero and flow around every text block — <strong>whole tiles only, never cut</strong>. <strong>Text clearance</strong> sets the keep-out zone; <strong>Clearance follows</strong> toggles per-line hugging vs. block box; the <strong>rim</strong> controls dissolve the boundary. Works in any edge mode via "Scene behind text."</p>
+      <div class="range"><span><b>Clearance</b> 0–96px</span><span><b>Follows</b> lines / box</span><span><b>Rim depth</b> 1–20 rows</span><span><b>Extend</b> 0–600px</span></div>
+    </div>
+  </div>
+
+  <!-- Ripple params -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="width:86%;height:60%;position:relative;overflow:hidden">
+          <svg viewBox="0 0 200 80" style="width:100%;height:100%"><path d="M0,40 Q25,10 50,40 T100,40 T150,40 T200,40" fill="none" stroke="var(--pink)" stroke-width="3"/></svg>
+        </div>
+        <span class="exlabel">amplitude · frequency · speed</span>
+      </div>
+      <div class="caption">Ripple edge</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Ripple params</h3><span class="verdict v-situ">Situational</span></div>
+      <div class="path">rippleAmplitude · rippleFrequency · rippleSpeed · rippleDither · ripplePixelate</div>
+      <p>Only relevant when Ripple edge mode is picked. <strong>Amplitude/Frequency/Speed</strong> shape the wave; <strong>Dither edge</strong> and <strong>Pixelate</strong> control whether the wave dissolves into scattered tiles or steps as a blocky tile-wave. A rich but mode-locked sub-panel.</p>
+      <div class="range"><span><b>Amplitude</b> 1–15vh</span><span><b>Frequency</b> 2–20</span><span><b>Speed</b> 0–3</span></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══════════════ ANIMATION ═══════════════ -->
+<section id="anim"><div class="wrap">
+  <div class="grouphead"><h2>Animation</h2><span class="tag g-anim">Motion</span></div>
+  <p class="groupsub">Scenes drive motion only — drift, pulse, scan, breathing, loop-break — while shapes, grid, and colors stay as you set them. A scene is a curated preset over the raw fine-tune levers below it.</p>
+
+  <!-- Scenes -->
+  <div class="ctrl wide-example">
+    <div>
+      <div class="example">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;width:92%;height:82%;font-family:var(--mono);font-size:8px;color:var(--muted)">
+          <span style="border:1px solid var(--line);border-radius:4px;display:grid;place-items:center;background:#0a1714">Orbit</span>
+          <span style="border:1px solid var(--line);border-radius:4px;display:grid;place-items:center;background:#0a1714">Breathe</span>
+          <span style="border:1px solid var(--line);border-radius:4px;display:grid;place-items:center;background:#0a1714">Radar</span>
+          <span style="border:1px solid var(--line);border-radius:4px;display:grid;place-items:center;background:#0a1714">Falling</span>
+          <span style="border:1px solid var(--line);border-radius:4px;display:grid;place-items:center;background:#0a1714">Sweep</span>
+          <span style="border:1px solid var(--line);border-radius:4px;display:grid;place-items:center;background:#0a1714">Living</span>
+          <span style="border:1px solid var(--line);border-radius:4px;display:grid;place-items:center;background:#0a1714;color:var(--sky)">+5</span>
+          <span style="border:1px solid var(--line);border-radius:4px;display:grid;place-items:center;background:#0a1714">Classic</span>
+        </div>
+        <span class="exlabel">11 motion presets</span>
+      </div>
+      <div class="caption">Scene templates</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Scene templates (×11) + Playing</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">activeScene · animation.playing</div>
+      <p>Eleven curated motion presets: Orbit, Breathe, Color Flow, Gentle Drift, Living, Falling, Sweep, Radar, Error Sweep, Breath, Classic. Each is a motion-only overlay. Strong system — but there's real <strong>overlap</strong>: Orbit/Living both rotate, Breathe/Breath both gap-pulse, Color Flow/Gentle Drift both drift+cycle. Could consolidate ~11 → 7 without losing range.</p>
+      <div class="range"><span><b>Presets</b> 11</span><span><b>Playing</b> toggle</span><span><b>Contract</b> motion-only</span></div>
+    </div>
+  </div>
+
+  <!-- Break loop -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="width:70%;height:70%;position:relative">
+          <svg viewBox="0 0 100 100" style="width:100%;height:100%"><circle cx="50" cy="50" r="34" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="50" cy="50" r="34" fill="none" stroke="var(--sky)" stroke-width="3" stroke-dasharray="40 200" stroke-linecap="round"/><circle cx="84" cy="50" r="4" fill="var(--pink)"/></svg>
+        </div>
+        <span class="exlabel">never-repeating drift overlay</span>
+      </div>
+      <div class="caption">Break Loop</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Break Loop + Amount</h3><span class="verdict v-situ">Situational</span></div>
+      <div class="path">loopBreak · loopBreakAmount</div>
+      <p>Layers a non-repeating drift on top of the scene so the motion never visibly loops: <strong>Rotate, Drift, Orbit, Wander,</strong> or Off. A nice "never obvious it's a loop" polish, but a secondary refinement rather than a headline control.</p>
+      <div class="range"><span><b>Modes</b> 5</span><span><b>Amount</b> 0.1–2×</span></div>
+    </div>
+  </div>
+
+  <!-- Fine-tune -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="width:84%;display:flex;flex-direction:column;gap:7px">
+          <div style="height:5px;border-radius:3px;background:linear-gradient(90deg,var(--sky),transparent)"></div>
+          <div style="height:5px;border-radius:3px;background:linear-gradient(90deg,var(--sky),transparent);width:70%"></div>
+          <div style="height:5px;border-radius:3px;background:linear-gradient(90deg,var(--sky),transparent);width:50%"></div>
+          <div style="height:5px;border-radius:3px;background:linear-gradient(90deg,var(--sky),transparent);width:85%"></div>
+        </div>
+        <span class="exlabel">scan · drift · pulse · wave · gap</span>
+      </div>
+      <div class="caption">Fine-tune</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Fine-tune animation (raw levers)</h3><span class="verdict v-situ">Power-user</span></div>
+      <div class="path">scanMode/Amplitude/Speed/Angle · driftX/Y · rotationDrift · pulseAmount/Speed · waveAmplitude/Speed/Angle · gapPulse/Speed</div>
+      <p>The raw motion parameters the scene presets are built from — scan (oscillate), drift (continuous), rotation, pulse, wave sweep, and gap-pulse breathing. Genuinely powerful for authoring new looks, and correctly tucked behind a fold. Keep, but this is expert territory, not everyday.</p>
+      <div class="range"><span><b>Levers</b> ~13</span><span><b>Behind</b> fold</span><span><b>Feeds</b> scene presets</span></div>
+    </div>
+  </div>
+
+  <!-- Duplicate tile anim -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="width:80%;height:70%;display:grid;place-items:center;text-align:center;color:var(--redun);font-family:var(--mono);font-size:11px;line-height:1.5">appears in<br>Pixel Grid too</div>
+        <span class="exlabel">same 3 modes, second location</span>
+      </div>
+      <div class="caption">Tile animation (dup)</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Tile Animation (duplicate)</h3><span class="verdict v-redun">Redundant</span></div>
+      <div class="path">animation.tileDisplay + size params (again)</div>
+      <p>The exact same Color/alpha · Mask size · Point sizes control (plus size spread/speed/map scale) is rendered <strong>a second time</strong> here, having already appeared in Pixel Grid. One instance should be removed — pick the home that reads best and delete the other.</p>
+      <div class="range"><span><b>Status</b> duplicate of Pixel Grid</span></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══════════════ HOVER ═══════════════ -->
+<section id="hover"><div class="wrap">
+  <div class="grouphead"><h2>Hover</h2><span class="tag g-hover">Interaction</span></div>
+  <p class="groupsub">What happens under the cursor — the signature "peek the other state" interaction. This is where the hero earns its keep as an interactive piece rather than a static background.</p>
+
+  <!-- Mode -->
+  <div class="ctrl wide-example">
+    <div>
+      <div class="example">
+        <div style="position:relative;width:88%;height:80%;border-radius:6px;overflow:hidden;background:#0a1714;border:1px solid var(--line);display:grid;grid-template-columns:repeat(9,1fr);gap:3px;padding:6px;align-content:center">
+          <span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span>
+          <span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot g" style="height:6px"></span><span class="dot g" style="height:6px"></span><span class="dot g" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span>
+          <span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot g" style="height:6px"></span><span class="dot g" style="height:6px;border-radius:50%"></span><span class="dot g" style="height:6px;border-radius:50%"></span><span class="dot g" style="height:6px;border-radius:50%"></span><span class="dot g" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span>
+          <span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot g" style="height:6px"></span><span class="dot g" style="height:6px"></span><span class="dot g" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span><span class="dot" style="height:6px"></span>
+        </div>
+        <span class="exlabel">green fix peeks through the pink field</span>
+      </div>
+      <div class="caption">Warp-reveal (signature)</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Hover Mode + Warp-reveal</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">hover.mode · warpRotate/Round/Scale/Jitter · warpRevealEnabled · warpErrorText</div>
+      <p>Four modes — <strong>Recolor, Reveal, Warp, Overlay</strong>. Warp is the signature: pixel-grid tiles rotate/round in the hover region and <strong>reveal the opposite state</strong> through them, with log-fragment error text surfacing below the cursor. This interaction <em>is</em> the product story. Recolor/Overlay are lighter alternatives.</p>
+      <div class="range"><span><b>Modes</b> 4</span><span><b>Warp</b> rotate/round/size/spread</span><span><b>Reveal</b> + error text</span></div>
+    </div>
+  </div>
+
+  <!-- Trigger + area -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:44px;height:44px;border:2px solid var(--amber);border-radius:3px"></div>
+          <div style="width:44px;height:44px;border:2px solid var(--amber);border-radius:50%"></div>
+          <div style="width:44px;height:44px;position:relative"><div style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,var(--amber) 0 4px,transparent 4px 8px),repeating-linear-gradient(90deg,var(--amber) 0 4px,transparent 4px 8px);-webkit-mask:radial-gradient(circle,#000 60%,transparent 62%);mask:radial-gradient(circle,#000 60%,transparent 62%);opacity:.7"></div></div>
+        </div>
+        <span class="exlabel">square · circle · pixel-circle</span>
+      </div>
+      <div class="caption">Trigger &amp; area</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Trigger + Hover Area</h3><span class="verdict v-situ">Situational</span></div>
+      <div class="path">trigger · hoverShape · dwellSpeed · dwellFadeBack</div>
+      <p><strong>Trigger</strong>: Instant (fixed radius follows cursor) or Dwell (grows over time into a full takeover). <strong>Hover Area</strong>: square, circle, or pixel-circle (staircased whole tiles). Real expressive range for the interaction's feel, but secondary to the mode choice.</p>
+      <div class="range"><span><b>Trigger</b> instant / dwell</span><span><b>Area</b> 3 shapes</span><span><b>Growth</b> 50–1000 px/s</span></div>
+    </div>
+  </div>
+
+  <!-- Mask -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="width:60%;height:60%;border-radius:50%;background:radial-gradient(circle,color-mix(in oklch,var(--amber) 40%,transparent),transparent 70%);border:1px dashed var(--amber)"></div>
+        <span class="exlabel">radius · dynamic size · mouse influence</span>
+      </div>
+      <div class="caption">Mask</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Mask (Radius · Dynamic Size · Mouse Influence)</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">radius · radiusY · dynamicSize · mouseInfluence</div>
+      <p>Sizing of the hover region. <strong>Radius</strong> (and Height for rectangular) sets reach; <strong>Dynamic Size</strong> scales it with cursor velocity; <strong>Mouse Influence</strong> sets how much the pattern origin follows the cursor. Core to how responsive the interaction feels.</p>
+      <div class="range"><span><b>Radius</b> 20–1600px</span><span><b>Influence</b> 0–1</span><span><b>Dynamic</b> on/off</span></div>
+    </div>
+  </div>
+
+  <!-- Haptics (dead on desktop) -->
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="width:80%;height:70%;display:grid;place-items:center;text-align:center;color:var(--dead);font-family:var(--mono);font-size:11px;line-height:1.5">touch devices<br>only</div>
+        <span class="exlabel">no effect on a desktop showcase</span>
+      </div>
+      <div class="caption">Haptics</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Haptics</h3><span class="verdict v-dead">Dead (desktop)</span></div>
+      <div class="path">haptic.enabled · tickDistance · patterns · dwellTickPercent</div>
+      <p>Web-vibration feedback on hover/dwell/movement — genuinely nice on a phone, but <strong>inert on the desktop showcase</strong> this taxonomy targets, and it's a deep sub-panel (7 preset pickers). Recommend collapsing behind a "Touch" fold or hiding when no vibration API is present.</p>
+      <div class="range"><span><b>Presets</b> 7 patterns</span><span><b>Platform</b> touch only</span></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══════════════ CHROME ═══════════════ -->
+<section id="chrome"><div class="wrap">
+  <div class="grouphead"><h2>Page Chrome</h2><span class="tag g-chrome">Header · buttons · layout</span></div>
+  <p class="groupsub">The non-shader parts of the hero that still belong in scope: the header background, CTA styling, and the copy grid. (Typography proper is excluded from this pass.)</p>
+
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="display:flex;flex-direction:column;gap:10px;width:80%">
+          <span style="padding:6px 14px;border-radius:0;background:var(--green);color:#04110c;font-family:var(--mono);font-size:10px;font-weight:600;text-align:center;letter-spacing:.08em">SQUARE · CAPS</span>
+          <span style="padding:6px 14px;border-radius:8px;background:var(--green);color:#04110c;font-family:var(--mono);font-size:10px;font-weight:600;text-align:center">Rounded</span>
+          <span style="padding:6px 14px;border-radius:999px;background:var(--green);color:#04110c;font-family:var(--mono);font-size:10px;font-weight:600;text-align:center">Pill</span>
+        </div>
+      </div>
+      <div class="caption">Button styling</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Buttons + Header</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">button.radius · button.uppercase · headerBg</div>
+      <p><strong>Buttons</strong>: shared corner-radius (Square/Rounded/Pill) and uppercase toggle across all header and hero CTAs — a small control with big brand reach (the square+caps set echoes the pixel tiles). <strong>Header</strong>: transparent vs. solid background. Both recently added and pulling their weight.</p>
+      <div class="range"><span><b>Radius</b> 0–999px</span><span><b>Caps</b> on/off</span><span><b>Header</b> transparent / solid</span></div>
+    </div>
+  </div>
+
+  <div class="ctrl">
+    <div>
+      <div class="example">
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:6px;width:82%;height:70%">
+          <div style="border:1px solid var(--green);border-radius:4px;background:color-mix(in oklch,var(--green) 10%,transparent)"></div>
+          <div style="border:1px solid var(--pink);border-radius:4px;background:color-mix(in oklch,var(--pink) 10%,transparent)"></div>
+        </div>
+        <span class="exlabel">headline cols ↔ response cols</span>
+      </div>
+      <div class="caption">Layout grid</div>
+    </div>
+    <div class="meta">
+      <div class="rowtop"><h3>Layout (Cols · Gutter · Baselines)</h3><span class="verdict v-core">Core</span></div>
+      <div class="path">layout.headlineCols · responseCols · gutter · showBaselines</div>
+      <p>The 12-column copy split — headline vs. response width, the gutter between them, and a magenta baseline-guide overlay for alignment checks. Directly shapes the hero composition; the baseline overlay is a build-time aid (could live under a "debug" affordance).</p>
+      <div class="range"><span><b>Headline</b> 3–10 cols</span><span><b>Gutter</b> 0–64px</span><span><b>Baselines</b> debug toggle</span></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══════════════ VERDICT ═══════════════ -->
+<section id="verdict"><div class="wrap">
+  <div class="grouphead"><h2>Cuts &amp; power verdict</h2></div>
+  <p class="groupsub">The actionable takeaways: what to retire, and where the real strength of the system lives.</p>
+
+  <div class="callout">
+    <h3>▶ Recommended cuts — the fastest way to simplify</h3>
+    <p>Nine controls add surface without adding reach. Removing or folding them would make the panel noticeably calmer with zero loss of expressive range.</p>
+  </div>
+
+  <div class="cols" style="margin-top:20px">
+    <div class="card cut">
+      <h3>Remove / fold</h3>
+      <ul>
+        <li><b>Tile Animation (duplicate)</b> — same control in both Pixel Grid and Animation; keep one.</li>
+        <li><b>Multi-Color</b> — Alpha Layers already give 3 colors + shapes with more control.</li>
+        <li><b>Cell Size</b> — inert while Pixel Grid is on (always). Hide when grid enabled.</li>
+        <li><b>Frame scrubber</b> — manual still-frame; no place in a live playground.</li>
+        <li><b>World Width / Height</b> — pattern aspect; niche to the point of unused.</li>
+      </ul>
+    </div>
+    <div class="card cut">
+      <h3>Collapse / gate</h3>
+      <ul>
+        <li><b>Haptics</b> — touch-only; hide or fold behind a "Touch" section on desktop.</li>
+        <li><b>Scene presets</b> — 11 → ~7; merge Orbit/Living, Breathe/Breath, Color&nbsp;Flow/Gentle&nbsp;Drift.</li>
+        <li><b>Baseline guides</b> — a debug aid; move under a debug affordance.</li>
+        <li><b>Fit / Rotation / Offset / Origin</b> — keep, but fold into an "advanced sizing" group.</li>
+      </ul>
+    </div>
+    <div class="card core">
+      <h3>The load-bearing spine</h3>
+      <ul>
+        <li><b>Initial State</b> — the Problem ⇄ Fix premise the whole hero rests on.</li>
+        <li><b>Pixel Grid</b> geometry — tile size, divide, gap, radius: the mosaic identity.</li>
+        <li><b>Tile Animation modes</b> — three renderers; the biggest look lever after the grid.</li>
+        <li><b>Section Edge</b> — six modes + scene-behind-text; turns background into layout.</li>
+        <li><b>Hover warp-reveal</b> — the signature "peek the other state" interaction.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cols" style="margin-top:16px">
+    <div class="card">
+      <h3 style="color:var(--sky)">Where the power really is</h3>
+      <ul>
+        <li>Any <b>look</b> (grid geometry + tile mode + colors) composes freely with any <b>motion</b> (scene) and any <b>edge treatment</b> — three orthogonal axes multiply into a very large design space.</li>
+        <li>The <b>same config</b> drives desktop, tablet and mobile live-synced, so every combination is verified responsive by construction.</li>
+        <li>The <b>hover warp-reveal + error text</b> is a genuinely distinctive interaction few devtool heroes have — this is the showcase moment.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--situ)">One sharp edge to remember</h3>
+      <ul>
+        <li><b>Snap + Color/alpha</b> flattens scene motion — dots lock to the grid, so drift/scan only twinkle. For visible scene motion in Color/alpha, turn snap <b>off</b>; for crisp static grids, keep it on. This single interaction caused most of the "scenes don't do anything" confusion.</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+</div><!-- /panel-taxonomy -->
+
+<!-- ═══════════════ LAYER STACK ═══════════════ -->
+<div id="panel-stack" class="tabpanel">
+  <section><div class="wrap">
+    <div class="grouphead"><h2>Layer stack</h2><span class="tag g-grid">Live composite</span></div>
+    <p class="groupsub">The hero is a stack of compositing layers. Toggle each one to watch its exact contribution to the final image — this is how the panel's controls translate into pixels. The render is a faithful canvas approximation of the real dither pipeline (motion runs so you can read each layer).</p>
+
+    <div class="playbar">
+      <button class="playbtn" id="stack-play">❚❚ Pause</button>
+      <span class="playhint">Toggle layers on the right. Each adds one stage of the real render pipeline.</span>
+    </div>
+
+    <div class="stack-wrap">
+      <div class="stage">
+        <canvas id="stack-canvas"></canvas>
+        <span class="stagelabel" id="stack-label">full stack</span>
+      </div>
+      <div class="layerlist" id="stack-layers">
+        <h3>Compositing order</h3>
+        <!-- layers injected by script -->
+      </div>
+    </div>
+  </div></section>
+</div><!-- /panel-stack -->
+
+<!-- ═══════════════ SCENE REEL ═══════════════ -->
+<div id="panel-scenes" class="tabpanel">
+  <section><div class="wrap">
+    <div class="grouphead"><h2>Scene reel</h2><span class="tag g-anim">Real preview</span></div>
+    <p class="groupsub">Every motion preset rendered by the <strong>real hero</strong> — same-origin live previews, not approximations. Use the controls to check each scene across the variations that matter: grid on/off, resting state, and renderer. Verdicts flag the three that overlap enough to merge.</p>
+
+    <div class="reel-controls" id="reel-controls">
+      <div class="rc-group"><span class="rc-label">Grid</span>
+        <button class="rc-btn is-on" data-k="grid" data-v="1">On</button>
+        <button class="rc-btn" data-k="grid" data-v="0">Off</button>
+      </div>
+      <div class="rc-group"><span class="rc-label">State</span>
+        <button class="rc-btn is-on" data-k="state" data-v="problem">Problem</button>
+        <button class="rc-btn" data-k="state" data-v="fix">Fix</button>
+      </div>
+      <div class="rc-group"><span class="rc-label">Renderer</span>
+        <button class="rc-btn is-on" data-k="tile" data-v="points">Point sizes</button>
+        <button class="rc-btn" data-k="tile" data-v="color">Color / alpha</button>
+      </div>
+      <span class="playhint" id="reel-hint">Real hero · points renderer (canvas). Switch to Color/alpha for the genuine Paper shader (heavier — WebGL).</span>
+    </div>
+
+    <div class="scene-grid" id="scene-grid">
+      <!-- real preview cards injected by script -->
+    </div>
+  </div></section>
+</div><!-- /panel-scenes -->
+</main>
+
+<footer><div class="wrap">
+  Hero Lab — Design Panel taxonomy · static diagrams + live canvas approximations · typography controls excluded from this pass
+</div></footer>
+
+<script>
+(() => {
+  "use strict";
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ── value noise ── */
+  function hash(x, y, s) {
+    const n = Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453;
+    return n - Math.floor(n);
+  }
+  function vnoise(x, y, t) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const s = Math.floor(t), tf = t - s;
+    const g = (sx) => {
+      const a = hash(xi, yi, sx), b = hash(xi + 1, yi, sx), c = hash(xi, yi + 1, sx), d = hash(xi + 1, yi + 1, sx);
+      return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+    };
+    return g(s) * (1 - tf) + g(s + 1) * tf;
+  }
+
+  const PINK = "#e6307a", ORANGE = "#ff6b2b", MAGENTA = "#ff3366", GREEN = "#2dd4a8";
+  const PALETTE = [PINK, ORANGE, MAGENTA];
+
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /* Faithful-enough dot-field renderer.
+     cfg: pitch, gap, radius, alpha(multi-color), points(size-vary), grid(square tiles),
+          edge(dissolve bottom), hover(green disc), churn, driftX, driftY, breatheAmp,
+          breatheSpeed, scanAmp, scanSpeed, scanAngle(rad), waveAmp, waveSpeed, colorCycle */
+  function drawField(cv, t, cfg) {
+    const ctx = cv.getContext("2d");
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#0a1714";
+    ctx.fillRect(0, 0, W, H);
+    const pitch = cfg.pitch;
+    const gap = cfg.grid ? cfg.gap : 1;
+    const cols = Math.ceil(W / pitch), rows = Math.ceil(H / pitch);
+    const scan = cfg.scanAmp ? cfg.scanAmp * Math.sin(t * cfg.scanSpeed * Math.PI * 2) : 0;
+    const wave = cfg.waveAmp ? cfg.waveAmp * Math.sin(t * cfg.waveSpeed * Math.PI * 2) : 0;
+    const flowX = (cfg.driftX || 0) * t * 5 + scan * Math.cos(cfg.scanAngle || 0);
+    const flowY = (cfg.driftY || 0) * t * 5 + wave + scan * Math.sin(cfg.scanAngle || 0);
+    const breathe = cfg.breatheAmp ? (0.5 + 0.5 * Math.sin(t * (cfg.breatheSpeed || 0.1) * Math.PI * 2)) : 0;
+    const cx = cols * 0.5, cy = rows * 0.45, hoverR2 = (cols * 0.15) ** 2;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const nx = c + flowX, ny = r + flowY;
+        const n = vnoise(nx * 0.3, ny * 0.3, t * (cfg.churn || 0.15));
+        // edge dissolve near the bottom
+        if (cfg.edge) {
+          const es = rows * 0.62;
+          if (r > es) { const g2 = (r - es) / (rows - es); if (hash(c, r, 7) < g2) continue; }
+        }
+        const lit = cfg.points ? true : n > 0.44;
+        if (!lit) continue;
+        let size = pitch - gap;
+        if (cfg.points) {
+          const sv = vnoise(nx * 0.26 + 7, ny * 0.26 - 3, t * (cfg.churn || 0.15));
+          let bs = 1;
+          if (cfg.breatheAmp) bs = 1 - cfg.breatheAmp * 0.5 * (1 - breathe);
+          size = (pitch - gap) * (0.28 + 0.72 * sv) * bs;
+        } else if (cfg.breatheAmp) {
+          size = (pitch - gap) * (1 - cfg.breatheAmp * 0.45 * (1 - breathe));
+        }
+        if (size < 0.6) continue;
+        let color;
+        if (cfg.alpha) {
+          let ci = Math.floor(hash(c, r, 701) * PALETTE.length + (cfg.colorCycle ? t * cfg.colorCycle : 0));
+          ci = ((ci % PALETTE.length) + PALETTE.length) % PALETTE.length;
+          color = PALETTE[ci];
+        } else {
+          color = PINK;
+        }
+        if (cfg.hover) {
+          const dx = c - cx, dy = r - cy;
+          if (dx * dx + dy * dy < hoverR2) color = GREEN;
+        }
+        const px = c * pitch + (pitch - size) / 2;
+        const py = r * pitch + (pitch - size) / 2;
+        ctx.globalAlpha = Math.max(0.18, Math.min(0.95, 0.4 + 0.6 * n));
+        ctx.fillStyle = color;
+        const rad = cfg.grid ? cfg.radius : Math.min(size / 2, pitch * 0.5);
+        if (rad > 0.5) roundRect(ctx, px, py, size, size, rad);
+        else ctx.fillRect(px, py, size, size);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function fitCanvas(cv, cssH) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = cv.clientWidth || cv.parentElement.clientWidth;
+    cv.width = Math.max(1, Math.round(w * dpr));
+    cv.height = Math.max(1, Math.round((cssH || w * 0.5) * dpr));
+    cv.style.height = (cssH || w * 0.5) + "px";
+  }
+
+  /* ── Layer stack ── */
+  const LAYERS = [
+    { key: "base",  on: true,  lt: "1 · Base dither",  ld: "Shader threshold field — which cells are lit.", verdict: "core", vlabel: "Core" },
+    { key: "alpha", on: true,  lt: "2 · Alpha layers", ld: "3 screen-blended colors (pink / orange / magenta).", verdict: "core", vlabel: "Core" },
+    { key: "grid",  on: true,  lt: "3 · Pixel grid",   ld: "Square tiles with gap — the mosaic mask.", verdict: "core", vlabel: "Core" },
+    { key: "points",on: true,  lt: "4 · Point sizes",  ld: "Tiles breathe in size — the liveliest renderer.", verdict: "core", vlabel: "Core" },
+    { key: "edge",  on: true,  lt: "5 · Edge dissolve",ld: "Tiles scatter out where the field meets the copy.", verdict: "core", vlabel: "Core" },
+    { key: "hover", on: false, lt: "6 · Hover reveal",  ld: "The green fix peeks through under the cursor.", verdict: "core", vlabel: "Signature" },
+  ];
+  const stackCanvas = document.getElementById("stack-canvas");
+  const stackLabel = document.getElementById("stack-label");
+  const layerList = document.getElementById("stack-layers");
+  LAYERS.forEach((L) => {
+    const el = document.createElement("div");
+    el.className = "layer" + (L.on ? " on" : "");
+    el.innerHTML = '<div class="sw"></div><div><div class="lt">' + L.lt + '</div><div class="ld">' + L.ld +
+      '</div><span class="lk v-' + L.verdict + '">' + L.vlabel + '</span></div>';
+    el.addEventListener("click", () => { L.on = !L.on; el.classList.toggle("on", L.on); updateStackLabel(); });
+    layerList.appendChild(el);
+  });
+  function flag(k) { return LAYERS.find((l) => l.key === k).on; }
+  function updateStackLabel() {
+    const on = LAYERS.filter((l) => l.on).length;
+    stackLabel.textContent = on === LAYERS.length ? "full stack" : on + " of " + LAYERS.length + " layers";
+  }
+  function stackCfg() {
+    return {
+      pitch: 26, gap: flag("grid") ? 7 : 0, radius: 0,
+      alpha: flag("alpha"), points: flag("points"), grid: flag("grid"),
+      edge: flag("edge"), hover: flag("hover"),
+      churn: 0.18, driftX: 0.012, driftY: 0.006, breatheAmp: flag("points") ? 0.6 : 0.3,
+      breatheSpeed: 0.12, colorCycle: 0.15,
+    };
+  }
+
+  /* ── Scene reel ── */
+  const SCENES = [
+    { name: "Orbit",       desc: "Rotating drift, never loops",       verdict: "merge", vlabel: "Merge → w/ Living", m: { driftX: 0.012, driftY: 0.008, churn: 0.3, breatheAmp: 0.35, breatheSpeed: 0.1 } },
+    { name: "Breathe",     desc: "Tiles open & close in place",       verdict: "keep",  vlabel: "Keep",  m: { breatheAmp: 0.85, breatheSpeed: 0.18, churn: 0.1 } },
+    { name: "Color Flow",  desc: "Horizontal flow + color cycle",     verdict: "keep",  vlabel: "Keep",  m: { driftX: 0.045, churn: 0.2, colorCycle: 0.35, breatheAmp: 0.3 } },
+    { name: "Gentle Drift",desc: "Soft diagonal drift",               verdict: "merge", vlabel: "Merge → w/ Color Flow", m: { driftX: 0.01, driftY: 0.016, churn: 0.15, breatheAmp: 0.25 } },
+    { name: "Living",      desc: "Organic breathing + rotation",      verdict: "merge", vlabel: "Merge → w/ Orbit", m: { driftX: 0.006, driftY: 0.004, breatheAmp: 0.5, breatheSpeed: 0.14, churn: 0.25 } },
+    { name: "Falling",     desc: "Errors cascading straight down",    verdict: "keep",  vlabel: "Keep",  m: { driftY: 0.05, churn: 0.2, breatheAmp: 0.3 } },
+    { name: "Sweep",       desc: "Fast horizontal sweep",             verdict: "keep",  vlabel: "Keep",  m: { driftX: 0.05, churn: 0.2, breatheAmp: 0.3 } },
+    { name: "Radar",       desc: "Back-and-forth horizontal scan",    verdict: "keep",  vlabel: "Keep",  m: { scanAmp: 0.6, scanSpeed: 0.16, scanAngle: 0, waveAmp: 0.18, waveSpeed: 0.16, breatheAmp: 0.35, churn: 0.18 } },
+    { name: "Error Sweep", desc: "Diagonal scan + vertical wave",     verdict: "keep",  vlabel: "Keep",  m: { scanAmp: 0.5, scanSpeed: 0.13, scanAngle: Math.PI / 6, waveAmp: 0.22, waveSpeed: 0.16, breatheAmp: 0.3, churn: 0.2 } },
+    { name: "Breath",      desc: "Slow, deep meditative breathing",   verdict: "merge", vlabel: "Merge → w/ Breathe", m: { breatheAmp: 0.9, breatheSpeed: 0.06, churn: 0.08 } },
+    { name: "Classic",     desc: "Barely-there motion — baseline",    verdict: "keep",  vlabel: "Keep",  m: { churn: 0.1, breatheAmp: 0.12, breatheSpeed: 0.08 } },
+  ];
+  // Scene store ids (match ditherStore SceneTemplateId order to SCENES above).
+  const SCENE_IDS = ["orbit","breathe-tiles","color-flow","gentle-drift","living-texture","falling-errors","signal-sweep","radar-scan","error-sweep","deep-breath","solid-classic"];
+  const reel = { grid: "1", state: "problem", tile: "points" };
+  const sceneGrid = document.getElementById("scene-grid");
+  const sceneFrames = []; // { card, wrap, id, loaded }
+
+  function frameSrc(id) {
+    const p = new URLSearchParams();
+    p.set("preview", "1");
+    p.set("scene", id);
+    p.set("grid", reel.grid);
+    p.set("state", reel.state);
+    p.set("tile", reel.tile);
+    return "/?" + p.toString();
+  }
+  // Real hero renders at desktop width; scale it down into a compact card.
+  const FRAME_W = 1440, FRAME_SCALE = 0.16; // ~230px wide card
+
+  function buildCard(S, id) {
+    const card = document.createElement("div");
+    card.className = "scene-card";
+    const wrap = document.createElement("div");
+    const cardW = 232, cardH = Math.round(cardW * 0.62);
+    wrap.style.cssText = "position:relative;width:100%;height:" + cardH + "px;overflow:hidden;border-bottom:1px solid var(--line-soft)";
+    wrap.innerHTML = '<div class="ph" style="position:absolute;inset:0">scroll to load</div>';
+    card.appendChild(wrap);
+    const body = document.createElement("div");
+    body.className = "scene-body";
+    body.innerHTML = '<div class="st"><h3>' + S.name + '</h3><span class="vv vv-' + S.verdict + '">' + S.vlabel + '</span></div><p>' + S.desc + '</p>';
+    card.appendChild(body);
+    sceneGrid.appendChild(card);
+    return { card, wrap, id, loaded: false, cardW, cardH };
+  }
+
+  function mountFrame(f) {
+    const scale = f.cardW / FRAME_W;
+    const fh = Math.round(f.cardH / scale);
+    f.wrap.innerHTML =
+      '<iframe src="' + frameSrc(f.id) + '" title="' + f.id + '" loading="lazy" ' +
+      'style="width:' + FRAME_W + 'px;height:' + fh + 'px;transform:scale(' + scale + ');transform-origin:top left;border:0;position:absolute;top:0;left:0"></iframe>';
+    f.loaded = true;
+  }
+  function repointFrames() {
+    sceneFrames.forEach((f) => { if (f.loaded) mountFrame(f); });
+  }
+
+  SCENES.forEach((S, i) => sceneFrames.push(buildCard(S, SCENE_IDS[i])));
+
+  // Lazy-mount only when scrolled into view (keeps 11 app instances affordable).
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      const f = sceneFrames.find((x) => x.card === e.target);
+      if (f && !f.loaded) mountFrame(f);
+    });
+  }, { rootMargin: "200px" });
+  sceneFrames.forEach((f) => io.observe(f.card));
+
+  // Controls: grid / state / renderer → re-point every loaded frame.
+  document.getElementById("reel-controls").addEventListener("click", (e) => {
+    const btn = e.target.closest(".rc-btn");
+    if (!btn) return;
+    const k = btn.dataset.k, v = btn.dataset.v;
+    reel[k] = v;
+    btn.parentElement.querySelectorAll(".rc-btn").forEach((b) => b.classList.toggle("is-on", b === btn));
+    const hint = document.getElementById("reel-hint");
+    hint.textContent = reel.tile === "color"
+      ? "Real hero · Color/alpha — the genuine Paper dithering shader (WebGL)."
+      : "Real hero · points renderer (canvas — lightweight).";
+    repointFrames();
+  });
+
+  /* ── loop + tab wiring ── */
+  let active = "taxonomy", playing = !reduce, t = 0, last = 0;
+
+  function sizeAll() {
+    fitCanvas(stackCanvas, Math.min(420, stackCanvas.clientWidth * 0.56));
+  }
+
+  function frame(now) {
+    if (!last) last = now;
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (playing) t += dt;
+    if (active === "stack") drawField(stackCanvas, t, stackCfg());
+    requestAnimationFrame(frame);
+  }
+
+  const tabs = [...document.querySelectorAll(".tab")];
+  const panels = { taxonomy: document.getElementById("panel-taxonomy"), stack: document.getElementById("panel-stack"), scenes: document.getElementById("panel-scenes") };
+  const tocrow = document.getElementById("tocrow");
+  function setTab(name) {
+    active = name;
+    tabs.forEach((b) => { const on = b.dataset.tab === name; b.classList.toggle("is-active", on); b.setAttribute("aria-selected", on); });
+    Object.entries(panels).forEach(([k, el]) => el.classList.toggle("is-active", k === name));
+    tocrow.classList.toggle("hidden", name !== "taxonomy");
+    if (name !== "taxonomy") { sizeAll(); }
+    window.scrollTo({ top: 0 });
+  }
+  tabs.forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+
+  function wirePlay(btnId) {
+    const btn = document.getElementById(btnId);
+    const sync = () => { btn.textContent = playing ? "❚❚ Pause" : "▶ Play"; };
+    btn.addEventListener("click", () => { playing = !playing; sync(); });
+    sync();
+  }
+  wirePlay("stack-play");
+  updateStackLabel();
+
+  let rt;
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(sizeAll, 150); });
+  sizeAll();
+  requestAnimationFrame(frame);
+})();
+</script>

@@ -1,16 +1,35 @@
 import { useEffect, useRef, useState } from 'react'
-import { TextInspectorProvider } from '../components/playground/TextInspectorContext'
-import TextInspectorPanel from '../components/playground/TextInspectorPanel'
+import { TextInspectorProvider, useTextInspector } from '../components/playground/TextInspectorContext'
+import TextInspectorPanel, { PANEL_WIDTH } from '../components/playground/TextInspectorPanel'
 import { useTextSelection } from '../components/playground/useTextSelection'
 import { useApplyOverrides } from '../components/playground/useApplyOverrides'
 import { fontPairs } from '../themes/fonts'
-import { useDitherStore, setEdgeConfig } from '../heroes/dither/ditherStore'
+import { useDitherStore, setEdgeConfig, initDitherSync, applySceneTemplate, setPixelGridConfig, setAnimationConfig, setInitialState, applyHeroTemplate, heroTemplates } from '../heroes/dither/ditherStore'
 import { heroes, getHero } from './registry'
 import { getContentPreset } from '../content/presets'
+import PreviewCanvas from './PreviewCanvas'
+import TemplateGallery from './TemplateGallery'
+import LayerExplorer from './LayerExplorer'
 
 const params = new URLSearchParams(window.location.search)
 const activeHero = getHero(params.get('hero'))
 const preset = getContentPreset(params.get('preset'))
+/** True when this window is a breakpoint-preview iframe: bare hero, no lab
+ *  chrome, store mirrored from the main window. */
+const isPreviewFrame = params.get('preview') === '1'
+/** Template a preview frame is pinned to (Templates gallery artboards). */
+const previewTemplate = params.get('template')
+/** Independent config pins for a preview frame (docs real-preview gallery):
+ *  ?preview=1&scene=<id>&grid=0|1&tile=color|size|points&state=problem|fix.
+ *  When any is present the frame applies them locally and does NOT sync. */
+const pinScene = params.get('scene')
+const pinGrid = params.get('grid')
+const pinTile = params.get('tile') as 'color' | 'size' | 'points' | null
+const pinState = params.get('state') as 'problem' | 'fix' | null
+const isPinnedPreview = isPreviewFrame && !!(pinScene || pinGrid || pinTile || pinState)
+/** Source tab this preview binds to. Set by same-tab previews (Layers) so the
+ *  frame ignores other Hero Lab tabs broadcasting on the shared channel. */
+const previewSourceId = params.get('sid')
 
 // Mutate the active hero's store from the URL before React mounts.
 activeHero.applyUrlParams?.(params)
@@ -28,14 +47,27 @@ function ActiveHero() {
   )
 }
 
-function LabHeader({ headerBg }: { headerBg: 'transparent' | 'solid' }) {
+function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' | 'solid'; rightOffset: number; button: { radius: number; uppercase: boolean } }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   const bgClass = headerBg === 'solid'
     ? 'bg-t-bg border-b border-white/10'
     : 'bg-transparent'
+  // Header buttons follow the shared CTA styling (corner radius + caps) and
+  // carry the active template's display face — brand and action surfaces should
+  // share the hero's character instead of sitting in neutral UI type. Nav links
+  // below deliberately stay on the body sans: at 14px a display face (a hairline
+  // serif especially) loses legibility and stops scanning as navigation.
+  const brandFont = 'var(--font-hero-display, inherit)'
+  // CTAs read from their own var so a template whose display face goes weak at
+  // button size can opt them out while the wordmark keeps the character.
+  const btnStyle: React.CSSProperties = { borderRadius: button.radius, textTransform: button.uppercase ? 'uppercase' : undefined, fontFamily: 'var(--font-hero-cta, inherit)' }
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-40 transition-colors duration-300 ${bgClass}`}>
-      <div className="max-w-[1440px] mx-auto px-8 xl:px-16 py-4 flex items-center justify-between">
+    <header
+      className={`fixed top-0 left-0 z-40 transition-colors duration-300 ${bgClass}`}
+      style={{ right: rightOffset }}
+    >
+      <div className="max-w-[1440px] mx-auto px-5 sm:px-8 xl:px-16 py-4 flex items-center justify-between">
         <a href="#" className="flex items-center gap-3 shrink-0 no-underline text-t-headline">
           <span className="relative grid size-7 place-items-center rounded-lg border border-t-border-strong bg-t-bg-surface overflow-hidden">
             <span className="absolute inset-0 opacity-70" style={{
@@ -43,7 +75,7 @@ function LabHeader({ headerBg }: { headerBg: 'transparent' | 'solid' }) {
             }} />
             <span className="relative block size-2.5 rounded-sm bg-current rotate-45" />
           </span>
-          <span className="text-[18px] font-semibold tracking-[-0.03em]">{preset.brand}</span>
+          <span className="text-[18px] font-semibold tracking-[-0.03em]" style={{ fontFamily: brandFont }}>{preset.brand}</span>
         </a>
 
         <nav className="hidden xl:flex items-center">
@@ -71,18 +103,72 @@ function LabHeader({ headerBg }: { headerBg: 'transparent' | 'solid' }) {
         <div className="hidden xl:flex items-center gap-4 shrink-0">
           <a
             href="#"
-            className="text-base no-underline px-5 py-1.5 rounded-full transition-colors whitespace-nowrap text-t-cta2-text border border-t-border-strong bg-transparent hover:bg-t-bg-surface"
+            style={btnStyle}
+            className="text-base no-underline px-5 py-1.5 transition-colors whitespace-nowrap text-t-cta2-text border border-t-border-strong bg-transparent hover:bg-t-bg-surface"
           >
             {preset.signIn}
           </a>
           <a
             href="#"
-            className="text-base no-underline px-5 py-1.5 rounded-full border transition-colors whitespace-nowrap text-t-cta-text bg-t-cta-bg border-t-cta-bg hover:opacity-90"
+            style={btnStyle}
+            className="text-base no-underline px-5 py-1.5 border transition-colors whitespace-nowrap text-t-cta-text bg-t-cta-bg border-t-cta-bg hover:opacity-90"
           >
             {preset.cta}
           </a>
         </div>
+
+        {/* Mobile / tablet (< xl): compact CTAs + hamburger. Sign in fits from
+            md up; on phones it lives in the menu instead. */}
+        <div className="flex xl:hidden items-center gap-2.5">
+          <a
+            href="#"
+            style={btnStyle}
+            className="hidden md:block text-[14px] no-underline px-4 py-1.5 border transition-colors whitespace-nowrap text-t-cta2-text border-t-border-strong bg-transparent hover:bg-t-bg-surface"
+          >
+            {preset.signIn}
+          </a>
+          <a
+            href="#"
+            style={btnStyle}
+            className="text-[14px] no-underline px-4 py-1.5 border transition-colors whitespace-nowrap text-t-cta-text bg-t-cta-bg border-t-cta-bg hover:opacity-90"
+          >
+            {preset.cta}
+          </a>
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+            className="grid size-9 place-items-center rounded-lg border border-t-border-strong bg-transparent text-t-headline cursor-pointer transition-colors hover:bg-t-bg-surface"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              {menuOpen
+                ? <path d="M18 6L6 18M6 6l12 12" />
+                : <path d="M4 7h16M4 12h16M4 17h16" />}
+            </svg>
+          </button>
+        </div>
       </div>
+
+      {/* Dropdown menu — absolutely positioned below the bar so the header's
+          measured height (which drives the dot field's Top start) never moves. */}
+      {menuOpen && (
+        <div className="xl:hidden absolute top-full left-0 right-0 bg-t-bg border-b border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
+          <nav className="max-w-[1440px] mx-auto px-5 sm:px-8 py-2 flex flex-col">
+            {preset.navLinks.map((link) => (
+              <a
+                key={link.label}
+                href="#"
+                className="text-base no-underline py-3 text-t-body hover:text-t-headline border-b border-white/5 transition-colors"
+              >
+                {link.label}
+              </a>
+            ))}
+            <a href="#" className="md:hidden text-base no-underline py-3 text-t-cta2-text hover:text-t-headline transition-colors">
+              {preset.signIn}
+            </a>
+          </nav>
+        </div>
+      )}
     </header>
   )
 }
@@ -115,21 +201,52 @@ function HeroSwitcher() {
   )
 }
 
-export default function HeroLab() {
+type ViewMode = 'live' | 'breakpoints' | 'templates' | 'layers'
+
+function LabLayout() {
   const fontPair = fontPairs['jakarta-dm']
   const heroState = useDitherStore()
-  const [showInspector, setShowInspector] = useState(() => {
-    try {
-      const saved = localStorage.getItem('hero-lab-show-inspector')
-      if (saved === '1') return true
-      if (saved === '0') return false
-    } catch { /* ignore */ }
-    return false
-  })
+  const { enabled: panelOpen, setEnabled } = useTextInspector()
   const themedRef = useRef<HTMLDivElement>(null)
   const [themedNode, setThemedNode] = useState<HTMLDivElement | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('hero-lab-view-mode')
+      return saved === 'breakpoints' || saved === 'templates' || saved === 'layers' ? saved : 'live'
+    } catch {
+      return 'live'
+    }
+  })
+  // The Layers tab is a single stack-only surface: the progressive stack IS the
+  // interface there, so the Design Panel would be a redundant second control
+  // surface writing the same store. Hide it (and drop its layout offset) while
+  // in Layers; panelOpen is preserved so the panel returns on other views.
+  const showPanel = panelOpen && viewMode !== 'layers'
+  const panelOffset = showPanel ? PANEL_WIDTH : 0
 
   useEffect(() => { setThemedNode(themedRef.current) }, [])
+  useEffect(() => {
+    if (isPinnedPreview) {
+      // Independent real preview — apply pinned config, no cross-window sync.
+      if (pinState) setInitialState(pinState)
+      if (pinScene) applySceneTemplate(pinScene as Parameters<typeof applySceneTemplate>[0])
+      if (pinTile) setAnimationConfig({ tileDisplay: pinTile, playing: true })
+      if (pinGrid != null) setPixelGridConfig({ enabled: pinGrid === '1' })
+      return
+    }
+    initDitherSync(isPreviewFrame ? 'preview' : 'source', isPreviewFrame ? previewTemplate : null, isPreviewFrame ? previewSourceId : null)
+    // On a fresh load the main window has no active template, so nothing plays
+    // and the gallery shows every artboard static. Select + animate the FIRST
+    // template so the initial hero is a real, playing template; the gallery then
+    // animates only it and keeps the rest paused (one live WebGL context, not N).
+    // Skipped on HMR because the persisted store already has an active template.
+    if (!isPreviewFrame && !heroState.activeTemplate && heroTemplates.length > 0) {
+      applyHeroTemplate(heroTemplates[0].id)
+    }
+  }, [])
+  useEffect(() => {
+    try { localStorage.setItem('hero-lab-view-mode', viewMode) } catch { /* ignore */ }
+  }, [viewMode])
   useEffect(() => {
     document.title = `Hero Lab — ${activeHero.name}`
   }, [])
@@ -148,52 +265,95 @@ export default function HeroLab() {
     return () => ro.disconnect()
   }, [])
   useEffect(() => {
-    try { localStorage.setItem('hero-lab-show-inspector', showInspector ? '1' : '0') } catch { /* ignore */ }
-  }, [showInspector])
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'E' || e.key === 'e')) {
         e.preventDefault()
-        setShowInspector((v) => !v)
+        setEnabled(!panelOpen)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [panelOpen, setEnabled])
 
-  return (
-    <TextInspectorProvider activeVariant={activeHero.id}>
-      <div
-        ref={themedRef}
-        data-palette="glass"
-        className="min-h-screen"
-        style={{
-          '--font-display': fontPair.headline,
-          '--font-sans': fontPair.body,
-          '--font-display-stretch': fontPair.headlineStretch ?? 'normal',
-          '--font-display-hl-style': fontPair.highlightStyle,
-          '--font-display-hl-weight': fontPair.highlightWeight,
-          fontStretch: fontPair.headlineStretch ?? 'normal',
-        } as React.CSSProperties}
-      >
-        <LabHeader headerBg={heroState.headerBg} />
+  const themedVars = {
+    '--font-display': fontPair.headline,
+    '--font-sans': fontPair.body,
+    '--font-display-stretch': fontPair.headlineStretch ?? 'normal',
+    '--font-display-hl-style': fontPair.highlightStyle,
+    '--font-display-hl-weight': fontPair.highlightWeight,
+    fontStretch: fontPair.headlineStretch ?? 'normal',
+  } as React.CSSProperties
+
+  // Breakpoint-preview iframe: bare hero only — no panel, no switcher, no
+  // toggles. The store mirrors the main window via initDitherSync above.
+  if (isPreviewFrame) {
+    return (
+      <div ref={themedRef} data-palette="glass" className="min-h-screen" style={themedVars}>
+        <LabHeader headerBg={heroState.headerBg} rightOffset={0} button={heroState.button} />
         <ActiveHero />
       </div>
+    )
+  }
 
-      {showInspector && <TextInspectorPanel themedRoot={themedNode} paletteName="glass" />}
+  return (
+    <>
+      {viewMode === 'templates' ? (
+        <div style={{ marginRight: panelOffset }}>
+          <TemplateGallery />
+        </div>
+      ) : viewMode === 'layers' ? (
+        <div style={{ marginRight: panelOffset }}>
+          <LayerExplorer />
+        </div>
+      ) : viewMode === 'breakpoints' ? (
+        <div style={{ marginRight: panelOffset }}>
+          <PreviewCanvas />
+        </div>
+      ) : (
+        <div
+          ref={themedRef}
+          data-palette="glass"
+          className="min-h-screen"
+          style={{ ...themedVars, marginRight: panelOffset }}
+        >
+          <LabHeader headerBg={heroState.headerBg} rightOffset={panelOffset} button={heroState.button} />
+          <ActiveHero />
+        </div>
+      )}
+
+      {showPanel && <TextInspectorPanel themedRoot={themedNode} paletteName="glass" />}
 
       <HeroSwitcher />
 
-      <button
-        onClick={() => setShowInspector((v) => !v)}
-        title="Toggle design controls (⌘/Ctrl + Shift + E)"
-        className="fixed bottom-4 right-4 z-[1002] px-3 py-2 rounded-full border cursor-pointer transition-all backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 hover:border-white/25 hover:bg-[rgba(30,31,50,0.95)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] text-[12px] font-semibold text-white/70 hover:text-white/95 flex items-center gap-2"
+      {/* Live / Breakpoints view toggle — centered in the content area */}
+      <div
+        className="fixed bottom-4 left-0 z-[1002] flex justify-center pointer-events-none"
+        style={{ right: panelOffset }}
       >
-        <span aria-hidden style={{ opacity: showInspector ? 1 : 0.5 }}>
-          {showInspector ? '◉' : '○'}
-        </span>
-        {showInspector ? 'Hide controls' : 'Design controls'}
-      </button>
+        <div className="pointer-events-auto flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+          {([['live', 'Live'], ['breakpoints', 'Breakpoints'], ['templates', 'Templates'], ['layers', 'Layers']] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`text-[12px] font-semibold px-3 py-1.5 rounded-full cursor-pointer border-0 transition-all ${
+                viewMode === mode
+                  ? 'bg-white/15 text-white'
+                  : 'bg-transparent text-white/60 hover:text-white/90 hover:bg-white/5'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+export default function HeroLab() {
+  return (
+    <TextInspectorProvider activeVariant={activeHero.id}>
+      <LabLayout />
     </TextInspectorProvider>
   )
 }

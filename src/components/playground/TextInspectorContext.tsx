@@ -76,7 +76,13 @@ export function TextInspectorProvider({
   activeVariant: string
   children: ReactNode
 }) {
-  const [enabled, setEnabled] = useState(false)
+  const [enabled, setEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('text-inspector:enabled') !== '0'
+    } catch {
+      return true
+    }
+  })
   const [selectedElement, setSelectedElement] = useState<HTMLElement | null>(null)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [overrides, setOverrides] = useState<Overrides>(() => loadOverrides(activeVariant))
@@ -93,6 +99,10 @@ export function TextInspectorProvider({
   useEffect(() => {
     saveOverrides(activeVariant, overrides)
   }, [activeVariant, overrides])
+
+  useEffect(() => {
+    try { localStorage.setItem('text-inspector:enabled', enabled ? '1' : '0') } catch { /* ignore */ }
+  }, [enabled])
 
   const select = useCallback((el: HTMLElement | null, path: string | null) => {
     setSelectedElement(el)

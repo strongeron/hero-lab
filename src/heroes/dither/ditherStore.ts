@@ -77,20 +77,98 @@ export interface DitherCopy {
   responseSeparator?: 'none' | 'line' | 'dots' | 'fade';
   /** Use 'headline' as a special font mode: same font family as headline */
   responseFontMode?: 'custom' | 'headline';
+  /** Where the response line sits vertically.
+   *  'baseline' (default) aligns it to the headline's last baseline for
+   *  cross-column rhythm; 'cta' groups it tight above the CTA as a lead-in. */
+  responsePin?: 'baseline' | 'cta';
+  /** CSS font-family for CTA labels (omit = the headline face).
+   *  Escape hatch for display faces that go weak at button size: a 400-only
+   *  hairline serif has no bold to lean on, so at 16px on a filled pill it
+   *  reads fragile where a primary action needs optical weight. */
+  ctaFont?: string;
+  /** CSS font-family for the sub/body line (omit = the lab's body sans, Inter).
+   *  Lets a template run a single-family system (headline face for body too) or
+   *  an all-mono system, instead of defaulting every template to the same sans. */
+  subFont?: string;
+  /** How the hero composes at tablet widths (768–1023px).
+   *  'columns' (default) keeps the two-column split from md up.
+   *  'stack' delays the split to lg, so tablet composes like mobile — the
+   *  headline gets full width instead of a starved 7/12 column. Monospace
+   *  headlines need this (wide advance widths fragment into ragged lines);
+   *  proportional faces fit the two-column split fine. */
+  tabletLayout?: 'columns' | 'stack';
 }
 
 export type CopyVariantId =
+  | "full-bleed"
+  | "fine-grain"
   | "provocateur"
   | "value"
   | "ship-it"
   | "ai"
   | "speed"
   | "broke-fixed"
-  | "duck"
   | "wtf";
 
 export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }> =
   {
+    // Template-only variant: preserves the Broke / Fixed copy while giving the
+    // Fine Grain artboard its own typography instead of mutating Broke/Fixed.
+    "fine-grain": {
+      label: "Fine Grain",
+      layout: "problem",
+      headline: "Something broke. You should already know what.",
+      sub: "Errors, performance, and logs — one place. Five-minute install.",
+      response: "Caught everything. Start at line 42.",
+      cta: "Start free in 5 minutes",
+      headlineColorMode: "white",
+      // Fine art, fine strokes: this scene is a smooth, high-detail continuous
+      // field, not a discrete lattice. A serif's modulated stroke — thick stems
+      // against hairline joins — echoes that fine grain, and gives the gallery
+      // a third typographic voice instead of a third monospace.
+      headlineFont: "'Instrument Serif', serif",
+      // The wordmark keeps the serif (it reads elegant at 18px), but CTAs fall
+      // back to the body sans: Instrument Serif ships a 400 weight only, so on a
+      // filled 16px pill it reads fragile where a primary action needs presence.
+      ctaFont: "var(--font-sans, Inter, sans-serif)",
+      headlineWeight: 400,
+      headlineLeading: "1.02",
+      headlineTracking: "-0.01em",
+      headlineSize: "clamp(3rem, 5vw + 1rem, 5.25rem)",
+      responseFontMode: "headline",
+      responseSize: "36px",
+      responseFontStyle: "normal",
+      responseWeight: 400,
+      // Serifs set compactly, so the 7/12 tablet column is comfortable.
+      tabletLayout: "columns",
+    },
+    // Template-only variant: preserves the Broke / Fixed copy while giving the
+    // top Full Bleed artboard its own typography instead of mutating Problem.
+    "full-bleed": {
+      label: "Full Bleed",
+      layout: "problem",
+      headline: "Something broke. You should already know what.",
+      sub: "Errors, performance, and logs — one place. Five-minute install.",
+      response: "Caught everything. Start at line\u00A042.",
+      cta: "Start free in 5 minutes",
+      headlineColorMode: "white",
+      // Round art, round letterforms: the point renderer draws circular dots,
+      // so the headline uses a geometric sans whose bowls are true circles.
+      // Space Grotesk's narrow, quirky forms fought that geometry.
+      headlineFont: "'Outfit', sans-serif",
+      // Single-family system: the body runs in Outfit too. One geometric voice
+      // top to bottom reads more brand-forward than sans-for-body-by-default.
+      subFont: "'Outfit', sans-serif",
+      headlineWeight: 500,
+      headlineLeading: "1.0",
+      headlineSize: "clamp(2.8rem, 4vw + 1rem, 4.5rem)",
+      responseFontMode: "headline",
+      responseSize: "36px",
+      responseFontStyle: "normal",
+      responseWeight: 400,
+      // Proportional face fits the 7/12 tablet column, so keep two columns.
+      tabletLayout: "columns",
+    },
     provocateur: {
       label: "Provocateur",
       layout: "problem",
@@ -143,16 +221,42 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
       label: "AI",
       layout: "problem",
       headline: "Your AI built the app. Who's watching it\u00A0run?",
-      sub: "Errors, performance, and logs in one place. Query it in plain language. No dashboard required.",
+      // Focused: concrete signals, then the AI-native benefit that ties back to
+      // the headline's "who's watching it run". No em dash.
+      sub: "Errors, performance, and logs in one place. Ask what happened in plain language, no dashboard required.",
       response: "We speak AI\u00A0too.",
       cta: "Start free in 5 minutes",
       headlineColorMode: "white",
+      // Square art, monospace grid: the 96px tile field is hard squares on a
+      // fixed lattice, and a monospace face is the type equivalent \u2014 every
+      // glyph on the same advance width. JetBrains Mono over Space Mono because
+      // it is meaningfully narrower: tracking can shrink the gaps but can't fix
+      // monospace's uneven rhythm, so a tighter face does what tracking can't.
+      headlineFont: "'JetBrains Mono', monospace",
+      // All-mono system: the body runs in the same face. For error monitoring
+      // this is the on-message choice \u2014 the whole hero reads terminal-native.
+      subFont: "'JetBrains Mono', monospace",
       headlineWeight: 500,
+      // 0.95 was too tight: monospace carries generous side bearings, so
+      // sub-1 leading collapsed the block and read cramped rather than
+      // confident. 1.08 lets the lines breathe without losing density.
+      headlineLeading: "1.08",
+      // Monospace is drawn for code legibility at 14px, so at display sizes its
+      // fixed advance leaves too much air between glyphs. Pulling tracking to
+      // -0.05em (from the -0.03em default) tightens the words into solid blocks
+      // without breaking the even monospace rhythm or colliding glyphs.
+      headlineTracking: "-0.05em",
       headlineSize: "clamp(3rem, 5vw + 1rem, 5.5rem)",
       responseFontMode: "headline",
       responseSize: "36px",
       responseFontStyle: "normal",
       responseWeight: 400,
+      // Group the tagline tight above the CTA so "We speak AI too." reads as a
+      // lead-in to the button instead of floating up to the headline baseline.
+      responsePin: "cta",
+      // Monospace is wide: in a 7/12 tablet column this headline fragments
+      // into five ragged lines. Stacking gives it the full width (two lines).
+      tabletLayout: "stack",
     },
     speed: {
       label: "Speed",
@@ -188,21 +292,6 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
       responseFontStyle: "normal",
       responseWeight: 400,
     },
-    duck: {
-      label: "What the Duck",
-      layout: "problem",
-      headline: "What the duck just happened?",
-      sub: "Errors, performance, and logs — one place. Five minutes to install.",
-      response: "We saw everything.",
-      cta: "Start free in 5 minutes",
-      headlineColorMode: "white",
-      headlineWeight: 500,
-      headlineSize: "clamp(3rem, 5vw + 1rem, 5.5rem)",
-      responseFontMode: "headline",
-      responseSize: "36px",
-      responseFontStyle: "normal",
-      responseWeight: 400,
-    },
     wtf: {
       label: "WTF",
       layout: "problem",
@@ -223,6 +312,8 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     },
   };
 
+// 'wtf' stays defined (URL params / old configs keep working) but is no longer
+// offered in the panel.
 export const copyVariantIds: CopyVariantId[] = [
   "provocateur",
   "value",
@@ -230,8 +321,6 @@ export const copyVariantIds: CopyVariantId[] = [
   "ai",
   "speed",
   "broke-fixed",
-  "duck",
-  "wtf",
 ];
 
 export interface DitherShaderConfig {
@@ -294,6 +383,14 @@ export interface DitherEdgeConfig {
   textBlendMotion: number;
   /** Perlin noise animation speed (Hz). */
   textBlendSpeed: number;
+  /** Scene-behind-text: clear space (px) kept between shapes and every text
+   *  block — a tile whose padded box would touch text is dropped whole
+   *  (never cut). Applies in any edge mode when textBlend is on. */
+  textPadding: number;
+  /** What the clearance traces: 'lines' hugs each rendered text line (organic
+   *  ragged edge, shapes fill beside short lines); 'box' clears the whole
+   *  element rectangle (calmer, blocky negative space). Also used by 'full'. */
+  textRectMode: "lines" | "box";
   /** 'full' mode: clear distance (px) kept between shapes and text blocks. */
   fullPadding: number;
   /** Top start (px) — first row of shapes begins at the first whole tile at or
@@ -433,8 +530,10 @@ export type SceneTemplateId =
 export interface SceneTemplate {
   label: string;
   desc: string;
-  shader: Partial<DitherShaderConfig>;
-  animation: Partial<DitherAnimationConfig>;
+  /** Scenes are state-agnostic motion recipes. Keeping this type narrow makes
+   * it impossible for a scene to hardcode pink/green, shapes, scale, or grid. */
+  shader: Partial<Pick<DitherShaderConfig, "speed" | "colorCycleSpeed">>;
+  animation: Partial<Omit<DitherAnimationConfig, "playing" | "tileDisplay">>;
 }
 
 export type ScanMode = "continuous" | "oscillate";
@@ -496,6 +595,14 @@ export interface DitherAnimationConfig {
   tileSizeSpeed: number;
   /** Perlin noise spatial scale for tile sizes. */
   tileSizeNoise: number;
+}
+
+/** CTA / button styling shared by header and hero buttons. */
+export interface DitherButtonConfig {
+  /** Corner radius in px (0 = square, 999 = pill) */
+  radius: number;
+  /** Uppercase the button label */
+  uppercase: boolean;
 }
 
 export interface DitherLayoutConfig {
@@ -561,15 +668,24 @@ interface DitherState {
   pixelGrid: DitherPixelGridConfig;
   animation: DitherAnimationConfig;
   layout: DitherLayoutConfig;
+  button: DitherButtonConfig;
   haptic: DitherHapticConfig;
   copyVariant: CopyVariantId;
   /** Which named state is shown at rest. The other becomes the hover reveal. */
   initialState: InitialStateId;
   activeScene: SceneTemplateId | null;
+  /** Last applied hero template (picker highlight); null = untracked/custom */
+  activeTemplate: string | null;
   /** Active terminal theme ID (null = default colors) */
   terminalTheme: string | null;
   /** Absolute positions for WTF hero title elements */
   wtfTitlePositions: WtfTitlePositions;
+  /** Layers-explorer only: hold the screen-blended Color/alpha layers at their
+   *  authored opacity instead of running the per-frame emphasis swing. The swing
+   *  pulses the composite under `screen` blend (a recurring blink); the Layers
+   *  view wants a calm, stable base to stack onto. Off everywhere else, so Live
+   *  and Templates keep their colour shimmer unchanged. */
+  stableColorField: boolean;
 }
 
 /* ─── Defaults ─── */
@@ -632,6 +748,8 @@ export const defaultEdgeConfig: DitherEdgeConfig = {
   shaderExtend: 160,
   textBlendMotion: 0.35,
   textBlendSpeed: 0.08,
+  textPadding: 24,
+  textRectMode: "lines",
   fullPadding: 28,
   topInset: 0,
 };
@@ -714,6 +832,11 @@ export const defaultPixelGridConfig: DitherPixelGridConfig = {
   alignY: 0,
 };
 
+export const defaultButtonConfig: DitherButtonConfig = {
+  radius: 999,
+  uppercase: false,
+};
+
 export const defaultLayoutConfig: DitherLayoutConfig = {
   headlineCols: 8,
   responseCols: 4,
@@ -751,186 +874,215 @@ export const defaultAnimationConfig: DitherAnimationConfig = {
   waveAmplitude: 0,
   waveSpeed: 0.08,
   waveAngle: 0,
-  gapPulse: 2,
-  gapPulseSpeed: 0.09,
+  gapPulse: 3,
+  gapPulseSpeed: 0.12,
   loopBreak: "orbit",
   loopBreakAmount: 0.5,
   tileDisplay: "color",
   tileSizeSpread: 0.55,
-  tileSizeSpeed: 0.06,
+  tileSizeSpeed: 0.12,
   tileSizeNoise: 1.2,
 };
 
 export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
   "orbit": {
     label: "Orbit",
-    desc: "Slow rotation + drift — never loops",
+    desc: "Rotating drift that never loops",
     shader: {
-      speed: 0.1,
-      transparentBg: true,
-      colorCycleSpeed: 0.2,
-      scale: 0.8,
+      // Strong enough to remain legible when sampled through Problem's fixed
+      // 32px square grid; the previous values looked static at gallery scale.
+      speed: 0.18,
+      colorCycleSpeed: 0.32,
     },
     animation: {
-      playing: true,
       fps: 0,
-      driftY: 0.006,
-      driftX: 0.014,
-      rotationDrift: 1.2,
-      pulseAmount: 0.02,
-      pulseSpeed: 0.1,
+      driftY: 0.018,
+      driftX: 0.025,
+      rotationDrift: 4.0,
+      pulseAmount: 0.028,
+      pulseSpeed: 0.16,
       scanMode: "continuous" as const,
+      scanAmplitude: 0.6,
+      scanSpeed: 0.06,
+      scanAngle: 0,
       waveAmplitude: 0,
-      gapPulse: 1.5,
-      gapPulseSpeed: 0.08,
-      tileDisplay: "points",
-      tileSizeSpread: 0.5,
-      tileSizeSpeed: 0.045,
-      tileSizeNoise: 1.45,
+      waveSpeed: 0.08,
+      waveAngle: 0,
+      gapPulse: 3,
+      gapPulseSpeed: 0.14,
+      tileSizeSpread: 0.52,
+      tileSizeSpeed: 0.1,
+      tileSizeNoise: 1.4,
     },
   },
   "breathe-tiles": {
     label: "Breathe",
-    desc: "Tiles open & close + slow color shift",
+    desc: "Tiles open & close in place",
     shader: {
       speed: 0.07,
-      transparentBg: true,
-      colorCycleSpeed: 0.3,
-      scale: 0.82,
+      colorCycleSpeed: 0.28,
     },
     animation: {
-      playing: true,
       fps: 0,
       driftY: 0,
-      driftX: 0.004,
-      rotationDrift: 0.25,
+      driftX: 0,
+      rotationDrift: 0,
       pulseAmount: 0.03,
       pulseSpeed: 0.12,
       scanMode: "continuous" as const,
+      scanAmplitude: 0.6,
+      scanSpeed: 0.06,
+      scanAngle: 0,
       waveAmplitude: 0,
-      gapPulse: 5,
-      gapPulseSpeed: 0.12,
-      tileDisplay: "points",
-      tileSizeSpread: 0.72,
-      tileSizeSpeed: 0.08,
-      tileSizeNoise: 1,
+      waveSpeed: 0.08,
+      waveAngle: 0,
+      gapPulse: 6,
+      gapPulseSpeed: 0.16,
+      tileSizeSpread: 0.82,
+      tileSizeSpeed: 0.16,
+      tileSizeNoise: 1.0,
     },
   },
   "color-flow": {
     label: "Color Flow",
-    desc: "Horizontal drift with color cycling",
+    desc: "Horizontal flow with strong color cycling",
     shader: {
       speed: 0.1,
-      transparentBg: true,
-      colorCycleSpeed: 0.3,
-      alphaSpread: 0.04,
-      scale: 0.8,
+      colorCycleSpeed: 0.45,
     },
     animation: {
-      playing: true,
       fps: 0,
-      frameStep: 0.5,
       driftY: 0,
-      driftX: 0.02,
-      rotationDrift: 1.5,
-      pulseAmount: 0.025,
-      pulseSpeed: 0.15,
-      tileDisplay: "points",
+      driftX: 0.04,
+      rotationDrift: 0,
+      pulseAmount: 0.02,
+      pulseSpeed: 0.12,
+      scanMode: "continuous" as const,
+      scanAmplitude: 0.6,
+      scanSpeed: 0.06,
+      scanAngle: 0,
+      waveAmplitude: 0,
+      waveSpeed: 0.08,
+      waveAngle: 0,
+      gapPulse: 2,
+      gapPulseSpeed: 0.12,
       tileSizeSpread: 0.5,
-      tileSizeSpeed: 0.075,
-      tileSizeNoise: 1.8,
+      tileSizeSpeed: 0.12,
+      tileSizeNoise: 1.6,
     },
   },
   "gentle-drift": {
     label: "Gentle Drift",
-    desc: "Subtle flow with slow color shifts",
+    desc: "Soft diagonal drift",
     shader: {
-      speed: 0.12,
-      transparentBg: true,
+      speed: 0.1,
       colorCycleSpeed: 0.15,
-      scale: 0.8,
     },
     animation: {
-      playing: true,
       fps: 0,
-      driftY: 0.015,
-      driftX: 0.005,
+      // One panel Offset step is 0.05; the former 0.01/0.016 rates needed
+      // several seconds to move even that far and looked frozen between alpha
+      // pulses. Keep the motion gentle, but make every second visibly advance.
+      driftY: 0.05,
+      driftX: 0.035,
       rotationDrift: 0,
       pulseAmount: 0.02,
-      pulseSpeed: 0.15,
-      tileDisplay: "points",
+      pulseSpeed: 0.12,
+      scanMode: "continuous" as const,
+      scanAmplitude: 0.6,
+      scanSpeed: 0.06,
+      scanAngle: 0,
+      waveAmplitude: 0,
+      waveSpeed: 0.08,
+      waveAngle: 0,
+      gapPulse: 1.5,
+      gapPulseSpeed: 0.08,
       tileSizeSpread: 0.42,
-      tileSizeSpeed: 0.035,
+      tileSizeSpeed: 0.08,
       tileSizeNoise: 1.6,
     },
   },
   "living-texture": {
     label: "Living",
-    desc: "Organic breathing with color shifts",
+    desc: "Organic breathing with slow rotation",
     shader: {
-      speed: 0.08,
-      transparentBg: true,
-      colorCycleSpeed: 0.25,
-      scale: 0.85,
+      speed: 0.09,
+      colorCycleSpeed: 0.3,
     },
     animation: {
-      playing: true,
       fps: 0,
       driftY: 0,
       driftX: 0,
-      rotationDrift: 0.5,
+      rotationDrift: 0.8,
       pulseAmount: 0.04,
-      pulseSpeed: 0.2,
-      tileDisplay: "points",
-      tileSizeSpread: 0.68,
-      tileSizeSpeed: 0.055,
+      pulseSpeed: 0.12,
+      scanMode: "continuous" as const,
+      scanAmplitude: 0.6,
+      scanSpeed: 0.06,
+      scanAngle: 0,
+      waveAmplitude: 0,
+      waveSpeed: 0.08,
+      waveAngle: 0,
+      gapPulse: 5,
+      gapPulseSpeed: 0.15,
+      tileSizeSpread: 0.72,
+      tileSizeSpeed: 0.13,
       tileSizeNoise: 0.9,
     },
   },
   "falling-errors": {
     label: "Falling",
-    desc: "Errors gently cascading down",
+    desc: "Errors cascading straight down",
     shader: {
-      speed: 0.15,
-      transparentBg: true,
-      colorCycleSpeed: 0.2,
-      scale: 0.8,
+      speed: 0.14,
+      colorCycleSpeed: 0.18,
     },
     animation: {
-      playing: true,
       fps: 0,
-      driftY: 0.03,
+      driftY: 0.05,
       driftX: 0,
       rotationDrift: 0,
-      pulseAmount: 0.03,
-      pulseSpeed: 0.2,
-      tileDisplay: "points",
-      tileSizeSpread: 0.48,
-      tileSizeSpeed: 0.07,
+      pulseAmount: 0.02,
+      pulseSpeed: 0.12,
+      scanMode: "continuous" as const,
+      scanAmplitude: 0.6,
+      scanSpeed: 0.06,
+      scanAngle: 0,
+      waveAmplitude: 0,
+      waveSpeed: 0.08,
+      waveAngle: 0,
+      gapPulse: 2,
+      gapPulseSpeed: 0.13,
+      tileSizeSpread: 0.52,
+      tileSizeSpeed: 0.14,
       tileSizeNoise: 1.25,
     },
   },
   "signal-sweep": {
     label: "Sweep",
-    desc: "Slow horizontal scan with 3 distinct blobs",
+    desc: "Fast horizontal sweep",
     shader: {
       speed: 0.1,
-      transparentBg: true,
-      colorCycleSpeed: 0,
-      alphaSpread: 0.2,
-      scale: 0.8,
+      colorCycleSpeed: 0.12,
     },
     animation: {
-      playing: true,
       fps: 0,
       driftY: 0,
-      driftX: 0.02,
-      rotationDrift: 1.5,
-      pulseAmount: 0.025,
-      pulseSpeed: 0.15,
-      tileDisplay: "points",
+      driftX: 0.05,
+      rotationDrift: 0.6,
+      pulseAmount: 0.02,
+      pulseSpeed: 0.12,
+      scanMode: "continuous" as const,
+      scanAmplitude: 0.6,
+      scanSpeed: 0.06,
+      scanAngle: 0,
+      waveAmplitude: 0,
+      waveSpeed: 0.08,
+      waveAngle: 0,
+      gapPulse: 2.5,
+      gapPulseSpeed: 0.11,
       tileSizeSpread: 0.5,
-      tileSizeSpeed: 0.05,
+      tileSizeSpeed: 0.11,
       tileSizeNoise: 1.7,
     },
   },
@@ -938,107 +1090,115 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
     label: "Radar",
     desc: "Back-and-forth horizontal scan",
     shader: {
-      speed: 0.12,
-      transparentBg: true,
-      colorCycleSpeed: 0.15,
-      scale: 0.8,
+      speed: 0.16,
+      colorCycleSpeed: 0.22,
     },
     animation: {
-      playing: true,
       fps: 0,
       driftY: 0,
       driftX: 0,
       rotationDrift: 0,
-      pulseAmount: 0.015,
-      pulseSpeed: 0.1,
+      pulseAmount: 0.02,
+      pulseSpeed: 0.16,
       scanMode: "oscillate" as const,
       scanAmplitude: 0.6,
-      scanSpeed: 0.06,
+      scanSpeed: 0.13,
       scanAngle: 0,
-      waveAmplitude: 0.15,
-      waveSpeed: 0.08,
+      waveAmplitude: 0.18,
+      waveSpeed: 0.16,
       waveAngle: 0,
-      tileDisplay: "points",
-      tileSizeSpread: 0.55,
-      tileSizeSpeed: 0.06,
+      gapPulse: 3,
+      gapPulseSpeed: 0.14,
+      tileSizeSpread: 0.65,
+      tileSizeSpeed: 0.16,
       tileSizeNoise: 1.2,
     },
   },
   "error-sweep": {
     label: "Error Sweep",
-    desc: "Diagonal scan with origin wave",
+    desc: "Diagonal scan with a vertical wave",
     shader: {
-      speed: 0.1,
-      transparentBg: true,
-      colorCycleSpeed: 0.25,
-      alphaSpread: 0.06,
-      scale: 0.85,
+      speed: 0.36,
+      colorCycleSpeed: 0.4,
     },
     animation: {
-      playing: true,
       fps: 0,
       driftY: 0,
       driftX: 0,
-      rotationDrift: 0.3,
-      pulseAmount: 0.02,
-      pulseSpeed: 0.15,
+      rotationDrift: 1.2,
+      pulseAmount: 0.035,
+      pulseSpeed: 0.18,
       scanMode: "oscillate" as const,
-      scanAmplitude: 0.4,
-      scanSpeed: 0.05,
+      scanAmplitude: 0.85,
+      scanSpeed: 0.2,
       scanAngle: 30,
-      waveAmplitude: 0.2,
-      waveSpeed: 0.12,
+      waveAmplitude: 0.42,
+      waveSpeed: 0.24,
       waveAngle: 90,
-      tileDisplay: "points",
-      tileSizeSpread: 0.62,
-      tileSizeSpeed: 0.075,
+      gapPulse: 3.5,
+      gapPulseSpeed: 0.2,
+      tileSizeSpread: 0.6,
+      tileSizeSpeed: 0.13,
       tileSizeNoise: 1.15,
     },
   },
   "deep-breath": {
     label: "Breath",
-    desc: "Slow meditative breathing",
+    desc: "Slow, deep meditative breathing",
     shader: {
       speed: 0.06,
-      transparentBg: true,
-      colorCycleSpeed: 0.35,
-      scale: 0.85,
+      colorCycleSpeed: 0.32,
     },
     animation: {
-      playing: true,
       fps: 0,
       driftY: 0,
       driftX: 0,
       rotationDrift: 0,
       pulseAmount: 0.08,
-      pulseSpeed: 0.12,
-      tileDisplay: "points",
-      tileSizeSpread: 0.58,
-      tileSizeSpeed: 0.03,
+      pulseSpeed: 0.08,
+      scanMode: "continuous" as const,
+      scanAmplitude: 0.6,
+      scanSpeed: 0.06,
+      scanAngle: 0,
+      waveAmplitude: 0,
+      waveSpeed: 0.08,
+      waveAngle: 0,
+      gapPulse: 8,
+      gapPulseSpeed: 0.06,
+      tileSizeSpread: 0.72,
+      tileSizeSpeed: 0.05,
       tileSizeNoise: 1.4,
     },
   },
   "solid-classic": {
     label: "Classic",
-    desc: "Single color, minimal motion",
+    desc: "Near-static shader motion — calm baseline",
     shader: {
-      speed: 0.15,
-      transparentBg: false,
-      colorCycleSpeed: 0,
-      scale: 0.8,
+      // Paper's large contours reorganize dramatically even at the default
+      // 0.12-ish speed. Keep Classic genuinely ambient so it does not read as
+      // a periodic blink in the bare Layers view.
+      speed: 0.025,
+      colorCycleSpeed: 0.0,
     },
     animation: {
-      playing: true,
       fps: 0,
       driftY: 0,
       driftX: 0,
       rotationDrift: 0,
-      pulseAmount: 0.02,
-      pulseSpeed: 0.2,
-      tileDisplay: "points",
-      tileSizeSpread: 0.32,
-      tileSizeSpeed: 0.025,
-      tileSizeNoise: 2,
+      pulseAmount: 0.006,
+      pulseSpeed: 0.06,
+      scanMode: "continuous" as const,
+      scanAmplitude: 0.6,
+      scanSpeed: 0.06,
+      scanAngle: 0,
+      waveAmplitude: 0,
+      waveSpeed: 0.08,
+      waveAngle: 0,
+      gapPulse: 0.25,
+      gapPulseSpeed: 0.04,
+      tileSizeSpread: 0.28,
+      tileSizeSpeed: 0.04,
+      tileSizeNoise: 2.0,
     },
   },
 };
@@ -1066,22 +1226,130 @@ const defaults: DitherState = {
   pixelGrid: { ...defaultPixelGridConfig },
   animation: { ...defaultAnimationConfig },
   layout: { ...defaultLayoutConfig },
+  button: { ...defaultButtonConfig },
   haptic: { ...defaultHapticConfig },
   copyVariant: "broke-fixed",
   initialState: "problem",
   activeScene: null,
+  activeTemplate: null,
   terminalTheme: null,
   wtfTitlePositions: { ...defaultWtfTitlePositions },
+  stableColorField: false,
 };
 
 /* ─── Store ─── */
 
-let state: DitherState = structuredClone(defaults);
+type DitherStoreWindow = Window & {
+  __dither?: () => DitherState;
+  __ditherState?: DitherState;
+  __ditherSyncBridge?: DitherSyncBridge;
+};
+const storeWindow = typeof window === "undefined" ? null : window as DitherStoreWindow;
+// Fast Refresh replaces this module but not `window`. Reuse the live snapshot
+// so editing store or scene code cannot flash the preview back to defaults.
+let state: DitherState = storeWindow?.__ditherState ?? structuredClone(defaults);
+if (storeWindow) {
+  storeWindow.__ditherState = state;
+  storeWindow.__dither = () => state;
+}
+
+type DitherSyncMessage = { type: "state"; state: DitherState; copyVariants: typeof copyVariants; sourceId?: string };
+interface DitherSyncBridge {
+  started?: boolean;
+  role?: "source" | "preview";
+  templateId?: string | null;
+  live?: boolean;
+  lastAppliedJson?: string;
+  sourceSend?: () => void;
+  snapshot?: () => { state: DitherState; copyVariants: typeof copyVariants };
+  applyMessage?: (message: DitherSyncMessage) => void;
+  /** Stable per-tab id for the source in THIS window. Survives Fast Refresh
+   *  because it lives on the window-level bridge, not the module. */
+  sourceId?: string;
+  /** Preview-only: apply broadcasts from ONLY this source id. When set, the
+   *  frame ignores every other Hero Lab tab on the shared channel, so a second
+   *  tab's heartbeat can't overwrite it (the Layers scene-switch blink). */
+  expectSourceId?: string | null;
+  /** The live BroadcastChannel, kept on the bridge so the sender can be rebuilt
+   *  from a fresh module (HMR) without recreating the channel. */
+  channel?: BroadcastChannel;
+  /** Preview-only: timestamp (performance.now) of the last message accepted from
+   *  the bound source. Powers the liveness fallback so a preview can never stay
+   *  frozen if its source dies or desyncs. */
+  lastBoundMsgAt?: number;
+}
+
+// BroadcastChannel objects and timers survive Vite Fast Refresh, while this
+// module's `state` binding does not. Keep a tiny window-level bridge whose
+// callbacks are replaced by every fresh module instance; surviving channels
+// then always read/write the current store instead of blinking to stale state.
+const syncBridge: DitherSyncBridge = storeWindow
+  ? (storeWindow.__ditherSyncBridge ??= {})
+  : {};
+syncBridge.snapshot = () => ({ state, copyVariants });
+// Mint this tab's source id once (kept on the surviving bridge across HMR).
+syncBridge.sourceId ??= (typeof crypto !== "undefined" && crypto.randomUUID)
+  ? crypto.randomUUID()
+  : Math.random().toString(36).slice(2);
+
+/** This tab's source id — embed it in a preview iframe's URL (`&sid=…`) so the
+ *  frame binds to this source only and ignores other Hero Lab tabs. */
+export function getTabSourceId(): string {
+  return syncBridge.sourceId ?? "";
+}
+
+/** Build the source broadcaster from THIS module, reading the channel, id and
+ *  snapshot off the bridge at call time. Rebuilt on every module load so an HMR
+ *  across a protocol change (e.g. sourceId tagging) can never leave a stale,
+ *  untagged closure broadcasting — which would make bound previews reject every
+ *  message and freeze. The BroadcastChannel object itself survives on the bridge. */
+function refreshSourceSend(): () => void {
+  const send = () => {
+    const latest = syncBridge.snapshot?.() ?? { state, copyVariants };
+    syncBridge.channel?.postMessage({ type: "state", sourceId: syncBridge.sourceId, ...latest });
+  };
+  syncBridge.sourceSend = send;
+  return send;
+}
+
 const listeners = new Set<() => void>();
+if (syncBridge.role === "source") {
+  // Rebuild (not reuse) the sender so a surviving stale closure can't broadcast.
+  listeners.add(refreshSourceSend());
+}
+
+let batchDepth = 0;
+let batchDirty = false;
+
+function flushEmit() {
+  state = { ...state };
+  if (storeWindow) storeWindow.__ditherState = state;
+  listeners.forEach((l) => l());
+}
 
 function emit() {
-  state = { ...state };
-  listeners.forEach((l) => l());
+  if (batchDepth > 0) {
+    batchDirty = true;
+    return;
+  }
+  flushEmit();
+}
+
+/** Apply several related controls as one externally-observable state. This is
+ *  primarily for compound UI actions (Layers Full stack/Bare scene): React and
+ *  preview sync receive only the complete configuration, never transient
+ *  renderer combinations between individual setters. */
+export function batchDitherUpdates(run: () => void) {
+  batchDepth += 1;
+  try {
+    run();
+  } finally {
+    batchDepth -= 1;
+    if (batchDepth === 0 && batchDirty) {
+      batchDirty = false;
+      flushEmit();
+    }
+  }
 }
 
 function subscribe(listener: () => void) {
@@ -1099,17 +1367,19 @@ export function useDitherStore() {
 
 /* ─── Actions ─── */
 
-/** Shader keys controlled by scene templates — changing these clears activeScene */
+/** Shader keys a scene may drive — MOTION ONLY. Scenes never touch look keys
+ *  (scale, transparentBg, alphaSpread, shapes, colors, pixel grid). */
 const SCENE_SHADER_KEYS: (keyof DitherShaderConfig)[] = [
-  "speed", "transparentBg", "colorCycleSpeed", "alphaSpread", "scale",
+  "speed", "colorCycleSpeed",
 ];
-/** Animation keys controlled by scene templates (excludes 'playing') */
+/** Animation keys a scene may drive (excludes 'playing' and — deliberately —
+ *  'tileDisplay': the tile renderer is a look choice, not a motion one). */
 const SCENE_ANIM_KEYS: (keyof DitherAnimationConfig)[] = [
   "driftY", "driftX", "rotationDrift", "pulseAmount", "pulseSpeed", "fps", "frameStep",
   "scanMode", "scanAmplitude", "scanSpeed", "scanAngle",
   "waveAmplitude", "waveSpeed", "waveAngle",
   "gapPulse", "gapPulseSpeed", "loopBreak", "loopBreakAmount",
-  "tileDisplay", "tileSizeSpread", "tileSizeSpeed", "tileSizeNoise",
+  "tileSizeSpread", "tileSizeSpeed", "tileSizeNoise",
 ];
 
 /** Recommended loop-breaker per scene — applied when you pick a scene (you can
@@ -1164,15 +1434,23 @@ export function setHoverLayer(index: number, patch: Partial<DitherAlphaLayer>) {
 export function setInitialState(id: InitialStateId) {
   const base = id === "fix" ? fixLayers : problemLayers;
   const reveal = id === "fix" ? problemLayers : fixLayers;
+  const baseOpacities = state.shader.alphaLayers.map((layer) => layer.opacity);
+  const revealOpacities = state.hover.hoverLayers.map((layer) => layer.opacity);
   state.initialState = id;
   state.shader = {
     ...state.shader,
-    alphaLayers: base.map((l) => ({ ...l })),
+    alphaLayers: base.map((l, i) => ({
+      ...l,
+      opacity: baseOpacities[i] ?? l.opacity,
+    })),
     colorFront: base[0].color,
   };
   state.hover = {
     ...state.hover,
-    hoverLayers: reveal.map((l) => ({ ...l })),
+    hoverLayers: reveal.map((l, i) => ({
+      ...l,
+      opacity: revealOpacities[i] ?? l.opacity,
+    })),
     fixColor: reveal[0].color,
     fixShape: reveal[0].shape,
   };
@@ -1209,6 +1487,11 @@ export function setLayoutConfig(patch: Partial<DitherLayoutConfig>) {
   emit();
 }
 
+export function setButtonConfig(patch: Partial<DitherButtonConfig>) {
+  state.button = { ...state.button, ...patch };
+  emit();
+}
+
 export function setWtfTitlePos(key: keyof WtfTitlePositions, patch: Partial<TitlePos>) {
   state.wtfTitlePositions = {
     ...state.wtfTitlePositions,
@@ -1233,19 +1516,56 @@ export function setAnimationConfig(patch: Partial<DitherAnimationConfig>) {
   emit();
 }
 
-export function applySceneTemplate(id: SceneTemplateId) {
+/** Layers-explorer only: calm the screen-blended Color/alpha base (see
+ *  DitherState.stableColorField). Set on entering Layers, cleared on leaving. */
+export function setStableColorField(on: boolean) {
+  if (state.stableColorField === on) return;
+  state.stableColorField = on;
+  emit();
+}
+
+/** Change the loop-breaker WITHOUT detaching from the active scene. Plain
+ *  setAnimationConfig() nulls activeScene for any scene-motion key (loopBreak is
+ *  one), which would clear the scene highlight. This layers non-repeating motion
+ *  ('wander' = organic/random) on top of the CURRENT scene and keeps it
+ *  selected. Turning it on from a zero amount raises it to a visible default. */
+export function setLoopBreak(mode: LoopBreakMode) {
+  // Turning it on from the Layers picker uses a pronounced amount so the effect
+  // clearly reads as dynamic (scene defaults keep the subtler 0.5 for a gentle
+  // production anti-loop). Leave an already-strong amount alone.
+  const amount = mode === "none"
+    ? state.animation.loopBreakAmount
+    : Math.max(state.animation.loopBreakAmount, 1.3);
+  state.animation = { ...state.animation, loopBreak: mode, loopBreakAmount: amount };
+  emit();
+}
+
+/** Motion-only patches for a scene — shared by the scene buttons and by hero
+ *  templates that bake a scene in. */
+function sceneMotionPatches(id: SceneTemplateId) {
   const tmpl = sceneTemplates[id];
-  // Reset scene-controlled shader props to defaults, then apply template
-  const sceneShaderDefaults: Partial<DitherShaderConfig> = {};
-  for (const k of SCENE_SHADER_KEYS) sceneShaderDefaults[k] = defaultShaderConfig[k] as never;
-  state.shader = { ...state.shader, ...sceneShaderDefaults, ...tmpl.shader };
-  // Reset full animation to defaults, then apply template + its recommended
-  // loop-breaker (template can still override loopBreak explicitly).
-  state.animation = {
-    ...defaultAnimationConfig,
-    loopBreak: SCENE_LOOP_BREAK[id],
-    ...tmpl.animation,
-  };
+  const tShader = tmpl.shader as Partial<DitherShaderConfig>;
+  const tAnim = tmpl.animation as Partial<DitherAnimationConfig>;
+  const shaderPatch: Partial<DitherShaderConfig> = {};
+  for (const k of SCENE_SHADER_KEYS) {
+    shaderPatch[k] = (tShader[k] ?? defaultShaderConfig[k]) as never;
+  }
+  const animPatch: Partial<DitherAnimationConfig> = {};
+  for (const k of SCENE_ANIM_KEYS) {
+    animPatch[k] = (tAnim[k] ?? defaultAnimationConfig[k]) as never;
+  }
+  animPatch.loopBreak = tAnim.loopBreak ?? SCENE_LOOP_BREAK[id];
+  return { shaderPatch, animPatch };
+}
+
+export function applySceneTemplate(id: SceneTemplateId) {
+  // Scenes are MOTION OVERLAYS: reset only the motion keys to defaults, lay
+  // the scene's motion on top, and leave every look decision (tile display,
+  // scale, transparency, spread, pixel grid, shapes, colors) exactly as the
+  // user set it. Switching scenes swaps the dynamic, never the style.
+  const { shaderPatch, animPatch } = sceneMotionPatches(id);
+  state.shader = { ...state.shader, ...shaderPatch };
+  state.animation = { ...state.animation, ...animPatch, playing: true };
   state.activeScene = id;
   emit();
 }
@@ -1284,4 +1604,307 @@ export function setTerminalTheme(id: string | null) {
 export function resetDither() {
   state = structuredClone(defaults);
   emit();
+}
+
+/* ─── Hero templates ─── */
+
+/** A template is a curated snapshot: defaults + a small patch, applied
+ *  wholesale so every pick lands on the same art-directed look regardless of
+ *  what was tweaked before. topInset stays locally measured (header height). */
+export interface HeroTemplate {
+  id: string;
+  name: string;
+  desc: string;
+  /** Swatch colors for the picker's mini dot preview */
+  swatch: string[];
+  initialState: InitialStateId;
+  shader?: Partial<DitherShaderConfig>;
+  edge?: Partial<DitherEdgeConfig>;
+  hover?: Partial<DitherHoverConfig>;
+  animation?: Partial<DitherAnimationConfig>;
+  pixelGrid?: Partial<DitherPixelGridConfig>;
+  copyVariant?: CopyVariantId;
+  scene?: SceneTemplateId | null;
+  button?: Partial<DitherButtonConfig>;
+}
+
+export const heroTemplates: HeroTemplate[] = [
+  {
+    id: "full-bleed",
+    name: "Full Bleed",
+    desc: "Shapes fill the whole hero and flow around every text line — tight 8px clearance with a lively 2-row rim, resting on the pink problem state.",
+    swatch: ["#E6307A", "#FF6B2B", "#FF3366"],
+    initialState: "problem",
+    copyVariant: "full-bleed",
+    edge: {
+      mode: "full",
+      fullPadding: 8,
+      textRectMode: "lines",
+      dissolveDepth: 2,
+      textBlendMotion: 1,
+      textBlendSpeed: 0.33,
+    },
+    animation: { tileDisplay: "points" },
+  },
+  {
+    id: "problem",
+    name: "Problem",
+    desc: "Square error tiles on a 96px grid with wide gaps, pink problem state at rest; hover reveals the green fix. AI-native copy in Space Mono.",
+    swatch: ["#E6307A", "#FF6B2B", "#FF3366"],
+    initialState: "problem",
+    // AI-native headline baked in: "Your AI built the app. Who's watching it run?"
+    copyVariant: "ai",
+    // Match the reveal layer's detailed sampling. The global 0.21 scale makes
+    // Error Sweep read as a few broad, almost-static regions; 0.81 exposes the
+    // moving scan/wave structure in the resting pink scene too.
+    shader: { scale: 0.81 },
+    // snap OFF: with snap on, every tile locks to one identical dot and the
+    // dither axis-aligns, so scene drift/scan/rotation can only flip tiles
+    // on/off at the threshold — every scene looks the same. Snap off lets the
+    // dither flow freely under the square tile mask, so scene motion reads.
+    pixelGrid: { cell: 96, divisions: 3, gap: 13, radius: 0, snap: false },
+    // The most expressive color/alpha scene: diagonal scan + vertical wave,
+    // slow rotation, color cycling, and an orbiting non-looping drift.
+    scene: "error-sweep",
+    animation: { tileDisplay: "color" },
+    // Square, uppercase CTA to echo the sharp pixel tiles.
+    button: { radius: 0, uppercase: true },
+  },
+  {
+    // Captured from a live Layers exploration — the fine-grain Paper dither on
+    // the green fix state (Color/alpha renderer, no pixel grid), with the Sweep
+    // scene's slow diagonal scan and a rotating loop-break so it never repeats.
+    // Motion is authored directly (scene: null) so the rotate loop-break isn't
+    // overwritten by the scene's own recommended drift.
+    id: "fine-grain",
+    name: "Fine Grain",
+    desc: "Fine-grain Paper dither on the green fix state — a smooth, high-detail field with a slow diagonal sweep and a rotating loop-break so the motion never repeats. Hover warps to the pink problem with error-log fragments.",
+    swatch: ["#2DD4A8", "#3ECF8E", "#1A8A70"],
+    initialState: "fix",
+    copyVariant: "fine-grain",
+    shader: {
+      type: "8x8",
+      shape: "simplex",
+      size: 2,
+      scale: 0.6,
+      speed: 0.1,
+      colorCycleSpeed: 0.12,
+      rotation: 8,
+      transparentBg: true,
+      alphaSpread: 0.04,
+      fit: "cover",
+    },
+    edge: {
+      mode: "dissolve",
+      position: 62,
+      dissolveDepth: 7,
+      dissolveSeed: 1,
+      shaderExtend: 160,
+      ripplePixelate: true,
+      rippleDither: true,
+      rippleAmplitude: 4,
+      rippleFrequency: 6,
+      rippleSpeed: 0.5,
+      textBlend: false,
+    },
+    // Full hover story on top of the calm resting field: warp reveal to the pink
+    // problem with error-log fragments (defaults already enable reveal + text).
+    hover: {
+      enabled: true,
+      mode: "warp",
+      wholeTiles: true,
+      hoverShape: "pixel-circle",
+      warpRevealEnabled: true,
+      warpErrorText: true,
+      warpRotate: 35,
+      warpJitter: 1.5,
+      fixType: "2x2",
+      fixSize: 18.5,
+      fixScale: 0.81,
+      radius: 100,
+    },
+    // Color/alpha renderer — no pixel grid, so the dither reads as a fine
+    // continuous field rather than discrete tiles.
+    pixelGrid: { enabled: false, snap: false },
+    scene: null,
+    animation: {
+      tileDisplay: "color",
+      driftX: 0.05,
+      driftY: 0,
+      rotationDrift: 0.6,
+      pulseAmount: 0.02,
+      pulseSpeed: 0.12,
+      scanMode: "continuous",
+      scanAmplitude: 0.6,
+      scanSpeed: 0.06,
+      scanAngle: 0,
+      waveAmplitude: 0,
+      waveSpeed: 0.08,
+      waveAngle: 0,
+      gapPulse: 2.5,
+      gapPulseSpeed: 0.11,
+      loopBreak: "rotate",
+      loopBreakAmount: 1.3,
+      tileSizeSpread: 0.5,
+      tileSizeSpeed: 0.11,
+      tileSizeNoise: 1.7,
+      frameStep: 0.5,
+      fps: 0,
+    },
+  },
+];
+
+export function applyHeroTemplate(id: string) {
+  const tmpl = heroTemplates.find((t) => t.id === id);
+  if (!tmpl) return;
+  const base = structuredClone(defaults);
+  const rest = tmpl.initialState === "fix" ? fixLayers : problemLayers;
+  const reveal = tmpl.initialState === "fix" ? problemLayers : fixLayers;
+  state = {
+    ...base,
+    shader: {
+      ...base.shader,
+      ...tmpl.shader,
+      alphaLayers: rest.map((l) => ({ ...l })),
+      colorFront: rest[0].color,
+    },
+    // topInset is viewport-specific (measured off the live header) — keep it.
+    edge: { ...base.edge, ...tmpl.edge, topInset: state.edge.topInset },
+    hover: {
+      ...base.hover,
+      ...tmpl.hover,
+      hoverLayers: reveal.map((l) => ({ ...l })),
+      fixColor: reveal[0].color,
+      fixShape: reveal[0].shape,
+    },
+    animation: { ...base.animation, ...tmpl.animation },
+    pixelGrid: { ...base.pixelGrid, ...tmpl.pixelGrid },
+    button: { ...base.button, ...tmpl.button },
+    copyVariant: tmpl.copyVariant ?? base.copyVariant,
+    initialState: tmpl.initialState,
+    activeScene: tmpl.scene !== undefined ? tmpl.scene : base.activeScene,
+    activeTemplate: id,
+  };
+  // A baked-in scene contributes its motion overlay on top of the template's
+  // look (same motion-only contract as picking the scene in the panel).
+  if (tmpl.scene) {
+    const { shaderPatch, animPatch } = sceneMotionPatches(tmpl.scene);
+    state.shader = { ...state.shader, ...shaderPatch };
+    state.animation = { ...state.animation, ...animPatch };
+  }
+  emit();
+}
+
+/* ─── Preview sync ─── */
+
+let syncStarted = syncBridge.started === true;
+
+function configurePreviewSync(templateId: string | null, expectSourceId: string | null = null) {
+  syncBridge.role = "preview";
+  syncBridge.templateId = templateId;
+  syncBridge.expectSourceId = expectSourceId;
+  // Assume the bound source is live at bind time so the fallback below only fires
+  // after real silence, not on the first frame before the source is heard.
+  syncBridge.lastBoundMsgAt = typeof performance !== "undefined" ? performance.now() : 0;
+  syncBridge.applyMessage = (message) => {
+    if (message?.type !== "state") return;
+    // Bound to a single source tab: normally ignore every other Hero Lab tab's
+    // broadcast (and heartbeat) on the shared channel, so a second tab can't
+    // overwrite the scene the user just picked (the Layers blink).
+    if (syncBridge.expectSourceId) {
+      if (message.sourceId === syncBridge.expectSourceId) {
+        syncBridge.lastBoundMsgAt = typeof performance !== "undefined" ? performance.now() : 0;
+      } else {
+        // Not our bound source. Liveness safety-net: if our source has gone
+        // silent (no tagged message for >5s — 3+ missed heartbeats, i.e. its
+        // tab was closed or wedged), accept other traffic so the preview can
+        // NEVER stay permanently frozen. Otherwise keep ignoring it.
+        const now = typeof performance !== "undefined" ? performance.now() : 0;
+        const silentFor = now - (syncBridge.lastBoundMsgAt ?? 0);
+        if (silentFor <= 5000) return;
+      }
+    }
+    const incoming = message.state;
+    if (templateId) {
+      if (incoming.activeTemplate !== templateId) {
+        // Someone else's artboard is being edited — return to canonical.
+        if (syncBridge.live) {
+          syncBridge.live = false;
+          syncBridge.lastAppliedJson = "";
+          applyHeroTemplate(templateId);
+          state = { ...state, animation: { ...state.animation, playing: false } };
+          emit();
+        }
+        return;
+      }
+      syncBridge.live = true;
+    }
+    const json = JSON.stringify(message.state) + JSON.stringify(message.copyVariants);
+    if (json === syncBridge.lastAppliedJson) return;
+    syncBridge.lastAppliedJson = json;
+    for (const id of Object.keys(message.copyVariants) as CopyVariantId[]) {
+      Object.assign(copyVariants[id], message.copyVariants[id]);
+    }
+    state = {
+      ...incoming,
+      edge: { ...incoming.edge, topInset: state.edge.topInset },
+    };
+    emit();
+  };
+}
+
+// A preview's channel may have survived a hot update. Refresh its destination
+// callback immediately even when React preserves the [] effect that created it.
+if (syncBridge.role === "preview") {
+  configurePreviewSync(syncBridge.templateId ?? null, syncBridge.expectSourceId ?? null);
+}
+
+/** Mirror the store across windows (main window ↔ preview iframes) over a
+ *  BroadcastChannel. 'source' broadcasts every change and answers a
+ *  late-joining frame's hello; 'preview' applies incoming state wholesale —
+ *  except edge.topInset, which stays locally measured because it depends on
+ *  the frame's own header height (the nav collapses at small widths).
+ *
+ *  A preview frame can be pinned to a template (`templateId`): it renders that
+ *  template's canonical look and only goes LIVE (mirroring the main store)
+ *  while that template is the active one in the main window. When another
+ *  artboard takes over, the frame snaps back to its canonical template. */
+export function initDitherSync(role: "source" | "preview", templateId: string | null = null, expectSourceId: string | null = null) {
+  if (syncStarted || typeof BroadcastChannel === "undefined") return;
+  syncStarted = true;
+  syncBridge.started = true;
+  syncBridge.role = role;
+  syncBridge.templateId = templateId;
+  const ch = new BroadcastChannel("hero-lab-dither-sync");
+  syncBridge.channel = ch;
+  if (role === "source") {
+    // Build the sender from the current module and keep every caller pointed at
+    // syncBridge.sourceSend (indirection) so an HMR that rebuilds it — see
+    // refreshSourceSend — is picked up by the heartbeat and hello handler too,
+    // never a captured stale closure.
+    listeners.add(refreshSourceSend());
+    ch.onmessage = (e) => {
+      if (e.data?.type === "hello") syncBridge.sourceSend?.();
+    };
+    // Heartbeat: re-broadcast periodically so a frame that missed a message
+    // (HMR reload, throttled background tab) always converges instead of
+    // staying stale forever. Frames skip identical payloads, so idle
+    // heartbeats cost nothing downstream.
+    setInterval(() => syncBridge.sourceSend?.(), 1500);
+  } else {
+    // Canonical artboards hold a STATIC preview (one rendered frame, zero GPU
+    // work) — animation runs only on the artboard being edited.
+    const applyCanonicalPaused = () => {
+      if (!templateId) return;
+      applyHeroTemplate(templateId);
+      state = { ...state, animation: { ...state.animation, playing: false } };
+      emit();
+    };
+    applyCanonicalPaused();
+    configurePreviewSync(templateId, expectSourceId);
+    ch.onmessage = (e) => {
+      syncBridge.applyMessage?.(e.data as DitherSyncMessage);
+    };
+    ch.postMessage({ type: "hello" });
+  }
 }

@@ -75,6 +75,26 @@ function parsePx(val: string): number {
   return parseFloat(val) || 0
 }
 
+/** Docked sidebar width — the lab layout offsets the hero by this much so the
+ *  panel pushes content instead of covering it. */
+export const PANEL_WIDTH = 320
+
+function SlidersIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="21" y1="4" x2="14" y2="4" />
+      <line x1="10" y1="4" x2="3" y2="4" />
+      <line x1="21" y1="12" x2="12" y2="12" />
+      <line x1="8" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="20" x2="16" y2="20" />
+      <line x1="12" y1="20" x2="3" y2="20" />
+      <line x1="14" y1="2" x2="14" y2="6" />
+      <line x1="8" y1="10" x2="8" y2="14" />
+      <line x1="16" y1="18" x2="16" y2="22" />
+    </svg>
+  )
+}
+
 interface Props {
   themedRoot: HTMLElement | null
   paletteName?: string
@@ -109,14 +129,10 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
       <button
         onClick={() => setEnabled(true)}
         className="fixed top-20 right-6 z-[1001] px-3 py-2 rounded-xl border cursor-pointer transition-all backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 hover:border-white/20 hover:bg-[rgba(30,31,50,0.95)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] text-[12px] font-semibold text-white/70 hover:text-white/90 flex items-center gap-2"
-        title="Open Control Panel"
+        title="Open Design Panel (⌘/Ctrl + Shift + E)"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 7V4h16v3" />
-          <path d="M9 20h6" />
-          <path d="M12 4v16" />
-        </svg>
-        Inspector
+        <SlidersIcon />
+        Design Panel
       </button>
     )
   }
@@ -166,15 +182,13 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
     <div
       ref={panelRef}
       data-inspector-panel
-      className="fixed top-16 right-4 bottom-4 z-[1000] w-[300px] rounded-2xl border shadow-[0_16px_48px_rgba(0,0,0,0.6)] backdrop-blur-2xl bg-[rgba(20,21,35,0.95)] border-white/8 flex flex-col overflow-hidden"
+      className="fixed top-0 right-0 bottom-0 z-[1000] w-[320px] border-l backdrop-blur-2xl bg-[rgba(20,21,35,0.97)] border-white/10 flex flex-col overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/6 shrink-0">
         <span className="text-[12px] font-semibold text-white/90 flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" />
-          </svg>
-          Control Panel
+          <SlidersIcon />
+          Design Panel
         </span>
         <div className="flex items-center gap-1.5">
           {totalOverrides > 0 && (
