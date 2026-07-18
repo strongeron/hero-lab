@@ -4,6 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Hero & landing-page lab — swappable shader backgrounds with a live control panel. First hero: Dither, a dot-field scene with a Problem⇄Fix warp-reveal.",
+  "license": "MIT",
+  "author": "Gleb Stroganov (https://glebstroganov.com)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/strongeron/hero-lab.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

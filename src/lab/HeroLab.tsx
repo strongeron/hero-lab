@@ -7,6 +7,8 @@ import { fontPairs } from '../themes/fonts'
 import { useDitherStore, setEdgeConfig, initDitherSync, applySceneTemplate, setPixelGridConfig, setAnimationConfig, setInitialState, applyHeroTemplate, heroTemplates } from '../heroes/dither/ditherStore'
 import { heroes, getHero } from './registry'
 import { getContentPreset } from '../content/presets'
+import BrandMark, { visitFormation, staticMarkDataUri } from '../components/BrandMark'
+import SiteFooter from '../components/SiteFooter'
 import PreviewCanvas from './PreviewCanvas'
 import TemplateGallery from './TemplateGallery'
 import LayerExplorer from './LayerExplorer'
@@ -68,15 +70,15 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
       style={{ right: rightOffset }}
     >
       <div className="max-w-[1440px] mx-auto px-5 sm:px-8 xl:px-16 py-4 flex items-center justify-between">
-        <a href="#" className="flex items-center gap-3 shrink-0 no-underline text-t-headline">
-          <span className="relative grid size-7 place-items-center rounded-lg border border-t-border-strong bg-t-bg-surface overflow-hidden">
-            <span className="absolute inset-0 opacity-70" style={{
-              background: 'radial-gradient(circle at 30% 20%, var(--color-t-cta-bg), transparent 55%)',
-            }} />
-            <span className="relative block size-2.5 rounded-sm bg-current rotate-45" />
-          </span>
-          <span className="text-[18px] font-semibold tracking-[-0.03em]" style={{ fontFamily: brandFont }}>{preset.brand}</span>
-        </a>
+        <div className="flex items-center gap-3 shrink-0 text-t-headline">
+          {/* Generative mark — a new shader formation each visit. Preview frames
+              get the no-GL variant so a gallery of artboards doesn't spend a
+              WebGL context per header. */}
+          <BrandMark size={28} static={isPreviewFrame} interactive={!isPreviewFrame} />
+          <a href="#" className="no-underline text-t-headline text-[18px] font-semibold tracking-[-0.03em]" style={{ fontFamily: brandFont }}>
+            {preset.brand}
+          </a>
+        </div>
 
         <nav className="hidden xl:flex items-center">
           {preset.navLinks.map((link) => (
@@ -249,6 +251,11 @@ function LabLayout() {
   }, [viewMode])
   useEffect(() => {
     document.title = `Hero Lab — ${activeHero.name}`
+    // Match the favicon to this visit's formation, so the tab carries the same
+    // roll as the header mark. Preview frames skip it — they have no tab.
+    if (isPreviewFrame) return
+    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    if (link) link.href = staticMarkDataUri(visitFormation, 64)
   }, [])
   // Default Top start to the measured header height so the first row of shapes
   // begins whole below the filled nav — the panel slider can still override it.
@@ -318,6 +325,9 @@ function LabLayout() {
         >
           <LabHeader headerBg={heroState.headerBg} rightOffset={panelOffset} button={heroState.button} />
           <ActiveHero />
+          {/* Live view only — the artboard/breakpoint views are about the hero
+              in isolation, and preview iframes render the bare hero. */}
+          <SiteFooter />
         </div>
       )}
 
