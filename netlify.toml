@@ -1,0 +1,26 @@
+# Netlify serves this at the domain root, so the build overrides the repo's
+# default `base` of /hero-lab/ (which exists for the glebstroganov.com sub-path
+# deploy). See vite.config.ts.
+[build]
+  command = "BASE_PATH=/ npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Vite 7 requires Node 20.19+ / 22.12+.
+  NODE_VERSION = "22"
+
+# Deliberately no SPA catch-all redirect. The lab has no path-based routing —
+# every view is a query param (?hero, ?template, ?preview) on the same document.
+# A blanket /* -> /index.html 200 would turn a missing asset into a 200 that
+# returns HTML, which is the exact failure that made the sub-path build render
+# a blank page. Without it, a broken asset path 404s loudly instead.
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/posters/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"

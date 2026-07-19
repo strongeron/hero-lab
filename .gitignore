@@ -13,3 +13,6 @@ node_modules/.tmp
 
 # Local QA output (dogfood runs) — screenshots, reports; not repo content
 dogfood-output/
+
+# Local Netlify folder
+.netlify

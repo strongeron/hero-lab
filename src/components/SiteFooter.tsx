@@ -6,6 +6,7 @@
 
 const LINKS = [
   { label: 'Source on GitHub', href: 'https://github.com/strongeron/hero-lab' },
+  { label: 'Paper Design shaders', href: 'https://github.com/paper-design/shaders' },
   { label: 'glebstroganov.com', href: 'https://glebstroganov.com' },
   { label: 'X', href: 'https://x.com/strongeron' },
 ]
@@ -34,11 +35,31 @@ export default function SiteFooter() {
           </p>
 
           <p className="text-[15px] sm:text-base leading-relaxed text-t-body">
-            Hero Lab is a playground for hero sections — a WebGL dithering shader with every
-            parameter wired to a live control, breakpoint previews, and template artboards.
-            Built to answer a narrow question quickly: what does this section actually look
-            like at 320px, in motion, before anyone writes the CSS. Tune it, then copy the
-            config back into code.
+            <span className="text-t-headline">Hero Lab</span> is a playground for hero
+            sections — a WebGL dithering shader with every parameter wired to a live
+            control, breakpoint previews, and template artboards. Built to answer a narrow
+            question quickly: what does this section actually look like at 320px, in
+            motion, before anyone writes the CSS. Tune it, then copy the config back into
+            code.
+          </p>
+
+          <p className="text-[15px] sm:text-base leading-relaxed text-t-body">
+            The shader itself is{' '}
+            <a
+              href="https://github.com/paper-design/shaders"
+              className="text-t-headline no-underline hover:underline underline-offset-4"
+            >
+              @paper-design/shaders
+            </a>{' '}
+            by{' '}
+            <a
+              href="https://paper.design"
+              className="text-t-headline no-underline hover:underline underline-offset-4"
+            >
+              Paper Design
+            </a>{' '}
+            — free, open source, and MIT licensed. This lab is a control surface on top of
+            their work, not a replacement for it.
           </p>
 
           <nav className="flex flex-wrap items-center gap-x-8 gap-y-3 pt-2">

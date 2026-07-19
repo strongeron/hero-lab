@@ -3,11 +3,17 @@
 **A browser lab for hero sections.** Pick a hero, tune every shader parameter live, and
 share the exact look as a URL.
 
+### [→ Open the live lab](https://hero-lab.netlify.app)
+
 ![Hero Lab — the Dither hero, green "fix" state, with the generative mark in the header](docs/preview.jpg)
 
 The background is a real WebGL dithering shader, not an image. Every dot, colour, and
 motion value in it is exposed as a control, so you can push it around until the section
 looks right and then copy the config straight back into code.
+
+The shader is [**@paper-design/shaders**](https://github.com/paper-design/shaders) — free,
+open source, MIT. Hero Lab is a control surface on top of it. See
+[Credits](#credits).
 
 ---
 
@@ -114,10 +120,29 @@ animating.
 
 - **Vite 7** + **React 19** + **TypeScript**
 - **Tailwind CSS v4** (via `@tailwindcss/vite`) — the `t-*` palette tokens live in `src/index.css`
-- **@paper-design/shaders-react** — the `Dithering` shader (WebGL2)
+- **[@paper-design/shaders-react](https://github.com/paper-design/shaders)** — the `Dithering` shader (WebGL2)
 - **web-haptics** — subtle haptic feedback on interaction
 
 Four runtime dependencies, on purpose.
+
+## Credits
+
+The dithering shader — the thing that actually makes the background move — is
+**[@paper-design/shaders](https://github.com/paper-design/shaders)** by
+**[Paper Design](https://paper.design)** (Lost Coast Labs, Inc.). It is free, open source,
+and MIT licensed.
+
+Worth being precise about the split: Paper Design wrote the shader. Hero Lab wires its
+parameters to controls, adds the pixel-grid masking, the Problem⇄Fix warp reveal, the
+breakpoint and artboard views, and the URL serialization. If you want the shader on its
+own, take it from them directly — it stands up fine without any of this:
+
+```bash
+npm install @paper-design/shaders-react
+```
+
+Their [shader playground](https://shaders.paper.design) is the better starting point for
+exploring what else the library can do.
 
 ## Layout
 
@@ -157,15 +182,24 @@ appears once there are two or more heroes.
 
 ## Deploying
 
-The build assumes a sub-path (`/hero-lab/`). For any other location, set `BASE_PATH`:
+The build assumes a sub-path (`/hero-lab/`), since that's where it sits on
+glebstroganov.com. For any other location, set `BASE_PATH`:
 
 ```bash
 BASE_PATH=/ npm run build            # domain root
 BASE_PATH=/experiments/ npm run build
 ```
 
+The showcase deploy at [hero-lab.netlify.app](https://hero-lab.netlify.app) serves from
+the root, so `netlify.toml` sets `BASE_PATH=/` for its build.
+
 Anything that loads a file from `public/` must go through `import.meta.env.BASE_URL` — a
 bare `/posters/…` will 404 under a sub-path.
+
+Note that `netlify.toml` deliberately has **no** SPA catch-all redirect. The lab has no
+path-based routing — every view is a query param on the same document — and a blanket
+`/* → /index.html 200` turns a missing asset into a 200 that returns HTML, which is
+exactly what makes the page render blank instead of erroring.
 
 ## Notes
 
@@ -175,9 +209,10 @@ bare `/posters/…` will 404 under a sub-path.
 
 ## License
 
-[MIT](LICENSE). The shader itself comes from
-[@paper-design/shaders-react](https://github.com/paper-design/shaders), under its own
-licence.
+[MIT](LICENSE) — © 2026 Gleb Stroganov.
+
+`@paper-design/shaders` is separately MIT licensed, © 2024 Lost Coast Labs, Inc.
+(Paper Design).
 
 ---
 
