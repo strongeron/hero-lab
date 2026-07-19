@@ -6,7 +6,10 @@ function getDomPath(root: HTMLElement, target: HTMLElement): string | null {
   const indices: number[] = []
   let node: HTMLElement | null = target
   while (node && node !== root) {
-    const parent = node.parentElement
+    // Annotated rather than inferred: `node` is reassigned from `parent` at the
+    // end of the loop, so leaving this to inference makes the two depend on
+    // each other and TS falls back to `any` (TS7022).
+    const parent: HTMLElement | null = node.parentElement
     if (!parent) return null
     const idx = Array.from(parent.children).indexOf(node)
     if (idx === -1) return null
@@ -51,7 +54,6 @@ function findTextAncestor(root: HTMLElement, target: HTMLElement): HTMLElement |
 }
 
 const HIGHLIGHT_OUTLINE = '2px solid rgba(27, 68, 218, 0.7)'
-const HIGHLIGHT_RADIUS = '2px'
 
 export function useTextSelection(heroRef: React.RefObject<HTMLElement | null>) {
   const { enabled, select, selectedElement } = useTextInspector()

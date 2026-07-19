@@ -1066,7 +1066,6 @@ export default function DitherHero() {
 
   // ── Ripple edge animation ──
   const [ripplePhase, setRipplePhase] = useState(0)
-  const rippleContainerRef = useRef<HTMLDivElement>(null)
   // Measured shader-container size, needed to build the pixelated ripple in px.
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
   // The Paper dither shader pixelizes from the canvas center, not from 0,0.
@@ -1390,7 +1389,9 @@ export default function DitherHero() {
   const problemMotionBoost = initialState === 'problem'
     && anim.tileDisplay === 'color'
     && activeScene != null
-    && activeScene !== 'classic'
+    // The id is `solid-classic` — `classic` is only the display label, and
+    // comparing against it silently never matches.
+    && activeScene !== 'solid-classic'
     ? 1.8
     : 1
 

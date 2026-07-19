@@ -1,0 +1,33 @@
+name: CI
+
+# Runs on pushes to main and on every PR, so a pull request is gated before its
+# Netlify deploy preview is worth looking at. Deployment itself is NOT handled
+# here — Netlify builds from its own repo webhook (deploy key + push /
+# pull_request events). This workflow only decides whether the code is sound.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches netlify.toml's NODE_VERSION so CI cannot pass on a version
+          # the deploy never uses. Vite 7 needs 20.19+ / 22.12+.
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Build last: it is the slowest step and the one most likely to be fixed
+      # by fixing a type error above.
+      - name: Build
+        run: npm run build
