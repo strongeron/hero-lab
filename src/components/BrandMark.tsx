@@ -169,11 +169,21 @@ export default function BrandMark({
 
   const mark = (
     <span
-      className="relative block overflow-hidden rounded-lg border border-t-border-strong"
-      // `isolation` confines the shader's screen blend to this box. Without it
-      // the canvas blends against the page — which on a light header washes the
-      // whole mark out to nothing.
-      style={{ width: size, height: size, background: formation.colorBack, isolation: 'isolate' }}
+      className="relative block overflow-hidden rounded-lg"
+      style={{
+        width: size,
+        height: size,
+        background: formation.colorBack,
+        // `isolation` confines the shader's screen blend to this box. Without
+        // it the canvas blends against the page — which on a light header
+        // washes the whole mark out to nothing.
+        isolation: 'isolate',
+        // A single soft inset hairline instead of a token border plus a bright
+        // inner ring. Those stacked into a hard bright outline that read as a
+        // UI chip and drew more attention than the formation inside it. Low
+        // alpha describes the edge without competing with the field.
+        boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.09)',
+      }}
     >
       {/* The floor — a seeded dot formation under the live shader.
           The dither field oscillates through *empty* as it animates, so on its
@@ -211,11 +221,12 @@ export default function BrandMark({
           worldHeight={1}
           maxPixelCount={size * size * 4}
           minPixelRatio={1}
-          style={{ width: '100%', height: '100%', display: 'block', mixBlendMode: 'screen', position: 'relative' }}
+          // Held below full strength so the live grain reads as a tint over the
+          // formation rather than a bright field in its own right — the mark
+          // should sit quietly next to the wordmark, not glow beside it.
+          style={{ width: '100%', height: '100%', display: 'block', mixBlendMode: 'screen', position: 'relative', opacity: 0.8 }}
         />
       )}
-      {/* Inner hairline — keeps the mark crisp against a light header. */}
-      <span className="pointer-events-none absolute inset-0 rounded-lg ring-1 ring-inset ring-white/10" />
     </span>
   )
 
