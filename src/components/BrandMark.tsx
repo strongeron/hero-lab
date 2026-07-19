@@ -3,14 +3,15 @@
  *
  *  The lab's whole thesis is "one scene, many formations", so the logo is the
  *  thesis at 28px: same shader, same palettes, different draw each load. The
- *  seed is module-level, so every mount in a page shares one formation (the
- *  header and the favicon can't disagree), and `?logo=<hex>` pins it when a
- *  screenshot needs to be reproducible.
+ *  seed is module-level, so every mount in a page shares one formation, and
+ *  `?logo=<hex>` pins it when a screenshot needs to be reproducible.
  *
- *  Cost note: this is a real WebGL context. The main window can afford one; the
- *  gallery/breakpoint iframes cannot (they already run the hero's own shader
- *  layers, several frames at a time), so those get `static` — a seeded SVG dot
- *  formation drawn from the same generator. Same vocabulary, no GL. */
+ *  This is Hero Lab's own mark, not the demo brand's. It appears once, on the
+ *  lab toolbar (Templates / Breakpoints / Layers) — never inside an artboard,
+ *  where ACME's fixed mark belongs instead.
+ *
+ *  Cost note: this is a real WebGL context. One view is mounted at a time, so
+ *  that's one context total. */
 import { useState } from 'react'
 import { Dithering } from '@paper-design/shaders-react'
 
@@ -114,8 +115,8 @@ const prefersReducedMotion = () =>
   typeof window !== 'undefined' &&
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
 
-/** This page load's formation. Module-level so header + favicon agree. */
-export const visitFormation = makeFormation(readSeed(), prefersReducedMotion())
+/** This page load's formation. Module-level so every mount in the page agrees. */
+const visitFormation = makeFormation(readSeed(), prefersReducedMotion())
 
 // ─── Static fallback ──────────────────────────────────────────────────────────
 
@@ -146,9 +147,9 @@ function staticMarkSvg(f: Formation, px = 28): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${px} ${px}" width="${px}" height="${px}"><rect width="${px}" height="${px}" rx="${(px / 4).toFixed(2)}" fill="${f.colorBack}"/>${dots}</svg>`
 }
 
-/** The static mark as a data URI — used for the favicon and the no-GL fallback,
- *  which keeps the SVG out of innerHTML entirely. */
-export function staticMarkDataUri(f: Formation, px = 28): string {
+/** The static mark as a data URI — the underlay beneath the live shader, as a
+ *  background-image so the SVG never goes through innerHTML. */
+function staticMarkDataUri(f: Formation, px = 28): string {
   return `data:image/svg+xml,${encodeURIComponent(staticMarkSvg(f, px))}`
 }
 
@@ -156,12 +157,9 @@ export function staticMarkDataUri(f: Formation, px = 28): string {
 
 export default function BrandMark({
   size = 28,
-  static: isStatic = false,
   interactive = true,
 }: {
   size?: number
-  /** Skip WebGL — render the seeded SVG formation only. */
-  static?: boolean
   /** Click to roll a new formation. */
   interactive?: boolean
 }) {
@@ -197,36 +195,34 @@ export default function BrandMark({
         className="absolute inset-0 bg-cover bg-center"
         style={{
           backgroundImage: `url("${staticMarkDataUri(formation, size)}")`,
-          opacity: isStatic ? 1 : 0.72,
+          opacity: 0.72,
         }}
       />
-      {!isStatic && (
-        <Dithering
-          // Black back + screen blend = the empty parts of the field composite
-          // away, letting the underlay show through. Same trick the hero uses
-          // to stack its alpha layers.
-          colorBack="#000000"
-          colorFront={formation.colorFront}
-          shape={formation.shape}
-          type={formation.type}
-          size={formation.size}
-          scale={formation.scale}
-          rotation={formation.rotation}
-          offsetX={formation.offsetX}
-          offsetY={formation.offsetY}
-          speed={formation.speed}
-          frame={formation.frame}
-          fit="cover"
-          worldWidth={1}
-          worldHeight={1}
-          maxPixelCount={size * size * 4}
-          minPixelRatio={1}
-          // Held below full strength so the live grain reads as a tint over the
-          // formation rather than a bright field in its own right — the mark
-          // should sit quietly next to the wordmark, not glow beside it.
-          style={{ width: '100%', height: '100%', display: 'block', mixBlendMode: 'screen', position: 'relative', opacity: 0.8 }}
-        />
-      )}
+      <Dithering
+        // Black back + screen blend = the empty parts of the field composite
+        // away, letting the underlay show through. Same trick the hero uses
+        // to stack its alpha layers.
+        colorBack="#000000"
+        colorFront={formation.colorFront}
+        shape={formation.shape}
+        type={formation.type}
+        size={formation.size}
+        scale={formation.scale}
+        rotation={formation.rotation}
+        offsetX={formation.offsetX}
+        offsetY={formation.offsetY}
+        speed={formation.speed}
+        frame={formation.frame}
+        fit="cover"
+        worldWidth={1}
+        worldHeight={1}
+        maxPixelCount={size * size * 4}
+        minPixelRatio={1}
+        // Held below full strength so the live grain reads as a tint over the
+        // formation rather than a bright field in its own right — the mark
+        // should sit quietly next to the wordmark, not glow beside it.
+        style={{ width: '100%', height: '100%', display: 'block', mixBlendMode: 'screen', position: 'relative', opacity: 0.8 }}
+      />
     </span>
   )
 

@@ -23,7 +23,7 @@ src/
       DitherPanel.tsx       the control panel body
       urlParams.ts          reads URL params into the store pre-mount
   components/
-    BrandMark.tsx           the generative logo
+    BrandMark.tsx           the generative Hero Lab logo (lab toolbars only)
     SiteFooter.tsx          author / colophon footer (Live view only)
     playground/             TextInspectorPanel, PaletteColorPicker, selection hooks
   content/presets.ts        header brand + nav, swappable
@@ -55,8 +55,13 @@ instead, so the shader alone would be the mark; at 28px the field is sparse ofte
 that it degraded to a muddy coloured box.
 
 **One `<Dithering>` is one WebGL context, and browsers cap a page at roughly 16.** Past
-that, canvases silently fail to acquire one. The gallery and breakpoint iframes therefore
-render the static formation only; the live shader mark is spent on the main window.
+that, canvases silently fail to acquire one. The mark is therefore spent in exactly one
+place: the lab toolbar shared by Templates, Breakpoints and Layers, of which one view is
+mounted at a time.
+
+It is deliberately *not* the demo brand's mark. ACME's logo (`LabHeader` in `HeroLab.tsx`)
+is a fixed shape — a mark that redraws itself per visit isn't a brand, and the baked
+posters can't follow one, so the live view and the gallery would disagree.
 
 Also worth knowing: `mixBlendMode: screen` escapes to the page without `isolation: isolate`
 on the container, which washes the mark out entirely on a light header. And only shapes

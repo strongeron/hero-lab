@@ -7,7 +7,6 @@ import { fontPairs } from '../themes/fonts'
 import { useDitherStore, setEdgeConfig, initDitherSync, applySceneTemplate, setPixelGridConfig, setAnimationConfig, setInitialState, applyHeroTemplate, heroTemplates } from '../heroes/dither/ditherStore'
 import { heroes, getHero } from './registry'
 import { getContentPreset } from '../content/presets'
-import BrandMark from '../components/BrandMark'
 import SiteFooter from '../components/SiteFooter'
 import PreviewCanvas from './PreviewCanvas'
 import TemplateGallery from './TemplateGallery'
@@ -70,18 +69,21 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
       style={{ right: rightOffset }}
     >
       <div className="max-w-[1440px] mx-auto px-5 sm:px-8 xl:px-16 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3 shrink-0 text-t-headline">
-          {/* Static here, in every context. This is the demo brand's mark inside
-              a hero that is itself a moving shader — a second animation at 28px
-              competes with the thing the page exists to show. It stays
-              generative (a new formation each visit, click to reroll); it just
-              doesn't move. The animated version lives on the Templates toolbar,
-              where it marks the project rather than the demo. */}
-          <BrandMark size={28} static interactive={!isPreviewFrame} />
-          <a href="#" className="no-underline text-t-headline text-[18px] font-semibold tracking-[-0.03em]" style={{ fontFamily: brandFont }}>
+        <a href="#" className="flex items-center gap-3 shrink-0 no-underline text-t-headline">
+          {/* Fixed, not the generative BrandMark. ACME is a demo *brand*: a
+              mark that redraws itself per visit isn't one, and it left the
+              live view disagreeing with the gallery's baked posters. Only the
+              wordmark's face follows the template. */}
+          <span className="relative grid size-7 place-items-center rounded-lg border border-t-border-strong bg-t-bg-surface overflow-hidden">
+            <span className="absolute inset-0 opacity-70" style={{
+              background: 'radial-gradient(circle at 30% 20%, var(--color-t-cta-bg), transparent 55%)',
+            }} />
+            <span className="relative block size-2.5 rounded-sm bg-current rotate-45" />
+          </span>
+          <span className="text-[18px] font-semibold tracking-[-0.03em]" style={{ fontFamily: brandFont }}>
             {preset.brand}
-          </a>
-        </div>
+          </span>
+        </a>
 
         <nav className="hidden xl:flex items-center">
           {preset.navLinks.map((link) => (
