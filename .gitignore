@@ -20,3 +20,7 @@ docs/og-candidates/
 
 # Local Netlify folder
 .netlify
+
+# Cover variants are regenerable output of docs/cover/generate-cover.py.
+# Only the shipped SVG is tracked.
+docs/cover/cover-a1-*.svg
