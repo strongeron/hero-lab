@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDitherStore, applyHeroTemplate, heroTemplates, getTabSourceId } from '../heroes/dither/ditherStore'
-import BrandMark from '../components/BrandMark'
+import LabToolbarTitle from './LabToolbarTitle'
 import { DEVICES } from './PreviewCanvas'
 
 const GAP = 32
@@ -66,21 +66,10 @@ export default function TemplateGallery() {
     <div className="h-screen flex flex-col bg-[#0b0c14]">
       {/* Pinned toolbar */}
       <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
-        {/* `min-w-0` + `nowrap` so the strap line truncates instead of wrapping:
-            without it a narrow viewport turns this row into a tall column and
-            shoves the artboards down the page. The strap is context, not
-            navigation, so it's the first thing to go when space is short. */}
-        <span className="text-[12px] font-semibold text-white/90 flex items-center gap-2 min-w-0 whitespace-nowrap">
-          {/* The project's own mark, and the one place the generative logo
-              animates — this toolbar belongs to Hero Lab, not to the demo brand
-              inside the artboards, so motion here competes with nothing. */}
-          <BrandMark size={20} />
-          Hero Lab
-          <span className="font-normal text-white/45">Templates</span>
-          <span className="hidden lg:inline font-normal text-white/25 truncate">
-            baked snapshots — select an artboard to load the live animation &amp; edit in the Design Panel
-          </span>
-        </span>
+        <LabToolbarTitle
+          view="Templates"
+          strap="baked snapshots — select an artboard to load the live animation & edit in the Design Panel"
+        />
         <div className="flex items-center gap-1 p-0.5 rounded-lg bg-white/[0.04] border border-white/8">
           {([['fit', `Fit ${Math.round(fitScale * 100)}%`], [0.75, '75%'], [1, '100%']] as const).map(
             ([mode, label]) => (

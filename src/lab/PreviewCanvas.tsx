@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getTabSourceId } from '../heroes/dither/ditherStore'
+import LabToolbarTitle from './LabToolbarTitle'
 
 /** The three breakpoints shown side by side, at true relative scale. Each is a
  *  real same-origin iframe at native device width, so viewport media queries
@@ -55,13 +56,10 @@ export default function PreviewCanvas() {
     <div className="h-screen flex flex-col bg-[#0b0c14]">
       {/* Pinned canvas toolbar */}
       <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
-        <span className="text-[12px] font-semibold text-white/90 flex items-baseline gap-2">
-          Hero Lab
-          <span className="font-normal text-white/45">Breakpoints</span>
-          <span className="font-normal text-white/25">
-            the current hero across devices — reflects Live &amp; the selected template
-          </span>
-        </span>
+        <LabToolbarTitle
+          view="Breakpoints"
+          strap="the current hero across devices — reflects Live & the selected template"
+        />
         <div className="flex items-center gap-1 p-0.5 rounded-lg bg-white/[0.04] border border-white/8">
           {([['fit', `Fit ${Math.round(fitScale * 100)}%`], [0.5, '50%'], [1, '100%']] as const).map(
             ([mode, label]) => (

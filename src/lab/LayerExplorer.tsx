@@ -19,6 +19,7 @@ import {
   sceneTemplateIds,
   type TileDisplayMode,
 } from '../heroes/dither/ditherStore'
+import LabToolbarTitle from './LabToolbarTitle'
 
 /** Real-shader layer taxonomy, composed as a progressive STACK.
  *
@@ -202,15 +203,10 @@ export default function LayerExplorer() {
   return (
     <div className="h-screen flex flex-col bg-[#0b0c14]">
       <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
-        {/* `min-w-0` + `nowrap` so the strap line truncates instead of wrapping:
-            without it a narrow viewport turns this row into a four-line column
-            and shoves the whole canvas down the page. The strap is context, not
-            navigation, so it's the first thing to go when space is short. */}
-        <span className="text-[12px] font-semibold text-white/90 flex items-baseline gap-2 min-w-0 whitespace-nowrap">
-          Hero Lab
-          <span className="font-normal text-white/45">Layers</span>
-          <span className="hidden lg:inline font-normal text-white/25 truncate">bare scene first — stack one setting at a time on the real shader</span>
-        </span>
+        <LabToolbarTitle
+          view="Layers"
+          strap="bare scene first — stack one setting at a time on the real shader"
+        />
         <div className="flex items-center gap-1.5">
           <button onClick={resetBare} className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/25 bg-white/[0.03] cursor-pointer transition-colors">Bare scene</button>
           <button onClick={() => applyLevel(STACK.length)} className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/25 bg-white/[0.03] cursor-pointer transition-colors">Full stack</button>
