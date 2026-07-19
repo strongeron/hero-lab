@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDitherStore, applyHeroTemplate, heroTemplates, getTabSourceId } from '../heroes/dither/ditherStore'
+import BrandMark from '../components/BrandMark'
 import { DEVICES } from './PreviewCanvas'
 
 const GAP = 32
@@ -65,7 +66,11 @@ export default function TemplateGallery() {
     <div className="h-screen flex flex-col bg-[#0b0c14]">
       {/* Pinned toolbar */}
       <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
-        <span className="text-[12px] font-semibold text-white/90 flex items-baseline gap-2">
+        <span className="text-[12px] font-semibold text-white/90 flex items-center gap-2">
+          {/* The project's own mark, and the one place the generative logo
+              animates — this toolbar belongs to Hero Lab, not to the demo brand
+              inside the artboards, so motion here competes with nothing. */}
+          <BrandMark size={20} />
           Hero Lab
           <span className="font-normal text-white/45">Templates</span>
           <span className="font-normal text-white/25">

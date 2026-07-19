@@ -7,7 +7,7 @@ import { fontPairs } from '../themes/fonts'
 import { useDitherStore, setEdgeConfig, initDitherSync, applySceneTemplate, setPixelGridConfig, setAnimationConfig, setInitialState, applyHeroTemplate, heroTemplates } from '../heroes/dither/ditherStore'
 import { heroes, getHero } from './registry'
 import { getContentPreset } from '../content/presets'
-import BrandMark, { visitFormation, staticMarkDataUri } from '../components/BrandMark'
+import BrandMark from '../components/BrandMark'
 import SiteFooter from '../components/SiteFooter'
 import PreviewCanvas from './PreviewCanvas'
 import TemplateGallery from './TemplateGallery'
@@ -71,10 +71,13 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
     >
       <div className="max-w-[1440px] mx-auto px-5 sm:px-8 xl:px-16 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3 shrink-0 text-t-headline">
-          {/* Generative mark — a new shader formation each visit. Preview frames
-              get the no-GL variant so a gallery of artboards doesn't spend a
-              WebGL context per header. */}
-          <BrandMark size={28} static={isPreviewFrame} interactive={!isPreviewFrame} />
+          {/* Static here, in every context. This is the demo brand's mark inside
+              a hero that is itself a moving shader — a second animation at 28px
+              competes with the thing the page exists to show. It stays
+              generative (a new formation each visit, click to reroll); it just
+              doesn't move. The animated version lives on the Templates toolbar,
+              where it marks the project rather than the demo. */}
+          <BrandMark size={28} static interactive={!isPreviewFrame} />
           <a href="#" className="no-underline text-t-headline text-[18px] font-semibold tracking-[-0.03em]" style={{ fontFamily: brandFont }}>
             {preset.brand}
           </a>
@@ -211,12 +214,18 @@ function LabLayout() {
   const { enabled: panelOpen, setEnabled } = useTextInspector()
   const themedRef = useRef<HTMLDivElement>(null)
   const [themedNode, setThemedNode] = useState<HTMLDivElement | null>(null)
+  // Templates is the starter page: a first-time visitor lands on the gallery of
+  // artboards, which shows what the lab is (many looks, three breakpoints each)
+  // rather than dropping them into one hero with no context for it. A returning
+  // visitor keeps whatever view they last used.
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     try {
       const saved = localStorage.getItem('hero-lab-view-mode')
-      return saved === 'breakpoints' || saved === 'templates' || saved === 'layers' ? saved : 'live'
+      return saved === 'breakpoints' || saved === 'templates' || saved === 'layers' || saved === 'live'
+        ? saved
+        : 'templates'
     } catch {
-      return 'live'
+      return 'templates'
     }
   })
   // The Layers tab is a single stack-only surface: the progressive stack IS the
@@ -251,11 +260,6 @@ function LabLayout() {
   }, [viewMode])
   useEffect(() => {
     document.title = `Hero Lab — ${activeHero.name}`
-    // Match the favicon to this visit's formation, so the tab carries the same
-    // roll as the header mark. Preview frames skip it — they have no tab.
-    if (isPreviewFrame) return
-    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
-    if (link) link.href = staticMarkDataUri(visitFormation, 64)
   }, [])
   // Default Top start to the measured header height so the first row of shapes
   // begins whole below the filled nav — the panel slider can still override it.
@@ -335,11 +339,15 @@ function LabLayout() {
 
       <HeroSwitcher />
 
-      {/* Live / Breakpoints view toggle — centered in the content area */}
-      <div
-        className="fixed bottom-4 left-0 z-[1002] flex justify-center pointer-events-none"
-        style={{ right: panelOffset }}
-      >
+      {/* View toggle — anchored to the VIEWPORT centre, not the content area.
+          It used to sit inside the panel-narrowed column (`right: panelOffset`),
+          which meant it jumped sideways whenever the panel opened or closed —
+          most visibly on Layers, where the panel is hidden entirely, so the one
+          control that is present on every view was the one that moved between
+          them. It is global chrome; it should be in the same place everywhere.
+          At 1440 the pill spans roughly 505–935px and the panel starts at
+          1040px, so viewport-centring does not put it under the panel. */}
+      <div className="fixed bottom-4 left-0 right-0 z-[1002] flex justify-center pointer-events-none">
         <div className="pointer-events-auto flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
           {([['live', 'Live'], ['breakpoints', 'Breakpoints'], ['templates', 'Templates'], ['layers', 'Layers']] as const).map(([mode, label]) => (
             <button

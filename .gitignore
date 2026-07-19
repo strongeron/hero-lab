@@ -14,5 +14,9 @@ node_modules/.tmp
 # Local QA output (dogfood runs) — screenshots, reports; not repo content
 dogfood-output/
 
+# Rejected OG card alternates — kept on disk for reference, not repo content.
+# The chosen card ships as public/og-image.jpg.
+docs/og-candidates/
+
 # Local Netlify folder
 .netlify

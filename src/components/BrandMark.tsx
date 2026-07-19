@@ -119,8 +119,14 @@ export const visitFormation = makeFormation(readSeed(), prefersReducedMotion())
 
 // ─── Static fallback ──────────────────────────────────────────────────────────
 
-/** Seeded 5×5 dot grid — the mark's vocabulary without a GL context. Used in
- *  preview iframes and as the favicon. */
+/** Seeded 5×5 dot grid — the mark's vocabulary without a GL context.
+ *
+ *  Note this is NOT used for the favicon. The tab icon is a fixed file
+ *  (public/favicon.svg): a favicon is an identity anchor — people find a tab in
+ *  a strip of twenty by its icon, and browsers cache it into history and
+ *  bookmarks. Re-rolling it per visit trades that recognition for a detail
+ *  almost nobody sees at 16px. The formation stays generative where it reads:
+ *  in the page. */
 function staticMarkSvg(f: Formation, px = 28): string {
   const r = rng(f.seed ^ 0x9e3779b9)
   const cells = 5

@@ -133,6 +133,13 @@ export default function LayerExplorer() {
   const restoreId = useRef<string | null>(null)
   useEffect(() => {
     restoreId.current = s.activeTemplate
+    // Always explore from Fine Grain, whatever template is selected elsewhere.
+    // The stack is meant to read as "one setting at a time"; Full Bleed and
+    // Problem already ship a pixel grid, wide gaps and a tile renderer, so
+    // starting there means the first few steps toggle settings that are
+    // visually already on and the progression stops teaching anything. Fine
+    // Grain is the bare shader, so each step is the only thing that changes.
+    applyHeroTemplate('fine-grain')
     // Calm the screen-blended Color/alpha base while exploring layers — see
     // DitherState.stableColorField. Scoped to this view: cleared on leaving so
     // Live and Templates keep their colour shimmer.

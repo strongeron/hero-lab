@@ -5,7 +5,10 @@ share the exact look as a URL.
 
 ### [→ Open the live lab](https://hero-lab.netlify.app)
 
-![Hero Lab — the Dither hero, green "fix" state, with the generative mark in the header](docs/preview.jpg)
+![Hero Lab — the Templates view: every hero template as an artboard, at desktop, tablet and phone widths](docs/preview.jpg)
+
+*The Templates gallery is where the lab opens: every template as an artboard, at all
+three breakpoints. Click one to make it live and start editing.*
 
 The background is a real WebGL dithering shader, not an image. Every dot, colour, and
 motion value in it is exposed as a control, so you can push it around until the section
