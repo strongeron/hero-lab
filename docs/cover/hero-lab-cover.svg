@@ -2,46 +2,49 @@
   <style>
     .cell{animation:m1 12s cubic-bezier(.37,0,.63,1) infinite}
     .b0 .cell{animation-delay:0.00s}
-    .b1 .cell{animation-delay:-0.24s}
-    .b2 .cell{animation-delay:-0.48s}
-    .b3 .cell{animation-delay:-0.72s}
-    .b4 .cell{animation-delay:-0.96s}
-    .b5 .cell{animation-delay:-1.20s}
+    .b1 .cell{animation-delay:-0.20s}
+    .b2 .cell{animation-delay:-0.40s}
+    .b3 .cell{animation-delay:-0.60s}
+    .b4 .cell{animation-delay:-0.80s}
+    .b5 .cell{animation-delay:-1.00s}
+    .b6 .cell{animation-delay:-1.20s}
     @keyframes m1{
-      0%   {rx:13px;x:5px; y:5px; width:26px;height:26px;fill:#2DD4A8}
-      25%  {rx:2px; x:7px; y:7px; width:22px;height:22px;fill:#E6307A}
-      50%  {rx:8px; x:10px;y:10px;width:16px;height:16px;fill:#3ECF8E}
-      75%  {rx:4px; x:8px; y:8px; width:20px;height:20px;fill:#FF6B2B}
-      100% {rx:13px;x:5px; y:5px; width:26px;height:26px;fill:#2DD4A8}
+      0%  {rx:11px;x:5px;y:5px;width:22px;height:22px;fill:#2DD4A8}
+      25%  {rx:1px;x:7px;y:7px;width:18px;height:18px;fill:#E6307A}
+      50%  {rx:6.5px;x:9.5px;y:9.5px;width:13px;height:13px;fill:#3ECF8E}
+      75%  {rx:4px;x:7.5px;y:7.5px;width:17px;height:17px;fill:#FF6B2B}
+      100%  {rx:11px;x:5px;y:5px;width:22px;height:22px;fill:#2DD4A8}
     }
     @media (prefers-reduced-motion:reduce){
       .cell{animation:none}
     }
   </style>
   <defs>
+    <pattern id="f0" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="translate(0,28)" class="b0"><rect class="cell" x="5" y="5" width="22" height="22" rx="11" fill="#2DD4A8"/></pattern>
+    <pattern id="f1" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="translate(0,28)" class="b1"><rect class="cell" x="5" y="5" width="22" height="22" rx="11" fill="#2DD4A8"/></pattern>
+    <pattern id="f2" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="translate(0,28)" class="b2"><rect class="cell" x="5" y="5" width="22" height="22" rx="11" fill="#2DD4A8"/></pattern>
+    <pattern id="f3" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="translate(0,28)" class="b3"><rect class="cell" x="5" y="5" width="22" height="22" rx="11" fill="#2DD4A8"/></pattern>
+    <pattern id="f4" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="translate(0,28)" class="b4"><rect class="cell" x="5" y="5" width="22" height="22" rx="11" fill="#2DD4A8"/></pattern>
+    <pattern id="f5" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="translate(0,28)" class="b5"><rect class="cell" x="5" y="5" width="22" height="22" rx="11" fill="#2DD4A8"/></pattern>
+    <pattern id="f6" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="translate(0,28)" class="b6"><rect class="cell" x="5" y="5" width="22" height="22" rx="11" fill="#2DD4A8"/></pattern>
     <linearGradient id="g1" x1="0" y1="0" x2="1" y2=".4">
       <stop offset="0" stop-color="#fff" stop-opacity=".9"/>
       <stop offset="1" stop-color="#fff" stop-opacity=".22"/>
     </linearGradient>
     <mask id="mClear">
       <rect width="1120" height="700" fill="url(#g1)"/>
-      <rect x="40" y="392" width="470" height="216" rx="24" fill="#000"/>
+      <rect x="32" y="380" width="480" height="224" rx="24" fill="#000"/>
     </mask>
-    <pattern id="f0" width="36" height="36" patternUnits="userSpaceOnUse" class="b0"><rect class="cell" x="5" y="5" width="26" height="26" rx="13" fill="#2DD4A8"/></pattern>
-    <pattern id="f1" width="36" height="36" patternUnits="userSpaceOnUse" class="b1"><rect class="cell" x="5" y="5" width="26" height="26" rx="13" fill="#2DD4A8"/></pattern>
-    <pattern id="f2" width="36" height="36" patternUnits="userSpaceOnUse" class="b2"><rect class="cell" x="5" y="5" width="26" height="26" rx="13" fill="#2DD4A8"/></pattern>
-    <pattern id="f3" width="36" height="36" patternUnits="userSpaceOnUse" class="b3"><rect class="cell" x="5" y="5" width="26" height="26" rx="13" fill="#2DD4A8"/></pattern>
-    <pattern id="f4" width="36" height="36" patternUnits="userSpaceOnUse" class="b4"><rect class="cell" x="5" y="5" width="26" height="26" rx="13" fill="#2DD4A8"/></pattern>
-    <pattern id="f5" width="36" height="36" patternUnits="userSpaceOnUse" class="b5"><rect class="cell" x="5" y="5" width="26" height="26" rx="13" fill="#2DD4A8"/></pattern>
   </defs>
   <rect width="1120" height="700" fill="#0A1714"/>
   <g mask="url(#mClear)">
-    <rect x="0" y="96" width="187" height="604" fill="url(#f0)"/>
-    <rect x="187" y="96" width="187" height="604" fill="url(#f1)"/>
-    <rect x="373" y="96" width="187" height="604" fill="url(#f2)"/>
-    <rect x="560" y="96" width="187" height="604" fill="url(#f3)"/>
-    <rect x="747" y="96" width="187" height="604" fill="url(#f4)"/>
-    <rect x="933" y="96" width="187" height="604" fill="url(#f5)"/>
+    <rect x="0" y="124" width="160" height="576" fill="url(#f0)"/>
+    <rect x="160" y="124" width="160" height="576" fill="url(#f1)"/>
+    <rect x="320" y="124" width="160" height="576" fill="url(#f2)"/>
+    <rect x="480" y="124" width="160" height="576" fill="url(#f3)"/>
+    <rect x="640" y="124" width="160" height="576" fill="url(#f4)"/>
+    <rect x="800" y="124" width="160" height="576" fill="url(#f5)"/>
+    <rect x="960" y="124" width="160" height="576" fill="url(#f6)"/>
   </g>
   <g>
     <rect x="36" y="30" width="28" height="28" rx="8" fill="#ffffff" fill-opacity=".30"/>

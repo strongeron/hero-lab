@@ -34,17 +34,22 @@ Bands are staggered so the change sweeps across the field instead of snapping in
 unison. Note the stagger has to scale with the loop: the usual 30–80ms guidance
 is calibrated for ~250ms UI entrances, where it is 20–30% of the duration.
 Against a 12s ambient loop it is 0.8% — measurably applied and visually nothing.
-This uses 1.2s across six bands.
+This uses 1.2s across seven bands.
 
 `prefers-reduced-motion` freezes the field.
 
-## The variants
+## Geometry
 
-`generate-cover.py` emits four; **n1 is shipped**.
+Every shape lands whole — a cell sliced by an edge reads as a rendering bug, not
+a design. Three things must agree with the 32px cell step, and the constants at
+the top of the generator encode all three:
 
-| | |
-|---|---|
-| **n1** even keyframes, no holds | simplest continuous loop |
-| n2 micro-states | nine closely-spaced states; evolution rather than transitions |
-| n3 deep wave | bands offset most of the cycle, so the field is never uniform |
-| n4 decoupled rates | shape on 9s, colour on 14s — they never re-align |
+- field `1120 x 576` = **35 x 18 whole cells**
+- **7 bands of 160px** = 5 cells each, so no band boundary lands mid-cell
+- copy clearance `32,380 480x224` = **15 cells x 7 rows**, so its straight edges
+  fall between rows
+
+`patternUnits="userSpaceOnUse"` tiles from the SVG origin, so tile boundaries sit
+at multiples of the step from 0. The field starts at `y=124`, which is not one —
+hence `patternTransform="translate(0,28)"` phasing the grid onto it. That is what
+lets the field sit flush to the bottom edge without a sliced row.
