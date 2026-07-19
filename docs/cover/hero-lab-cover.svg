@@ -33,18 +33,18 @@
     </linearGradient>
     <mask id="mClear">
       <rect width="1120" height="700" fill="url(#g1)"/>
-      <rect x="32" y="380" width="480" height="224" rx="24" fill="#000"/>
+      <rect x="32" y="284" width="480" height="224" rx="24" fill="#000"/>
     </mask>
   </defs>
   <rect width="1120" height="700" fill="#0A1714"/>
   <g mask="url(#mClear)">
-    <rect x="0" y="124" width="160" height="576" fill="url(#f0)"/>
-    <rect x="160" y="124" width="160" height="576" fill="url(#f1)"/>
-    <rect x="320" y="124" width="160" height="576" fill="url(#f2)"/>
-    <rect x="480" y="124" width="160" height="576" fill="url(#f3)"/>
-    <rect x="640" y="124" width="160" height="576" fill="url(#f4)"/>
-    <rect x="800" y="124" width="160" height="576" fill="url(#f5)"/>
-    <rect x="960" y="124" width="160" height="576" fill="url(#f6)"/>
+    <rect x="0" y="92" width="160" height="608" fill="url(#f0)"/>
+    <rect x="160" y="92" width="160" height="608" fill="url(#f1)"/>
+    <rect x="320" y="92" width="160" height="608" fill="url(#f2)"/>
+    <rect x="480" y="92" width="160" height="608" fill="url(#f3)"/>
+    <rect x="640" y="92" width="160" height="608" fill="url(#f4)"/>
+    <rect x="800" y="92" width="160" height="608" fill="url(#f5)"/>
+    <rect x="960" y="92" width="160" height="608" fill="url(#f6)"/>
   </g>
   <g>
     <rect x="36" y="30" width="28" height="28" rx="8" fill="#ffffff" fill-opacity=".30"/>
@@ -58,10 +58,10 @@
     <rect x="984" y="28" width="100" height="32" rx="16" fill="#2DD4A8" fill-opacity=".85"/>
   </g>
   <g>
-    <rect x="72" y="424" width="380" height="22" rx="11" fill="#E8EFEA" fill-opacity=".92"/>
-    <rect x="72" y="460" width="281" height="22" rx="11" fill="#E8EFEA" fill-opacity=".92"/>
-    <rect x="72" y="508" width="311" height="10" rx="5" fill="#ffffff" fill-opacity=".26"/>
-    <rect x="72" y="528" width="220" height="10" rx="5" fill="#ffffff" fill-opacity=".26"/>
-    <rect x="72" y="564" width="160" height="36" rx="18" fill="#2DD4A8" fill-opacity=".9"/>
+    <rect x="82" y="308" width="380" height="22" rx="11" fill="#E8EFEA" fill-opacity=".92"/>
+    <rect x="82" y="344" width="281" height="22" rx="11" fill="#E8EFEA" fill-opacity=".92"/>
+    <rect x="82" y="392" width="311" height="10" rx="5" fill="#ffffff" fill-opacity=".26"/>
+    <rect x="82" y="412" width="220" height="10" rx="5" fill="#ffffff" fill-opacity=".26"/>
+    <rect x="82" y="448" width="160" height="36" rx="18" fill="#2DD4A8" fill-opacity=".9"/>
   </g>
 </svg>

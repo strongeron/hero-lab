@@ -11,17 +11,22 @@ Partial cells sliced by an edge look like a rendering bug, not a design. Three
 things have to agree with the cell step for that to hold:
 
   * the field width must be a whole number of cells   1120 / 32 = 35   OK
-  * the field height likewise                          576 / 32 = 18   OK
+  * the field height likewise                          608 / 32 = 19   OK
   * every band boundary, since each band is its own clipped rect —
     7 bands x 160px = 5 cells each                                     OK
 
 `patternUnits="userSpaceOnUse"` tiles from the SVG origin, so tile boundaries
-fall on multiples of the step from 0. The field starts at y=124, which is not
-one, hence `patternTransform` phase-shifting the grid by 124 mod 32 = 28. That
+fall on multiples of the step from 0. The field starts at y=92, which is not
+one, hence `patternTransform` phase-shifting the grid by 92 mod 32 = 28. That
 buys a field flush to the bottom edge with no sliced row.
 
 The shape is also inset within its cell, so it never touches a tile edge and
 cannot appear clipped where two bands meet.
+
+The clearance is centred in the field (192px of field above and below) and the
+copy is centred inside the clearance. Those invariants are asserted at the
+bottom of this file, so a future edit that breaks the grid fails loudly instead
+of shipping a sliced row.
 
 MOTION
 ------
@@ -43,14 +48,21 @@ W, H = 1120, 700
 
 STEP = 32                          # cell pitch
 FIELD_X, FIELD_W = 0, 1120         # 35 cells
-FIELD_Y, FIELD_H = 124, 576        # 18 rows, flush to the bottom edge
+# 19 rows, flush to the bottom edge, starting one cell clear of the header.
+# Only certain tops work: the height must stay a multiple of STEP to reach y=700
+# without a sliced row, which allows 28/60/92/124/... — 92 is the highest that
+# still leaves a full cell of air under the header.
+FIELD_Y, FIELD_H = 92, 608
 PHASE = FIELD_Y % STEP             # 28 — shifts the tile grid onto FIELD_Y
 BANDS = 7                          # 160px each = 5 cells, so band edges align
 
-# The copy clearance is snapped to the same grid, so its straight edges fall
-# BETWEEN rows instead of slicing through one. Only the 24px corner radius
-# crosses a cell, which is far less legible than a sliced row.
-HOLE_X, HOLE_Y, HOLE_W, HOLE_H = 32, 380, 480, 224   # 15 cells x 7 rows
+# Clearance centred in the field — 192px of field above and below — with both
+# edges still landing between rows rather than slicing one. Only the 24px corner
+# radius crosses a cell, which is far less legible than a sliced row.
+HOLE_X, HOLE_Y, HOLE_W, HOLE_H = 32, 284, 480, 224   # 15 cells x 7 rows
+
+# Copy centred inside that clearance: 24px above and below, 50px either side.
+COPY_X, COPY_Y = 82, 308
 
 BG = "#0A1714"
 INK = "#E8EFEA"
@@ -131,7 +143,7 @@ def header(y=44):
     return s
 
 
-def copy_block(x=72, y=424):
+def copy_block(x=COPY_X, y=COPY_Y):
     return (f'  <g>\n'
             f'    <rect x="{x}" y="{y}" width="380" height="22" rx="11" fill="{INK}" fill-opacity=".92"/>\n'
             f'    <rect x="{x}" y="{y+36}" width="281" height="22" rx="11" fill="{INK}" fill-opacity=".92"/>\n'
@@ -145,6 +157,14 @@ svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" fill="non
        f'  <style>\n{css()}\n  </style>\n  <defs>\n{defs()}  </defs>\n'
        f'  <rect width="{W}" height="{H}" fill="{BG}"/>\n'
        f'{field()}{header()}{copy_block()}</svg>\n')
+
+assert FIELD_W % STEP == 0, "field width must be whole cells"
+assert FIELD_H % STEP == 0, "field height must be whole cells"
+assert FIELD_Y + FIELD_H == H, "field must reach the bottom edge"
+assert (FIELD_W // BANDS) % STEP == 0, "band width must be whole cells"
+assert (HOLE_Y - PHASE) % STEP == 0 and (HOLE_Y + HOLE_H - PHASE) % STEP == 0, \
+    "clearance edges must fall between rows"
+assert HOLE_Y - FIELD_Y == H - (HOLE_Y + HOLE_H), "clearance must sit centred in the field"
 
 p = out / "hero-lab-cover.svg"
 p.write_text(svg)

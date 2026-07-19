@@ -44,12 +44,17 @@ Every shape lands whole — a cell sliced by an edge reads as a rendering bug, n
 a design. Three things must agree with the 32px cell step, and the constants at
 the top of the generator encode all three:
 
-- field `1120 x 576` = **35 x 18 whole cells**
+- field `1120 x 608` = **35 x 19 whole cells**
 - **7 bands of 160px** = 5 cells each, so no band boundary lands mid-cell
-- copy clearance `32,380 480x224` = **15 cells x 7 rows**, so its straight edges
+- copy clearance `32,284 480x224` = **15 cells x 7 rows**, so its straight edges
   fall between rows
 
 `patternUnits="userSpaceOnUse"` tiles from the SVG origin, so tile boundaries sit
-at multiples of the step from 0. The field starts at `y=124`, which is not one —
+at multiples of the step from 0. The field starts at `y=92`, which is not one —
 hence `patternTransform="translate(0,28)"` phasing the grid onto it. That is what
 lets the field sit flush to the bottom edge without a sliced row.
+
+The clearance is centred in the field (192px of field above and below) and the
+copy is centred inside it (24px top and bottom, 50px either side). All of these
+invariants are asserted at the bottom of `generate-cover.py`, so an edit that
+breaks the grid fails at generation time rather than shipping a sliced row.
