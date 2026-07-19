@@ -162,7 +162,15 @@ export default function LayerExplorer() {
     return () => ro.disconnect()
   }, [])
 
-  const heroBudget = Math.max(360, availW - PAD * 2 - TOGGLE_COL - 24)
+  // Below xl the controls sit UNDER the hero, so the hero gets the full width
+  // instead of leaving a gap for a column that isn't beside it. The old formula
+  // subtracted TOGGLE_COL unconditionally and floored at 360px, which on a
+  // 390px viewport asked for a 360px hero inside a 310px content box — hence
+  // the horizontal overflow. No floor now: narrow just means a smaller preview.
+  const stacked = availW < 1280
+  const heroBudget = stacked
+    ? Math.max(0, availW - PAD * 2)
+    : Math.max(360, availW - PAD * 2 - TOGGLE_COL - 24)
   const scale = availW > 0 ? Math.min(1, heroBudget / DESK.width) : 0.5
   const frameSrc = useMemo(() => {
     const p = new URLSearchParams(window.location.search)
@@ -194,10 +202,14 @@ export default function LayerExplorer() {
   return (
     <div className="h-screen flex flex-col bg-[#0b0c14]">
       <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
-        <span className="text-[12px] font-semibold text-white/90 flex items-baseline gap-2">
+        {/* `min-w-0` + `nowrap` so the strap line truncates instead of wrapping:
+            without it a narrow viewport turns this row into a four-line column
+            and shoves the whole canvas down the page. The strap is context, not
+            navigation, so it's the first thing to go when space is short. */}
+        <span className="text-[12px] font-semibold text-white/90 flex items-baseline gap-2 min-w-0 whitespace-nowrap">
           Hero Lab
           <span className="font-normal text-white/45">Layers</span>
-          <span className="font-normal text-white/25">bare scene first — stack one setting at a time on the real shader</span>
+          <span className="hidden lg:inline font-normal text-white/25 truncate">bare scene first — stack one setting at a time on the real shader</span>
         </span>
         <div className="flex items-center gap-1.5">
           <button onClick={resetBare} className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/25 bg-white/[0.03] cursor-pointer transition-colors">Bare scene</button>
@@ -206,7 +218,11 @@ export default function LayerExplorer() {
       </div>
 
       <div ref={wrapRef} className="flex-1 overflow-auto">
-        <div className="flex gap-6 items-start" style={{ padding: PAD }}>
+        {/* Stacks below xl. The hero preview keeps a fixed 1440-wide artboard
+            scaled down, so side-by-side leaves the controls column no room on a
+            narrow viewport — it got squeezed past the right edge and the stack
+            was unreachable there. */}
+        <div className="flex flex-col xl:flex-row gap-6 items-start" style={{ padding: PAD }}>
           {/* Live real-shader hero */}
           <div className="shrink-0">
             <div className="rounded-xl border border-white/10 overflow-hidden bg-black shadow-[0_16px_48px_rgba(0,0,0,0.5)]" style={{ width: DESK.width * scale, height: DESK.height * scale }}>
@@ -222,7 +238,7 @@ export default function LayerExplorer() {
           </div>
 
           {/* Controls */}
-          <div className="flex-1 min-w-[300px] max-w-[440px] flex flex-col gap-4">
+          <div className="w-full xl:flex-1 xl:min-w-[300px] xl:max-w-[440px] flex flex-col gap-4">
 
             {/* Base: scene picker (the animated dither is the foundation) */}
             <div>

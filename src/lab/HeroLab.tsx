@@ -214,6 +214,9 @@ function LabLayout() {
   const { enabled: panelOpen, setEnabled } = useTextInspector()
   const themedRef = useRef<HTMLDivElement>(null)
   const [themedNode, setThemedNode] = useState<HTMLDivElement | null>(null)
+  // Read on first render, not in the effect: initialising to false gives a
+  // phone one frame with the 320px desktop offset applied.
+  const [isNarrow, setIsNarrow] = useState(() => window.matchMedia('(max-width: 639px)').matches)
   // Templates is the starter page: a first-time visitor lands on the gallery of
   // artboards, which shows what the lab is (many looks, three breakpoints each)
   // rather than dropping them into one hero with no context for it. A returning
@@ -233,8 +236,18 @@ function LabLayout() {
   // surface writing the same store. Hide it (and drop its layout offset) while
   // in Layers; panelOpen is preserved so the panel returns on other views.
   const showPanel = panelOpen && viewMode !== 'layers'
-  const panelOffset = showPanel ? PANEL_WIDTH : 0
+  // Below `sm` the panel goes full-width and overlays instead of sitting beside
+  // the content, so no offset — shifting the canvas by 320px there would push
+  // the thing being edited off-screen behind the panel.
+  const panelOffset = showPanel && !isNarrow ? PANEL_WIDTH : 0
 
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    const sync = () => setIsNarrow(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
   useEffect(() => { setThemedNode(themedRef.current) }, [])
   useEffect(() => {
     if (isPinnedPreview) {

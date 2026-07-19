@@ -178,11 +178,15 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
   const currentColorHex = rgbToHex(currentColor)
   const isDitherHero = activeVariant === 'dither'
 
+  // Full width on phones: at a fixed 320 the panel covered nearly all of a
+  // 390px viewport while the layout still shifted content sideways by the same
+  // amount, so the thing being edited sat off-screen behind it. Below `sm` it
+  // takes the screen and overlays; HeroLab drops `panelOffset` at that size.
   return (
     <div
       ref={panelRef}
       data-inspector-panel
-      className="fixed top-0 right-0 bottom-0 z-[1000] w-[320px] border-l backdrop-blur-2xl bg-[rgba(20,21,35,0.97)] border-white/10 flex flex-col overflow-hidden"
+      className="fixed top-0 right-0 bottom-0 z-[1000] w-full sm:w-[320px] border-l backdrop-blur-2xl bg-[rgba(20,21,35,0.97)] border-white/10 flex flex-col overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/6 shrink-0">
