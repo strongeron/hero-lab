@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useDitherStore, applyHeroTemplate, heroTemplates, getTabSourceId } from '../heroes/dither/ditherStore'
 import LabToolbarTitle from './LabToolbarTitle'
 import { DEVICES } from './PreviewCanvas'
@@ -20,7 +20,9 @@ export default function TemplateGallery() {
   const [availWidth, setAvailWidth] = useState(0)
   const [zoom, setZoom] = useState<ZoomMode>('fit')
 
-  useEffect(() => {
+  // Layout effect: measure before the first paint, so the artboards do not
+  // paint at the 0.3 fallback scale and then jump (CLS 0.078 on Slow 4G).
+  useLayoutEffect(() => {
     const el = wrapRef.current
     if (!el) return
     const apply = () => setAvailWidth(el.clientWidth)

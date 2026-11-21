@@ -7,6 +7,7 @@ import { useDitherStore, setEdgeConfig, initDitherSync, applySceneTemplate, setP
 import { heroes, getHero } from './registry'
 import { getContentPreset } from '../content/presets'
 import SiteFooter from '../components/SiteFooter'
+import { prefersLessData } from '../utils/network'
 import PreviewCanvas from './PreviewCanvas'
 import TemplateGallery from './TemplateGallery'
 import PerfStrip, { PERF_STRIP_HEIGHT } from './PerfStrip'
@@ -236,12 +237,11 @@ function LabLayout() {
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     try {
       const saved = localStorage.getItem('hero-lab-view-mode')
-      return saved === 'breakpoints' || saved === 'templates' || saved === 'layers' || saved === 'live'
-        ? saved
-        : 'templates'
-    } catch {
-      return 'templates'
-    }
+      if (saved === 'breakpoints' || saved === 'templates' || saved === 'layers' || saved === 'live') return saved
+    } catch { /* storage blocked: fall through to the default */ }
+    // Templates loads 3 live iframes and the poster grid (about 0.8 MB more
+    // than Live). With Save-Data or a slow connection, start on Live instead.
+    return prefersLessData() ? 'live' : 'templates'
   })
   // The Layers tab is a single stack-only surface: the progressive stack IS the
   // interface there, so the Design Panel would be a redundant second control

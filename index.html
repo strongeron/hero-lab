@@ -66,7 +66,12 @@
     </style>
     <script>
       try {
-        if (localStorage.getItem('hero-lab-view-mode') === 'live' && !/[?&](hero|preset|template|scene|preview)=/.test(location.search))
+        // Same default as HeroLab: a first visit lands on Live only with
+        // Save-Data or a slow connection (src/utils/network.ts).
+        var c = navigator.connection || {}
+        var lessData = c.saveData || /^(slow-2g|2g|3g)$/.test(c.effectiveType || '') || matchMedia('(prefers-reduced-data: reduce)').matches
+        var view = localStorage.getItem('hero-lab-view-mode') || (lessData ? 'live' : 'templates')
+        if (view === 'live' && !/[?&](hero|preset|template|scene|preview)=/.test(location.search))
           document.documentElement.classList.add('shell-live')
       } catch (e) {}
     </script>
