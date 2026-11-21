@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import SectionLabel from '../../lab/ui/SectionLabel'
 
 /** Semantic text color tokens — the ones you'd actually apply to text */
 const TEXT_TOKENS = [
@@ -129,43 +130,45 @@ export default function PaletteColorPicker({ value, onChange, themedRoot, palett
   return (
     <div className="space-y-2.5 flex-1">
       {/* Current color preview */}
-      <div className="flex items-center gap-2.5 bg-white/[0.03] rounded-lg px-2.5 py-2">
+      <div className="flex items-center gap-2.5 bg-lab-fill rounded-lg px-2.5 py-2">
         <div
-          className="w-8 h-8 rounded-lg border border-white/10 shrink-0 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]"
+          className="w-8 h-8 rounded-lg border border-lab-border shrink-0 inset-shadow-xs"
           style={{ background: value || 'transparent' }}
         />
         <div className="flex-1 min-w-0">
-          <div className="text-[11px] font-mono text-white/70 truncate">{value}</div>
-          <div className="text-[9px] font-mono text-white/30 truncate">{rgbToOklch(value)}</div>
+          <div className="text-lab-xs font-mono text-lab-fg-muted truncate">{value}</div>
+          <div className="text-lab-xs font-mono text-lab-fg-subtle truncate">{rgbToOklch(value)}</div>
         </div>
       </div>
 
       {/* Semantic text tokens */}
       <div>
-        <span className="text-[9px] font-semibold tracking-[0.08em] uppercase text-white/25 px-0.5 mb-1 block">
+        <SectionLabel level={4} className="px-0.5 mb-1">
           Theme tokens
-          {paletteName && <span className="text-white/15 ml-1 normal-case tracking-normal">({paletteName})</span>}
-        </span>
+          {paletteName && <span className="ml-1 normal-case tracking-normal">({paletteName})</span>}
+        </SectionLabel>
         <div className="space-y-px">
           {textTokens.map(({ token, label, color }) => (
             <button
               key={token}
+              type="button"
               onClick={() => onChange(color)}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer border-0 transition-colors text-left ${
+              aria-pressed={isMatch(color)}
+              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer border-0 transition-colors text-left lab-focus ${
                 isMatch(color)
-                  ? 'bg-white/8'
-                  : 'bg-transparent hover:bg-white/[0.03]'
+                  ? 'bg-lab-fill-selected'
+                  : 'bg-transparent hover:bg-lab-fill-hover'
               }`}
             >
               <div
                 className={`w-4 h-4 rounded shrink-0 border ${
-                  isMatch(color) ? 'border-white/30 ring-1 ring-primary/50' : 'border-white/8'
+                  isMatch(color) ? 'border-lab-border-strong ring-1 ring-lab-accent/50' : 'border-lab-border'
                 }`}
                 style={{ background: color }}
               />
-              <span className="text-[10px] font-mono text-white/50 flex-1 truncate">{label}</span>
+              <span className="text-lab-xs font-mono text-lab-fg-muted flex-1 truncate">{label}</span>
               {isMatch(color) && (
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-primary-soft shrink-0">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true" className="text-lab-accent shrink-0">
                   <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
@@ -177,10 +180,13 @@ export default function PaletteColorPicker({ value, onChange, themedRoot, palett
       {/* Background tokens (collapsed) */}
       <div>
         <button
+          type="button"
           onClick={() => setShowBg(!showBg)}
-          className="text-[9px] font-semibold tracking-[0.08em] uppercase text-white/20 hover:text-white/30 px-0.5 mb-1 flex items-center gap-1 bg-transparent border-0 cursor-pointer transition-colors"
+          aria-expanded={showBg}
+          className="min-h-6 rounded text-lab-2xs font-semibold tracking-[0.1em] uppercase text-lab-fg-subtle hover:text-lab-fg-muted px-0.5 mb-1 flex items-center gap-1 bg-transparent border-0 cursor-pointer transition-colors lab-focus"
         >
           <svg
+            aria-hidden="true"
             width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"
             className={`transition-transform ${showBg ? 'rotate-90' : ''}`}
           >
@@ -193,18 +199,20 @@ export default function PaletteColorPicker({ value, onChange, themedRoot, palett
             {bgTokens.map(({ token, label, color }) => (
               <button
                 key={token}
+                type="button"
                 onClick={() => onChange(color)}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer border-0 transition-colors text-left ${
-                  isMatch(color) ? 'bg-white/8' : 'bg-transparent hover:bg-white/[0.03]'
+                aria-pressed={isMatch(color)}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer border-0 transition-colors text-left lab-focus ${
+                  isMatch(color) ? 'bg-lab-fill-selected' : 'bg-transparent hover:bg-lab-fill-hover'
                 }`}
               >
                 <div
                   className={`w-4 h-4 rounded shrink-0 border ${
-                    isMatch(color) ? 'border-white/30 ring-1 ring-primary/50' : 'border-white/8'
+                    isMatch(color) ? 'border-lab-border-strong ring-1 ring-lab-accent/50' : 'border-lab-border'
                   }`}
                   style={{ background: color }}
                 />
-                <span className="text-[10px] font-mono text-white/50 flex-1 truncate">{label}</span>
+                <span className="text-lab-xs font-mono text-lab-fg-muted flex-1 truncate">{label}</span>
               </button>
             ))}
           </div>
@@ -219,7 +227,8 @@ export default function PaletteColorPicker({ value, onChange, themedRoot, palett
           onChange={(e) => setHexInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleHexSubmit()}
           placeholder="Custom #hex"
-          className="flex-1 bg-white/[0.03] border border-white/8 rounded-lg px-2.5 py-1.5 text-[10px] text-white/70 font-mono placeholder:text-white/20 focus:border-white/15 transition-colors"
+          aria-label="Custom colour, hex"
+          className="flex-1 bg-lab-fill border border-lab-border rounded-lg px-2.5 py-1.5 text-lab-xs text-lab-fg-muted font-mono placeholder:text-lab-fg-subtle focus:border-lab-border-strong transition-colors lab-focus"
         />
       </div>
     </div>

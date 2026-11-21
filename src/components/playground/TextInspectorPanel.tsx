@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useTextInspector, type TypographyPreset } from './TextInspectorContext'
 import PaletteColorPicker from './PaletteColorPicker'
 import DitherPanel from '../../heroes/dither/DitherPanel'
+import Segmented, { type SegmentedOption } from '../../lab/ui/Segmented'
 
 const FONT_FAMILIES = [
   // Humanistic / Organic
@@ -78,7 +79,7 @@ function parsePx(val: string): number {
 
 function SlidersIcon({ size = 14 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="21" y1="4" x2="14" y2="4" />
       <line x1="10" y1="4" x2="3" y2="4" />
       <line x1="21" y1="12" x2="12" y2="12" />
@@ -174,30 +175,33 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
     <div
       ref={panelRef}
       data-inspector-panel
-      className="fixed top-0 right-0 bottom-0 z-[1000] w-full sm:w-[320px] border-l backdrop-blur-2xl bg-[rgba(20,21,35,0.97)] border-white/10 flex flex-col overflow-hidden"
+      className="fixed top-0 right-0 bottom-0 z-[1000] w-full sm:w-80 border-l backdrop-blur-2xl bg-lab-panel border-lab-border flex flex-col overflow-hidden"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/6 shrink-0">
-        <span className="text-[12px] font-semibold text-white/90 flex items-center gap-2">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-lab-border shrink-0">
+        <h2 className="m-0 text-lab-sm font-semibold text-lab-fg flex items-center gap-2">
           <SlidersIcon />
           Design Panel
-        </span>
+        </h2>
         <div className="flex items-center gap-1.5">
+          {/* Red on the reset controls is a scoped exception (DESIGN.md): no lab token marks a destructive reset. */}
           {totalOverrides > 0 && (
             <button
+              type="button"
               onClick={clearAll}
-              className="text-[10px] font-medium text-red-400/70 hover:text-red-400 cursor-pointer bg-transparent border-0 px-1.5 py-0.5 transition-colors"
+              className="min-h-6 rounded-md text-lab-xs font-medium text-red-400 hover:text-red-300 cursor-pointer bg-transparent border-0 px-1.5 transition-colors lab-focus"
             >
               Reset all ({totalOverrides})
             </button>
           )}
           <button
+            type="button"
             onClick={() => setEnabled(false)}
             aria-label="Close design panel"
             title="Close design panel (⌘/Ctrl + Shift + E)"
-            className="w-6 h-6 rounded-md flex items-center justify-center cursor-pointer bg-transparent border-0 text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
+            className="w-6 h-6 rounded-md flex items-center justify-center cursor-pointer bg-transparent border-0 text-lab-fg-subtle hover:text-lab-fg hover:bg-lab-fill-hover transition-colors lab-focus"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
@@ -209,32 +213,33 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
         {isDitherHero && <DitherPanel />}
         {!selectedElement ? (
           <div className="flex flex-col items-center justify-center h-full px-6 text-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-white/20">
+            <div className="w-10 h-10 rounded-xl bg-lab-fill flex items-center justify-center">
+              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-lab-fg-subtle">
                 <path d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
               </svg>
             </div>
-            <p className="text-[12px] text-white/25 leading-relaxed">
+            <p className="text-lab-sm text-lab-fg-subtle leading-relaxed">
               Click any text element in the hero to inspect and override its typography.
             </p>
           </div>
         ) : (
           <div className="p-3 space-y-4">
             {/* Selected element preview */}
-            <div className="bg-white/[0.03] rounded-xl px-3 py-2.5 border border-white/[0.04]">
+            <div className="bg-lab-fill rounded-xl px-3 py-2.5 border border-lab-border">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-white/25 bg-white/[0.04] px-1.5 py-0.5 rounded">
+                  <span className="text-lab-xs font-mono text-lab-fg-subtle bg-lab-fill-hover px-1.5 py-0.5 rounded">
                     {selectedElement.tagName.toLowerCase()}
                   </span>
                   {/* Inline color preview */}
                   <div
-                    className="w-3 h-3 rounded-sm border border-white/10"
+                    className="w-3 h-3 rounded-sm border border-lab-border"
                     style={{ background: currentColor }}
                   />
                 </div>
                 {overrideCount > 0 && (
                   <button
+                    type="button"
                     onClick={() => {
                       if (!selectedPath) return
                       for (const prop of Object.keys(pathOverrides)) {
@@ -242,13 +247,13 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
                         selectedElement.style.removeProperty(prop)
                       }
                     }}
-                    className="text-[9px] font-medium text-red-400/50 hover:text-red-400 cursor-pointer bg-transparent border-0 transition-colors"
+                    className="min-h-6 rounded px-1 -mx-1 text-lab-xs font-medium text-red-400 hover:text-red-300 cursor-pointer bg-transparent border-0 transition-colors lab-focus"
                   >
                     Reset ({overrideCount})
                   </button>
                 )}
               </div>
-              <p className="text-[11px] text-white/50 leading-snug">
+              <p className="text-lab-xs text-lab-fg-muted leading-snug">
                 {truncateText(selectedElement.textContent || '', 80)}
               </p>
             </div>
@@ -261,9 +266,10 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
             {/* Font Family */}
             <PropertyRow label="Font" overridden={isOverridden('font-family')} onReset={() => handleReset('font-family')}>
               <select
+                aria-label="Font family"
                 value={getEffective('font-family')}
                 onChange={(e) => handleSet('font-family', e.target.value)}
-                className="w-full bg-white/[0.04] border border-white/8 rounded-lg px-2.5 py-2 text-[11px] text-white/80 focus:border-white/15 cursor-pointer transition-colors"
+                className="w-full bg-lab-fill border border-lab-border rounded-lg px-2.5 py-2 text-lab-xs text-lab-fg focus:border-lab-border-strong cursor-pointer transition-colors lab-focus"
                 style={{ WebkitAppearance: 'none' }}
               >
                 {FONT_FAMILIES.map((f) => (
@@ -274,7 +280,8 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
 
             {/* Font Weight */}
             <PropertyRow label="Weight" overridden={isOverridden('font-weight')} onReset={() => handleReset('font-weight')}>
-              <SliderRow
+              <PropertySlider
+                label="Font weight"
                 value={parseInt(getEffective('font-weight')) || 400}
                 min={100} max={900} step={100}
                 display={(v) => String(v)}
@@ -284,7 +291,8 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
 
             {/* Font Size */}
             <PropertyRow label="Size" overridden={isOverridden('font-size')} onReset={() => handleReset('font-size')}>
-              <SliderRow
+              <PropertySlider
+                label="Font size"
                 value={parsePx(getEffective('font-size'))}
                 min={10} max={120} step={1}
                 display={(v) => `${v}px`}
@@ -294,7 +302,8 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
 
             {/* Line Height */}
             <PropertyRow label="Leading" overridden={isOverridden('line-height')} onReset={() => handleReset('line-height')}>
-              <SliderRow
+              <PropertySlider
+                label="Line height"
                 value={(() => {
                   const lh = getEffective('line-height')
                   const fs = parsePx(getEffective('font-size'))
@@ -310,7 +319,8 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
 
             {/* Letter Spacing */}
             <PropertyRow label="Tracking" overridden={isOverridden('letter-spacing')} onReset={() => handleReset('letter-spacing')}>
-              <SliderRow
+              <PropertySlider
+                label="Letter spacing"
                 value={(() => {
                   const ls = getEffective('letter-spacing')
                   if (ls === 'normal' || ls === '0px') return 0
@@ -326,8 +336,11 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
 
             {/* Font Style */}
             <PropertyRow label="Style" overridden={isOverridden('font-style')} onReset={() => handleReset('font-style')}>
-              <SegmentedControl
-                options={['normal', 'italic']}
+              <Segmented
+                size="xs"
+                stretch
+                label="Font style"
+                options={capitalised(['normal', 'italic'])}
                 value={getEffective('font-style')}
                 onChange={(v) => handleSet('font-style', v)}
               />
@@ -335,15 +348,18 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
 
             {/* Text Transform */}
             <PropertyRow label="Case" overridden={isOverridden('text-transform')} onReset={() => handleReset('text-transform')}>
-              <SegmentedControl
-                options={[...TEXT_TRANSFORMS]}
+              <Segmented
+                size="xs"
+                stretch
+                label="Text case"
+                options={capitalised(TEXT_TRANSFORMS)}
                 value={getEffective('text-transform')}
                 onChange={(v) => handleSet('text-transform', v)}
               />
             </PropertyRow>
 
             {/* Divider */}
-            <div className="border-t border-white/[0.04]" />
+            <div className="border-t border-lab-border" />
 
             {/* Color */}
             <PropertyRow label="Color" overridden={isOverridden('color')} onReset={() => handleReset('color')}>
@@ -403,10 +419,12 @@ function PresetChips({
           onClick={() => onApply(p)}
           onMouseEnter={() => setHoveredId(p.id)}
           onMouseLeave={() => setHoveredId(null)}
-          className="relative flex items-center gap-1.5 pl-2 pr-2 py-1 rounded-lg border border-white/8 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/15 cursor-pointer transition-colors text-[10px] text-white/60 hover:text-white/80"
+          type="button"
+          className="relative flex items-center gap-1.5 min-h-6 pl-2 pr-2 py-1 rounded-lg border border-lab-border bg-lab-fill hover:bg-lab-fill-hover hover:border-lab-border-strong cursor-pointer transition-colors text-lab-xs text-lab-fg-muted hover:text-lab-fg lab-focus"
         >
           <span
-            className="text-[11px] font-bold leading-none"
+            aria-hidden="true"
+            className="text-lab-xs font-bold leading-none"
             style={{
               fontFamily: p.props['font-family'] || 'inherit',
               fontWeight: p.props['font-weight'] || 'inherit',
@@ -415,11 +433,11 @@ function PresetChips({
           >
             Aa
           </span>
-          <span className="truncate max-w-[80px]">{p.name}</span>
+          <span className="truncate max-w-20">{p.name}</span>
           {hoveredId === p.id && (
             <span
               onClick={(e) => { e.stopPropagation(); onDelete(p.id) }}
-              className="ml-0.5 w-3.5 h-3.5 rounded-full bg-white/10 hover:bg-red-500/30 flex items-center justify-center text-white/40 hover:text-red-400 transition-colors"
+              className="ml-0.5 w-3.5 h-3.5 rounded-full bg-lab-fill-selected hover:bg-red-500/30 flex items-center justify-center text-lab-fg-subtle hover:text-red-400 transition-colors"
             >
               <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
                 <path d="M18 6L6 18M6 6l12 12" />
@@ -453,10 +471,11 @@ function SavePresetButton({
   if (!editing) {
     return (
       <button
+        type="button"
         onClick={() => setEditing(true)}
-        className="w-full mt-1 py-2 rounded-lg border border-dashed border-white/10 hover:border-white/20 bg-transparent hover:bg-white/[0.03] text-[10px] font-medium text-white/30 hover:text-white/50 cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+        className="w-full mt-1 py-2 rounded-lg border border-dashed border-lab-border hover:border-lab-border-strong bg-transparent hover:bg-lab-fill text-lab-xs font-medium text-lab-fg-subtle hover:text-lab-fg-muted cursor-pointer transition-colors flex items-center justify-center gap-1.5 lab-focus"
       >
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
           <path d="M12 5v14M5 12h14" />
         </svg>
         Save preset
@@ -475,11 +494,13 @@ function SavePresetButton({
           if (e.key === 'Escape') setEditing(false)
         }}
         placeholder="Preset name..."
-        className="flex-1 bg-white/[0.04] border border-white/10 focus:border-white/20 rounded-lg px-2.5 py-1.5 text-[11px] text-white/80 transition-colors"
+        aria-label="Preset name"
+        className="flex-1 bg-lab-fill border border-lab-border focus:border-lab-border-strong rounded-lg px-2.5 py-1.5 text-lab-xs text-lab-fg placeholder:text-lab-fg-subtle transition-colors lab-focus"
       />
       <button
+        type="button"
         onClick={() => { if (name.trim()) { onSave(name.trim()); setEditing(false) } }}
-        className="px-2.5 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-[10px] font-semibold text-primary-soft cursor-pointer border-0 transition-colors"
+        className="min-h-6 px-2.5 py-1.5 rounded-lg bg-lab-fill-selected hover:bg-lab-fill-hover text-lab-xs font-semibold text-lab-fg cursor-pointer border-0 transition-colors lab-focus"
       >
         Save
       </button>
@@ -504,15 +525,18 @@ function PropertyRow({
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          {overridden && <span className="w-1.5 h-1.5 rounded-full bg-primary-soft" />}
-          <span className={`text-[10px] font-medium tracking-wide uppercase ${overridden ? 'text-white/60' : 'text-white/30'}`}>
+          {overridden && <span className="w-1.5 h-1.5 rounded-full bg-lab-accent" aria-hidden="true" />}
+          <span className={`text-lab-2xs font-semibold tracking-wide uppercase ${overridden ? 'text-lab-fg-muted' : 'text-lab-fg-subtle'}`}>
             {label}
+            {overridden && <span className="sr-only"> (changed)</span>}
           </span>
         </div>
         {overridden && (
           <button
+            type="button"
             onClick={onReset}
-            className="text-[9px] text-white/20 hover:text-red-400/60 cursor-pointer bg-transparent border-0 transition-colors"
+            aria-label={`Reset ${label}`}
+            className="min-h-6 rounded px-1 -mx-1 text-lab-xs text-lab-fg-subtle hover:text-red-400 cursor-pointer bg-transparent border-0 transition-colors lab-focus"
           >
             reset
           </button>
@@ -523,7 +547,10 @@ function PropertyRow({
   )
 }
 
-function SliderRow({
+/** A labelled range with a formatted value. Kept local: the value needs a
+ *  formatter (`0.020em`), and the PropertyRow above already shows the label. */
+function PropertySlider({
+  label,
   value,
   min,
   max,
@@ -531,6 +558,7 @@ function SliderRow({
   display,
   onChange,
 }: {
+  label: string
   value: number
   min: number
   max: number
@@ -542,44 +570,21 @@ function SliderRow({
     <div className="flex items-center gap-3">
       <input
         type="range"
+        aria-label={label}
         min={min}
         max={max}
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="flex-1 cursor-pointer"
+        className="lab-range lab-focus flex-1 min-w-0"
       />
-      <span className="text-[11px] font-mono text-white/45 w-[56px] text-right shrink-0 tabular-nums">
+      <output className="text-lab-xs font-mono text-lab-fg-subtle w-14 text-right shrink-0 tabular-nums">
         {display(value)}
-      </span>
+      </output>
     </div>
   )
 }
 
-function SegmentedControl({
-  options,
-  value,
-  onChange,
-}: {
-  options: string[]
-  value: string
-  onChange: (v: string) => void
-}) {
-  return (
-    <div className="flex rounded-lg overflow-hidden bg-white/[0.03] border border-white/[0.05] flex-1">
-      {options.map((opt) => (
-        <button
-          key={opt}
-          onClick={() => onChange(opt)}
-          className={`flex-1 text-[10px] font-medium py-1.5 cursor-pointer border-0 transition-colors capitalize ${
-            value === opt
-              ? 'bg-white/10 text-white/80'
-              : 'bg-transparent text-white/30 hover:text-white/50 hover:bg-white/[0.03]'
-          }`}
-        >
-          {opt}
-        </button>
-      ))}
-    </div>
-  )
+function capitalised<T extends string>(values: readonly T[]): SegmentedOption<T>[] {
+  return values.map((v) => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }))
 }
