@@ -196,7 +196,7 @@ function HeroSwitcher() {
             key={h.id}
             href={url.pathname + url.search}
             title={h.tagline}
-            className={`text-[12px] font-semibold px-3 py-1.5 rounded-full no-underline transition-all ${
+            className={`text-[12px] font-semibold px-3 py-1.5 rounded-full no-underline transition-colors ${
               active ? 'bg-white/15 text-white' : 'text-white/60 hover:text-white/90 hover:bg-white/5'
             }`}
           >
@@ -368,7 +368,8 @@ function LabLayout() {
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              className={`text-[12px] font-semibold px-3 py-1.5 rounded-full cursor-pointer border-0 transition-all ${
+              aria-pressed={viewMode === mode}
+              className={`text-[12px] font-semibold px-3 py-1.5 rounded-full cursor-pointer border-0 transition-colors ${
                 viewMode === mode
                   ? 'bg-white/15 text-white'
                   : 'bg-transparent text-white/60 hover:text-white/90 hover:bg-white/5'

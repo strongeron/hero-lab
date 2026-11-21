@@ -128,7 +128,7 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
     return (
       <button
         onClick={() => setEnabled(true)}
-        className="fixed top-20 right-6 z-[1001] px-3 py-2 rounded-xl border cursor-pointer transition-all backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 hover:border-white/20 hover:bg-[rgba(30,31,50,0.95)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] text-[12px] font-semibold text-white/70 hover:text-white/90 flex items-center gap-2"
+        className="fixed top-20 right-6 z-[1001] px-3 py-2 rounded-xl border cursor-pointer transition-colors backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 hover:border-white/20 hover:bg-[rgba(30,31,50,0.95)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] text-[12px] font-semibold text-white/70 hover:text-white/90 flex items-center gap-2"
         title="Open Design Panel (⌘/Ctrl + Shift + E)"
       >
         <SlidersIcon />
@@ -205,7 +205,7 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
           )}
           <button
             onClick={() => setEnabled(false)}
-            className="w-6 h-6 rounded-md flex items-center justify-center cursor-pointer bg-transparent border-0 text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
+            className="w-6 h-6 rounded-md flex items-center justify-center cursor-pointer bg-transparent border-0 text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -273,7 +273,7 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
               <select
                 value={getEffective('font-family')}
                 onChange={(e) => handleSet('font-family', e.target.value)}
-                className="w-full bg-white/[0.04] border border-white/8 rounded-lg px-2.5 py-2 text-[11px] text-white/80 outline-none focus:border-white/15 cursor-pointer transition-colors"
+                className="w-full bg-white/[0.04] border border-white/8 rounded-lg px-2.5 py-2 text-[11px] text-white/80 focus:border-white/15 cursor-pointer transition-colors"
                 style={{ WebkitAppearance: 'none' }}
               >
                 {FONT_FAMILIES.map((f) => (
@@ -413,7 +413,7 @@ function PresetChips({
           onClick={() => onApply(p)}
           onMouseEnter={() => setHoveredId(p.id)}
           onMouseLeave={() => setHoveredId(null)}
-          className="relative flex items-center gap-1.5 pl-2 pr-2 py-1 rounded-lg border border-white/8 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/15 cursor-pointer transition-all text-[10px] text-white/60 hover:text-white/80"
+          className="relative flex items-center gap-1.5 pl-2 pr-2 py-1 rounded-lg border border-white/8 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/15 cursor-pointer transition-colors text-[10px] text-white/60 hover:text-white/80"
         >
           <span
             className="text-[11px] font-bold leading-none"
@@ -464,7 +464,7 @@ function SavePresetButton({
     return (
       <button
         onClick={() => setEditing(true)}
-        className="w-full mt-1 py-2 rounded-lg border border-dashed border-white/10 hover:border-white/20 bg-transparent hover:bg-white/[0.03] text-[10px] font-medium text-white/30 hover:text-white/50 cursor-pointer transition-all flex items-center justify-center gap-1.5"
+        className="w-full mt-1 py-2 rounded-lg border border-dashed border-white/10 hover:border-white/20 bg-transparent hover:bg-white/[0.03] text-[10px] font-medium text-white/30 hover:text-white/50 cursor-pointer transition-colors flex items-center justify-center gap-1.5"
       >
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
           <path d="M12 5v14M5 12h14" />
@@ -485,7 +485,7 @@ function SavePresetButton({
           if (e.key === 'Escape') setEditing(false)
         }}
         placeholder="Preset name..."
-        className="flex-1 bg-white/[0.04] border border-white/10 focus:border-white/20 rounded-lg px-2.5 py-1.5 text-[11px] text-white/80 outline-none transition-colors"
+        className="flex-1 bg-white/[0.04] border border-white/10 focus:border-white/20 rounded-lg px-2.5 py-1.5 text-[11px] text-white/80 transition-colors"
       />
       <button
         onClick={() => { if (name.trim()) { onSave(name.trim()); setEditing(false) } }}
@@ -581,7 +581,7 @@ function SegmentedControl({
         <button
           key={opt}
           onClick={() => onChange(opt)}
-          className={`flex-1 text-[10px] font-medium py-1.5 cursor-pointer border-0 transition-all capitalize ${
+          className={`flex-1 text-[10px] font-medium py-1.5 cursor-pointer border-0 transition-colors capitalize ${
             value === opt
               ? 'bg-white/10 text-white/80'
               : 'bg-transparent text-white/30 hover:text-white/50 hover:bg-white/[0.03]'

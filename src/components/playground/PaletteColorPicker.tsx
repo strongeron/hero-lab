@@ -151,7 +151,7 @@ export default function PaletteColorPicker({ value, onChange, themedRoot, palett
             <button
               key={token}
               onClick={() => onChange(color)}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer border-0 transition-all text-left ${
+              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer border-0 transition-colors text-left ${
                 isMatch(color)
                   ? 'bg-white/8'
                   : 'bg-transparent hover:bg-white/[0.03]'
@@ -194,7 +194,7 @@ export default function PaletteColorPicker({ value, onChange, themedRoot, palett
               <button
                 key={token}
                 onClick={() => onChange(color)}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer border-0 transition-all text-left ${
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer border-0 transition-colors text-left ${
                   isMatch(color) ? 'bg-white/8' : 'bg-transparent hover:bg-white/[0.03]'
                 }`}
               >
@@ -219,7 +219,7 @@ export default function PaletteColorPicker({ value, onChange, themedRoot, palett
           onChange={(e) => setHexInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleHexSubmit()}
           placeholder="Custom #hex"
-          className="flex-1 bg-white/[0.03] border border-white/8 rounded-lg px-2.5 py-1.5 text-[10px] text-white/70 font-mono placeholder:text-white/20 outline-none focus:border-white/15 transition-colors"
+          className="flex-1 bg-white/[0.03] border border-white/8 rounded-lg px-2.5 py-1.5 text-[10px] text-white/70 font-mono placeholder:text-white/20 focus:border-white/15 transition-colors"
         />
       </div>
     </div>

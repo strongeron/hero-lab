@@ -935,8 +935,8 @@ function buildWarpMask(
   spread: number, baseRadius: number,
   insideOnly = false, recolorCutoff?: number,
   snapSquare = false,
-): string | null {
-  if (pitch <= 1 || cw <= 0 || ch <= 0) return null
+): boolean {
+  if (pitch <= 1 || cw <= 0 || ch <= 0) return false
   const dpr = Math.min(2, Math.max(1, typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1))
   const canvasW = Math.max(1, Math.round(cw * dpr))
   const canvasH = Math.max(1, Math.round(ch * dpr))
@@ -945,7 +945,7 @@ function buildWarpMask(
     canvas.height = canvasH
   }
   const ctx = canvas.getContext('2d')
-  if (!ctx) return null
+  if (!ctx) return false
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, cw, ch)
   ctx.fillStyle = '#000'
@@ -997,12 +997,33 @@ function buildWarpMask(
       drew = true
     }
   }
-  return drew ? canvas.toDataURL() : null
+  return drew
+}
+
+/** Encode a mask canvas off the main thread and decode it before use. A sync
+ *  toDataURL here was a full-hero PNG encode on every cursor step (~75% of the
+ *  main thread during a hover sweep). Decoding first matters: an unloaded
+ *  mask-image counts as transparent, so swapping in a raw blob URL would
+ *  blank the layer for a frame. */
+function canvasToDecodedUrl(canvas: HTMLCanvasElement): Promise<string | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      if (!blob) { resolve(null); return }
+      const url = URL.createObjectURL(blob)
+      const img = new Image()
+      img.src = url
+      img.decode().then(() => resolve(url), () => { URL.revokeObjectURL(url); resolve(null) })
+    })
+  })
 }
 
 export default function DitherHero() {
-  const { shader: c, edge, copyVariant, hover, multiColor: mc, pixelGrid, animation: anim, layout, button, haptic: hap, terminalTheme: termThemeId, initialState, activeScene, stableColorField } = useDitherStore()
+  const { shader: c, edge, copyVariant, hover, multiColor: mc, pixelGrid, animation: storeAnim, layout, button, haptic: hap, terminalTheme: termThemeId, initialState, activeScene, stableColorField } = useDitherStore()
   const reducedMotion = usePrefersReducedMotion()
+  // Off-screen heroes read as paused: this stops the drift, mask and ripple
+  // loops and sets the shader speed to 0, which stops Paper's own rAF.
+  const [inView, setInView] = useState(true)
+  const anim = inView ? storeAnim : { ...storeAnim, playing: false }
   const spatialMotionScale = reducedMotion ? 0.15 : 1
   // CTA styling shared with the header (radius + caps), art-directable per template.
   const ctaStyle: React.CSSProperties = { borderRadius: button.radius }
@@ -1082,22 +1103,25 @@ export default function DitherHero() {
 
   useEffect(() => {
     if (edge.mode !== 'ripple') return
-    if (edge.rippleSpeed === 0) return
+    if (edge.rippleSpeed === 0 || !inView) return
 
     let running = true
     let last = performance.now()
 
+    // Commit the phase at ~24fps: the wave is slow, and each commit re-renders the hero.
     function tick(now: number) {
       if (!running) return
       const dt = (now - last) / 1000
-      last = now
-      setRipplePhase((p) => p + edge.rippleSpeed * dt * Math.PI * 2)
+      if (dt >= 1 / 24) {
+        last = now
+        setRipplePhase((p) => p + edge.rippleSpeed * dt * Math.PI * 2)
+      }
       requestAnimationFrame(tick)
     }
 
     requestAnimationFrame(tick)
     return () => { running = false }
-  }, [edge.mode, edge.rippleSpeed])
+  }, [edge.mode, edge.rippleSpeed, inView])
 
   // Ripple dithers the wave (Photoshop dissolve) when its toggle is on; otherwise
   // it's a hard/pixelated clip. Quantize the animated phase so the dither SVG
@@ -1793,6 +1817,13 @@ export default function DitherHero() {
   // epoch, which remounts the shader stacks (fresh canvases, fresh contexts).
   const [glEpoch, setGlEpoch] = useState(0)
   useEffect(() => {
+    const el = shaderContainerRef.current
+    if (!el) return
+    const io = new IntersectionObserver(([e]) => setInView(e.isIntersecting))
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+  useEffect(() => {
     const host = shaderContainerRef.current
     if (!host) return
     const id = window.setInterval(() => {
@@ -1879,6 +1910,18 @@ export default function DitherHero() {
   const warpSceneCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const warpGenRef = useRef({ px: -1, py: -1, r: -1, ry: -1, velocity: -1, key: '' })
   const [warp, setWarp] = useState<{ url: string; sceneUrl: string | null; px: number; py: number; r: number } | null>(null)
+  const warpEncodingRef = useRef(false)
+  // Each new mask re-renders the hero; ~24 swaps/s looks smooth and halves the commits.
+  const warpLastStartRef = useRef(0)
+  const warpTokenRef = useRef(0)
+  // Revoke a replaced mask's blob URLs only after the new one has committed.
+  useEffect(() => {
+    if (!warp) return
+    return () => {
+      URL.revokeObjectURL(warp.url)
+      if (warp.sceneUrl) URL.revokeObjectURL(warp.sceneUrl)
+    }
+  }, [warp])
   const dynamicSizeRef = useRef(hover.dynamicSize)
   dynamicSizeRef.current = hover.dynamicSize
   const baseRadiusRef = useRef(hover.radius)
@@ -2071,45 +2114,66 @@ export default function DitherHero() {
             wc.rotate, wc.round, wc.scale, spread, wc.recolor, wc.recolorEnabled,
             wc.overlayEnabled, wc.revealEnabled, wc.snapSquare,
           ].join(':')
-          if (Math.abs(a.px - gen.px) >= 2 || Math.abs(a.py - gen.py) >= 2 || Math.abs(a.radius - gen.r) >= 2 || Math.abs(a.radiusY - gen.ry) >= 2 || spreadChanged || gen.key !== maskKey) {
+          // One encode in flight at a time: while it runs, the loop keeps
+          // animating and the next build picks up the latest cursor position.
+          if (!warpEncodingRef.current && now - warpLastStartRef.current >= 1000 / 24 && (Math.abs(a.px - gen.px) >= 2 || Math.abs(a.py - gen.py) >= 2 || Math.abs(a.radius - gen.r) >= 2 || Math.abs(a.radiusY - gen.ry) >= 2 || spreadChanged || gen.key !== maskKey)) {
             if (!warpCanvasRef.current) warpCanvasRef.current = document.createElement('canvas')
-            const url = buildWarpMask(
+            const drewBase = buildWarpMask(
               warpCanvasRef.current, a.cw, a.ch, a.px, a.py, a.radius, a.radiusY || a.radius, shape,
               g.pitch, g.alignX, g.alignY, wc.basePiece, wc.rotate, wc.round, wc.scale, spread, wc.baseRadius,
               false, undefined, wc.snapSquare,
             )
-            let sceneUrl: string | null = null
-            if (url && (wc.revealEnabled || (wc.recolorEnabled && wc.recolor > 0))) {
+            let drewScene = false
+            if (drewBase && (wc.revealEnabled || (wc.recolorEnabled && wc.recolor > 0))) {
               // Reveal covers every warped tile (reach 1); recolor uses its reach.
               if (!warpSceneCanvasRef.current) warpSceneCanvasRef.current = document.createElement('canvas')
-              sceneUrl = buildWarpMask(
+              drewScene = buildWarpMask(
                 warpSceneCanvasRef.current, a.cw, a.ch, a.px, a.py, a.radius, a.radiusY || a.radius, shape,
                 g.pitch, g.alignX, g.alignY, wc.basePiece, wc.rotate, wc.round, wc.scale, spread, wc.baseRadius,
                 true, wc.revealEnabled ? 1 : wc.recolor, wc.snapSquare,
               )
-            } else if (url && wc.overlayEnabled) {
+            } else if (drewBase && wc.overlayEnabled) {
               if (!warpSceneCanvasRef.current) warpSceneCanvasRef.current = document.createElement('canvas')
-              sceneUrl = buildWarpMask(
+              drewScene = buildWarpMask(
                 warpSceneCanvasRef.current, a.cw, a.ch, a.px, a.py, a.radius, a.radiusY || a.radius, shape,
                 g.pitch, g.alignX, g.alignY, wc.basePiece, wc.rotate, wc.round, wc.scale, spread, wc.baseRadius,
                 true, 1, wc.snapSquare,
               )
             }
-            if (url) {
+            if (drewBase) {
               gen.px = a.px; gen.py = a.py; gen.r = a.radius; gen.ry = a.radiusY; gen.velocity = a.velocity; gen.key = maskKey
-              setWarp({ url, sceneUrl, px: a.px, py: a.py, r: a.radius })
+              // toBlob snapshots the bitmap at call time, so reusing the two
+              // canvases on the next build is safe.
+              const token = ++warpTokenRef.current
+              const px = a.px, py = a.py, r = a.radius
+              warpEncodingRef.current = true
+              warpLastStartRef.current = now
+              Promise.all([
+                canvasToDecodedUrl(warpCanvasRef.current),
+                drewScene && warpSceneCanvasRef.current ? canvasToDecodedUrl(warpSceneCanvasRef.current) : null,
+              ]).then(([url, sceneUrl]) => {
+                warpEncodingRef.current = false
+                // Dropped if the warp was cleared or the effect re-ran meanwhile.
+                if (!running || token !== warpTokenRef.current || !url) {
+                  if (url) URL.revokeObjectURL(url)
+                  if (sceneUrl) URL.revokeObjectURL(sceneUrl)
+                  return
+                }
+                setWarp({ url, sceneUrl, px, py, r })
+                startLoop()
+              })
             }
           }
         } else if (a.radius <= 0 && gen.r !== -1) {
           gen.px = -1; gen.py = -1; gen.r = -1; gen.ry = -1; gen.velocity = -1; gen.key = ''
-          setWarp(null)
+          warpTokenRef.current++; setWarp(null)
           if (fixEl) fixEl.style.visibility = 'hidden'
         } else if (fixEl && !hoverPreviewRef.current) {
           fixEl.style.visibility = 'hidden'
         }
       } else if (fixEl && !hoverPreviewRef.current) {
         // Left warp mode with a mask still up → clear it so React restores the grid.
-        if (warpGenRef.current.r !== -1) { warpGenRef.current = { px: -1, py: -1, r: -1, ry: -1, velocity: -1, key: '' }; setWarp(null) }
+        if (warpGenRef.current.r !== -1) { warpGenRef.current = { px: -1, py: -1, r: -1, ry: -1, velocity: -1, key: '' }; warpTokenRef.current++; setWarp(null) }
         if (a.radius > 0 || a.radiusY > 0) {
           if (hoverShapeRef.current === 'square') {
             const ry = a.radiusY || a.radius

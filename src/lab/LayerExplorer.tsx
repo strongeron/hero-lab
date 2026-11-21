@@ -254,7 +254,7 @@ export default function LayerExplorer() {
                         // across scene switches (one atomic update → no flash).
                         if (stickyLoopBreak.current !== null) setLoopBreak(stickyLoopBreak.current)
                       })}
-                      className={`text-[10px] font-mono py-1 px-1.5 rounded-md border cursor-pointer transition-all ${
+                      className={`text-[10px] font-mono py-1 px-1.5 rounded-md border cursor-pointer transition-colors ${
                         s.activeScene === id ? 'bg-white/12 border-white/20 text-white/90' : 'bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/70'
                       }`}
                     >{sceneTemplates[id].label}</button>
@@ -275,7 +275,7 @@ export default function LayerExplorer() {
                         key={m.id}
                         onClick={() => { stickyLoopBreak.current = m.id; setLoopBreak(m.id) }}
                         title={m.hint}
-                        className={`text-[10px] font-mono py-1 px-1.5 rounded-md border cursor-pointer transition-all ${
+                        className={`text-[10px] font-mono py-1 px-1.5 rounded-md border cursor-pointer transition-colors ${
                           s.animation.loopBreak === m.id ? 'bg-white/12 border-white/20 text-white/90' : 'bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/70'
                         }`}
                       >{m.label}</button>
@@ -295,7 +295,7 @@ export default function LayerExplorer() {
               <div className="flex gap-1">
                 {tileModes.map((m) => (
                   <button key={m.id} onClick={() => setRenderer(m.id)}
-                    className={`flex-1 text-[10.5px] font-mono py-1.5 px-2 rounded-md border cursor-pointer transition-all ${
+                    className={`flex-1 text-[10.5px] font-mono py-1.5 px-2 rounded-md border cursor-pointer transition-colors ${
                       s.animation.tileDisplay === m.id ? 'bg-white/12 border-white/20 text-white/90' : 'bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/70'
                     }`}>{m.label}</button>
                 ))}
@@ -325,7 +325,7 @@ export default function LayerExplorer() {
                   const on = L.on
                   return (
                     <button key={L.name} onClick={() => batchDitherUpdates(() => L.set(!on))}
-                      className={`grid grid-cols-[28px_1fr] gap-3 items-start text-left p-3 rounded-xl border cursor-pointer transition-all ${
+                      className={`grid grid-cols-[28px_1fr] gap-3 items-start text-left p-3 rounded-xl border cursor-pointer transition-colors ${
                         on ? 'border-emerald-400/25 bg-emerald-400/[0.05]' : 'border-white/[0.06] bg-white/[0.02] hover:border-white/15'
                       }`}>
                       <span className={`mt-0.5 w-6 h-6 grid place-items-center rounded-md font-mono text-[11px] ${on ? 'bg-emerald-400/15 text-emerald-300' : 'bg-white/[0.06] text-white/40'}`}>{i + 1}</span>

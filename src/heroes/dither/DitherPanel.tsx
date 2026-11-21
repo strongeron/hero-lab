@@ -62,7 +62,7 @@ const HEADER_MODES: { value: HeaderBgMode; label: string }[] = [
 const HAPTIC_PRESETS: HapticPresetId[] = ['selection', 'light', 'medium', 'heavy', 'soft', 'rigid', 'nudge']
 
 const pill = (active: boolean) =>
-  `text-[10px] font-medium py-1 px-2 rounded-md cursor-pointer border transition-all ${
+  `text-[10px] font-medium py-1 px-2 rounded-md cursor-pointer border transition-colors ${
     active
       ? 'bg-white/10 border-white/15 text-white/80'
       : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50 hover:bg-white/[0.06]'
@@ -218,7 +218,7 @@ export default function DitherPanel() {
         <div className="flex items-center gap-2">
           <button
             onClick={exportCode}
-            className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+            className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
               codeCopied
                 ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                 : 'bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/60 hover:bg-white/[0.06]'
@@ -228,7 +228,7 @@ export default function DitherPanel() {
           </button>
           <button
             onClick={copySettings}
-            className="text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/60 hover:bg-white/[0.06]"
+            className="text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/60 hover:bg-white/[0.06]"
           >
             {copied ? 'Copied!' : 'Copy Config'}
           </button>
@@ -262,7 +262,7 @@ export default function DitherPanel() {
               <button
                 key={opt.value}
                 onClick={() => setInitialState(opt.value)}
-                className={`flex-1 py-1.5 px-2 rounded-lg cursor-pointer border transition-all text-left ${
+                className={`flex-1 py-1.5 px-2 rounded-lg cursor-pointer border transition-colors text-left ${
                   state.initialState === opt.value
                     ? 'bg-white/10 border-white/15'
                     : 'bg-white/[0.03] border-white/[0.05] hover:bg-white/[0.06]'
@@ -287,7 +287,7 @@ export default function DitherPanel() {
           </span>
           <button
             onClick={copySettings}
-            className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+            className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
               copied
                 ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                 : 'bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/60 hover:bg-white/[0.06]'
@@ -312,7 +312,7 @@ export default function DitherPanel() {
             <span className="text-[9px] text-white/50 font-mono">{c.colorBack}</span>
             <button
               onClick={() => setShaderConfig({ transparentBg: !c.transparentBg })}
-              className={`text-[8px] font-medium py-0.5 px-1.5 rounded cursor-pointer border transition-all ml-auto ${
+              className={`text-[8px] font-medium py-0.5 px-1.5 rounded cursor-pointer border transition-colors ml-auto ${
                 c.transparentBg
                   ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                   : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -452,7 +452,7 @@ export default function DitherPanel() {
             <div className="flex items-center gap-2">
               <button
                 onClick={copySettings}
-                className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+                className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                   copied
                     ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                     : 'bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/60 hover:bg-white/[0.06]'
@@ -463,7 +463,7 @@ export default function DitherPanel() {
               </button>
               <button
                 onClick={() => setPixelGridConfig({ enabled: !pg.enabled })}
-                className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+                className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                   pg.enabled
                     ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                     : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -488,7 +488,7 @@ export default function DitherPanel() {
                 <span className="text-[9px] text-white/40">Snap to dither</span>
                 <button
                   onClick={() => setPixelGridConfig({ snap: !pg.snap })}
-                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                     pg.snap
                       ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                       : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -557,7 +557,7 @@ export default function DitherPanel() {
             </span>
             <button
               onClick={() => setMultiColorConfig({ enabled: !mc.enabled })}
-              className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+              className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                 mc.enabled
                   ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                   : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -611,7 +611,7 @@ export default function DitherPanel() {
               <button
                 key={opt.value}
                 onClick={() => setEdgeConfig({ mode: opt.value })}
-                className={`text-[10px] font-medium py-1.5 px-2.5 rounded-lg cursor-pointer border transition-all ${
+                className={`text-[10px] font-medium py-1.5 px-2.5 rounded-lg cursor-pointer border transition-colors ${
                   e.mode === opt.value
                     ? 'bg-white/10 border-white/15 text-white/80'
                     : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50 hover:bg-white/[0.06]'
@@ -654,7 +654,7 @@ export default function DitherPanel() {
               )}
               <button
                 onClick={() => setEdgeConfig({ dissolveSeed: e.dissolveSeed + 1 })}
-                className="text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/60 hover:bg-white/[0.06]"
+                className="text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/60 hover:bg-white/[0.06]"
                 title="Reshuffle which rim tiles drop out"
               >
                 Reshuffle
@@ -729,7 +729,7 @@ export default function DitherPanel() {
               )}
               <button
                 onClick={() => setEdgeConfig({ dissolveSeed: e.dissolveSeed + 1 })}
-                className="text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/60 hover:bg-white/[0.06]"
+                className="text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/60 hover:bg-white/[0.06]"
                 title="Reshuffle which tiles drop out"
               >
                 Reshuffle
@@ -743,7 +743,7 @@ export default function DitherPanel() {
                 <span className="text-[9px] text-white/40">Dither edge</span>
                 <button
                   onClick={() => setEdgeConfig({ rippleDither: !e.rippleDither })}
-                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                     e.rippleDither
                       ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                       : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -762,7 +762,7 @@ export default function DitherPanel() {
                   <Slider label="Dissolve Depth" value={e.dissolveDepth} min={1} max={20} step={1} suffix=" rows" onChange={(v) => setEdgeConfig({ dissolveDepth: v })} />
                   <button
                     onClick={() => setEdgeConfig({ dissolveSeed: e.dissolveSeed + 1 })}
-                    className="text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/60 hover:bg-white/[0.06]"
+                    className="text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/60 hover:bg-white/[0.06]"
                     title="Reshuffle which tiles drop out"
                   >
                     Reshuffle
@@ -775,7 +775,7 @@ export default function DitherPanel() {
                   <span className="text-[9px] text-white/40">Pixelate (tile wave)</span>
                   <button
                     onClick={() => setEdgeConfig({ ripplePixelate: !e.ripplePixelate })}
-                    className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+                    className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                       e.ripplePixelate
                         ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                         : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -805,7 +805,7 @@ export default function DitherPanel() {
             </span>
             <button
               onClick={() => setAnimationConfig({ playing: !a.playing })}
-              className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+              className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                 a.playing
                   ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                   : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -828,7 +828,7 @@ export default function DitherPanel() {
                 <button
                   key={id}
                   onClick={() => applySceneTemplate(id)}
-                  className={`text-left py-1.5 px-2 rounded-lg cursor-pointer border transition-all ${
+                  className={`text-left py-1.5 px-2 rounded-lg cursor-pointer border transition-colors ${
                     isActive
                       ? 'bg-white/10 border-white/15'
                       : 'bg-white/[0.03] border-white/[0.05] hover:bg-white/[0.06]'
@@ -949,7 +949,7 @@ export default function DitherPanel() {
             </span>
             <button
               onClick={() => setHoverConfig({ enabled: !h.enabled })}
-              className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+              className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                 h.enabled
                   ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                   : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -988,7 +988,7 @@ export default function DitherPanel() {
                 </button>
                 <button
                   onClick={() => setHoverConfig({ preview: !h.preview })}
-                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ml-auto ${
+                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ml-auto ${
                     h.preview
                       ? 'bg-amber-500/20 border-amber-500/30 text-amber-400/80'
                       : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -1029,7 +1029,7 @@ export default function DitherPanel() {
                     <span className="text-[9px] text-white/40">Whole tiles</span>
                     <button
                       onClick={() => setHoverConfig({ wholeTiles: !h.wholeTiles })}
-                      className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+                      className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                         h.wholeTiles
                           ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                           : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -1053,7 +1053,7 @@ export default function DitherPanel() {
                     <span className="text-[9px] text-white/40">Whole tiles</span>
                     <button
                       onClick={() => setHoverConfig({ wholeTiles: !h.wholeTiles })}
-                      className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+                      className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                         h.wholeTiles
                           ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                           : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -1419,7 +1419,7 @@ export default function DitherPanel() {
                 <span className="text-[9px] text-white/40">Dynamic Size</span>
                 <button
                   onClick={() => setHoverConfig({ dynamicSize: !h.dynamicSize })}
-                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                     h.dynamicSize
                       ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400/80'
                       : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -1441,7 +1441,7 @@ export default function DitherPanel() {
             </span>
             <button
               onClick={() => setHapticConfig({ enabled: !hap.enabled })}
-              className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+              className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                 hap.enabled
                   ? 'bg-violet-500/20 border-violet-500/30 text-violet-400/80'
                   : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -1462,7 +1462,7 @@ export default function DitherPanel() {
                 <span className="text-[9px] text-white/40">Force Debug Audio</span>
                 <button
                   onClick={() => setHapticConfig({ debug: !hap.debug })}
-                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                     hap.debug
                       ? 'bg-amber-500/20 border-amber-500/30 text-amber-400/80'
                       : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -1502,7 +1502,7 @@ export default function DitherPanel() {
                 <span className="text-[9px] text-white/40">Velocity Intensity</span>
                 <button
                   onClick={() => setHapticConfig({ velocityIntensity: !hap.velocityIntensity })}
-                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-all ${
+                  className={`text-[9px] font-medium py-0.5 px-2 rounded cursor-pointer border transition-colors ${
                     hap.velocityIntensity
                       ? 'bg-violet-500/20 border-violet-500/30 text-violet-400/80'
                       : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50'
@@ -1583,7 +1583,7 @@ export default function DitherPanel() {
               <button
                 key={opt.value}
                 onClick={() => setHeaderBg(opt.value)}
-                className={`flex-1 text-[10px] font-medium py-1.5 px-2 rounded-lg cursor-pointer border transition-all ${
+                className={`flex-1 text-[10px] font-medium py-1.5 px-2 rounded-lg cursor-pointer border transition-colors ${
                   state.headerBg === opt.value
                     ? 'bg-white/10 border-white/15 text-white/80'
                     : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50 hover:bg-white/[0.06]'
@@ -1637,7 +1637,7 @@ export default function DitherPanel() {
               <button
                 key={id}
                 onClick={() => setCopyVariant(id)}
-                className={`flex-1 text-[10px] font-medium py-1.5 px-2 rounded-lg cursor-pointer border transition-all ${
+                className={`flex-1 text-[10px] font-medium py-1.5 px-2 rounded-lg cursor-pointer border transition-colors ${
                   state.copyVariant === id
                     ? 'bg-white/10 border-white/15 text-white/80'
                     : 'bg-white/[0.03] border-white/[0.05] text-white/30 hover:text-white/50 hover:bg-white/[0.06]'
