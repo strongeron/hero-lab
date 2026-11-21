@@ -1530,7 +1530,7 @@ export default function DitherHero() {
 
   // Baseline lock (problem layout) — the right column snaps to the left one:
   // the response's last line shares the headline's last baseline, the CTA
-  // text sits on the sub's bottom baseline. Nudges accumulate incrementally
+  // label shares the sub's last baseline. Nudges accumulate incrementally
   // (target minus current, measured post-transform) so the lock converges and
   // then holds across font, size, and copy changes.
   useEffect(() => {
@@ -1559,10 +1559,10 @@ export default function DitherHero() {
         const rB = respP && lastLineBaseline(respP)
         if (hB != null && rB != null && Math.abs(hB - rB) > 0.5) response = clampNudge(response + (hB - rB))
         const sB = subEl && lastLineBaseline(subEl)
-        // Align the CTA pill's bottom EDGE (not its text baseline) to the
-        // sub's last baseline — the pill edge is the stronger visual line.
-        const cEdge = ctaEl ? ctaEl.getBoundingClientRect().bottom : null
-        if (sB != null && cEdge != null && Math.abs(sB - cEdge) > 0.5) cta = clampNudge(cta + (sB - cEdge))
+        // The CTA label sits on the sub's last baseline, so the button text
+        // and the sub read as one line of type across the two columns.
+        const cB = ctaEl && lastLineBaseline(ctaEl)
+        if (sB != null && cB != null && Math.abs(sB - cB) > 0.5) cta = clampNudge(cta + (sB - cB))
         // Both locks pull the response and the CTA toward each other. When the
         // headline's last baseline and the sub's last baseline sit closer than
         // the response + CTA stack needs (a one-line sub), they collide. Open
