@@ -130,7 +130,7 @@ function tileThreshold(cx: number, cy: number, seed: number): number {
 }
 
 function noiseFade(t: number): number {
-  return t * t * t * (t * (t * 6 - 15) + 1)
+  return t * t * t * (t * (t * 6 - 15) + 10)
 }
 
 function noiseHash2(ix: number, iy: number, seed: number): number {
