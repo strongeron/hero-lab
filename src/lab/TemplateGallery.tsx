@@ -56,9 +56,14 @@ export default function TemplateGallery() {
   // Bump when posters are re-baked. Without this the browser keeps serving the
   // cached image and the gallery silently shows the previous bake — the artboard
   // looks stale (old fonts, old state) while the file on disk is already right.
-  const POSTER_VERSION = 3
-  const posterSrc = (templateId: string, deviceId: string) =>
-    `${import.meta.env.BASE_URL}posters/${templateId}-${deviceId}.jpeg?v=${POSTER_VERSION}`
+  // WebP at full bake size plus a half-size copy (slow-connection audit, fix 4):
+  // the artboards render at well under bake size, so the browser picks the
+  // half copy at Fit zoom and the full one at 100% / on 2x screens.
+  const POSTER_VERSION = 4
+  const posterSrc = (templateId: string, deviceId: string, half = false) =>
+    `${import.meta.env.BASE_URL}posters/${templateId}-${deviceId}${half ? '-half' : ''}.webp?v=${POSTER_VERSION}`
+  /** Bake width per device: desktop is baked at 1x, tablet and mobile at 2x. */
+  const bakeWidth = (d: (typeof DEVICES)[number]) => (d.id === 'desktop' ? d.width : d.width * 2)
 
   const rowHeight = Math.max(...DEVICES.map((d) => d.height)) * scale
 
@@ -143,8 +148,13 @@ export default function TemplateGallery() {
                             // Clicking (overlay below) mounts the live hero.
                             <img
                               src={posterSrc(t.id, d.id)}
+                              srcSet={`${posterSrc(t.id, d.id, true)} ${bakeWidth(d) / 2}w, ${posterSrc(t.id, d.id)} ${bakeWidth(d)}w`}
+                              sizes={`${Math.ceil(d.width * scale)}px`}
+                              width={bakeWidth(d)}
+                              height={Math.round((bakeWidth(d) * d.height) / d.width)}
                               alt={`${t.name} — ${d.label} preview`}
                               loading="lazy"
+                              decoding="async"
                               draggable={false}
                               style={{ width: d.width * scale, height: d.height * scale, objectFit: 'cover', objectPosition: 'top', display: 'block' }}
                             />
