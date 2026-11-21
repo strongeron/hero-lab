@@ -194,7 +194,7 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
 function HeroSwitcher({ bottom }: { bottom: number }) {
   if (heroes.length < 2) return null
   return (
-    <div style={{ bottom }} className={`fixed left-4 z-[1002] flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-lab-surface border-lab-border ${floatShadow}`}>
+    <div style={{ bottom }} className={`fixed left-4 z-[1002] flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-lab-surface border-lab-border shadow-lab-float`}>
       {heroes.map((h) => {
         const active = h.id === activeHero.id
         const url = new URL(window.location.href)
@@ -225,9 +225,6 @@ const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
   { value: 'templates', label: 'Templates' },
   { value: 'layers', label: 'Layers' },
 ]
-/** Drop shadow of floating chrome. No lab shadow token exists; black at 50 %
- *  lifts the pill off any hero palette underneath. */
-const floatShadow = 'shadow-[0_8px_32px_black] shadow-black/50'
 /** The Design toggle matches a `Segmented shape="pill"` option. It is a
  *  separate on/off toggle, not one more view, so it is not in that group. */
 const designBtn = 'shrink-0 cursor-pointer border-0 font-medium transition-colors lab-focus rounded-full px-3 py-1.5 text-lab-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-lab-fg-muted'
@@ -397,7 +394,7 @@ function LabLayout() {
           roughly 440–1000px and the panel starts at 1040px, so viewport-centring
           does not put it under the panel. */}
       <div style={{ bottom: chromeBottom }} className="fixed left-0 right-0 z-[1002] flex justify-center pointer-events-none px-2">
-        <div className={`pointer-events-auto flex items-center pr-1 rounded-full border backdrop-blur-xl bg-lab-surface border-lab-border ${floatShadow} max-w-full overflow-x-auto`}>
+        <div className={`pointer-events-auto flex items-center pr-1 rounded-full border backdrop-blur-xl bg-lab-surface border-lab-border shadow-lab-float max-w-full overflow-x-auto`}>
           <Segmented shape="pill" label="View" options={VIEW_OPTIONS} value={viewMode} onChange={setViewMode} />
           <span aria-hidden="true" className="w-px h-4 ml-0.5 mr-1.5 bg-lab-border-strong shrink-0" />
           {/* Layers hides the panel on purpose (the stack is the control

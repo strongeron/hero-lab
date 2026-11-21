@@ -120,7 +120,7 @@ export default function TemplateGallery() {
                     {DEVICES.map((d) => (
                       <div key={d.id} className="shrink-0">
                         <div
-                          className="rounded-xl border border-lab-border overflow-hidden bg-black shadow-[0_16px_48px_black] shadow-black/50"
+                          className="rounded-xl border border-lab-border overflow-hidden bg-black shadow-lab-raised"
                           style={{ width: d.width * scale, height: d.height * scale }}
                         >
                           {active ? (
@@ -169,7 +169,7 @@ export default function TemplateGallery() {
                       aria-label={`Edit ${t.name} in the Design Panel`}
                       className="absolute inset-0 z-10 rounded-2xl cursor-pointer bg-transparent border-0 group lab-focus"
                     >
-                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity text-lab-xs font-semibold px-3 py-1.5 rounded-full bg-lab-toolbar border border-lab-border-strong text-lab-fg shadow-[0_8px_24px_black] shadow-black/50 whitespace-nowrap">
+                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity text-lab-xs font-semibold px-3 py-1.5 rounded-full bg-lab-toolbar border border-lab-border-strong text-lab-fg shadow-lab-float whitespace-nowrap">
                         Edit in Design Panel
                       </span>
                     </button>

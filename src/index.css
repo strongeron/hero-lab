@@ -60,6 +60,9 @@
   --text-lab-xs: 11px;
   --text-lab-sm: 12px;
   --text-lab-md: 13px;
+  /* Black at 50 % lifts lab UI off any hero palette underneath. */
+  --shadow-lab-float: 0 8px 32px rgb(0 0 0 / 0.5);
+  --shadow-lab-raised: 0 16px 48px rgb(0 0 0 / 0.5);
 
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;

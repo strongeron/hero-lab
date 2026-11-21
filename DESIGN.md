@@ -15,7 +15,7 @@ meaning (the emerald accent marks "editing" and "on").
 
 Required:
 
-- **Tokens only.** Lab UI colour, surface, border, fill and font size come from the
+- **Tokens only.** Lab UI colour, surface, border, fill, shadow and font size come from the
   `lab-*` tokens below. No raw `white/NN`, `rgba(...)`, hex or `text-[Npx]` in lab
   UI code. A scoped exception needs a comment naming why.
 - **Text contrast.** Text is `text-lab-fg`, `text-lab-fg-muted` or
@@ -39,9 +39,9 @@ used settings behind a disclosure over adding more rows.
 - Layouts: [index](design-system/LAYOUTS.md)
 - Patterns: [index](design-system/PATTERNS.md)
 - Tokens: `@theme` block in [`src/index.css`](src/index.css), the `--color-lab-*`
-  and `--text-lab-*` entries, plus the `lab-focus` utility and the `input.lab-range`
+  `--text-lab-*` and `--shadow-lab-*` entries, plus the `lab-focus` utility and the `input.lab-range`
   styles in the same file. Tailwind v4 turns them into `bg-lab-*`, `text-lab-*`,
-  `border-lab-*` utilities.
+  `border-lab-*`, `shadow-lab-*` utilities.
 
 | Token | Role |
 | --- | --- |
@@ -55,6 +55,8 @@ used settings behind a disclosure over adding more rows.
 | `lab-focus` | Focus ring colour |
 | `lab-accent` | "Editing" / "on" meaning only |
 | `text-lab-2xs` … `text-lab-md` | 10 / 11 / 12 / 13 px |
+| `shadow-lab-float` | Floating chrome and chips: bottom view bar, toolbar pill, hover chip |
+| `shadow-lab-raised` | Artboards on the canvas (Templates, Breakpoints, Layers) |
 
 - Themes: the lab UI has one dark theme. Hero palettes do not apply to it.
 

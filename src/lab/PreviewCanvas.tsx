@@ -87,7 +87,7 @@ export default function PreviewCanvas({ onHome }: { onHome?: () => void }) {
               </span>
             </div>
             <div
-              className="rounded-xl border border-lab-border overflow-hidden bg-black shadow-[0_16px_48px_black] shadow-black/50"
+              className="rounded-xl border border-lab-border overflow-hidden bg-black shadow-lab-raised"
               style={{ width: d.width * scale, height: d.height * scale }}
             >
               <iframe
