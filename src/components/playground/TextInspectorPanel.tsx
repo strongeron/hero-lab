@@ -75,9 +75,6 @@ function parsePx(val: string): number {
   return parseFloat(val) || 0
 }
 
-/** Docked sidebar width — the lab layout offsets the hero by this much so the
- *  panel pushes content instead of covering it. */
-export const PANEL_WIDTH = 320
 
 function SlidersIcon({ size = 14 }: { size?: number }) {
   return (

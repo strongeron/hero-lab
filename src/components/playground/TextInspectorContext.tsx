@@ -203,3 +203,8 @@ export function useTextInspector() {
   if (!ctx) throw new Error('useTextInspector must be used within TextInspectorProvider')
   return ctx
 }
+
+/** Docked Design Panel width — the lab layout offsets the hero by this much so
+ *  the panel pushes content instead of covering it. Lives here, not in the
+ *  panel module, so the lab can lazy-load the panel. */
+export const PANEL_WIDTH = 320

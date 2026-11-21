@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { TextInspectorProvider, useTextInspector } from '../components/playground/TextInspectorContext'
-import TextInspectorPanel, { PANEL_WIDTH } from '../components/playground/TextInspectorPanel'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { TextInspectorProvider, useTextInspector, PANEL_WIDTH } from '../components/playground/TextInspectorContext'
 import { useTextSelection } from '../components/playground/useTextSelection'
 import { useApplyOverrides } from '../components/playground/useApplyOverrides'
 import { fontPairs } from '../themes/fonts'
@@ -10,8 +9,14 @@ import { getContentPreset } from '../content/presets'
 import SiteFooter from '../components/SiteFooter'
 import PreviewCanvas from './PreviewCanvas'
 import TemplateGallery from './TemplateGallery'
-import LayerExplorer from './LayerExplorer'
 import PerfStrip, { PERF_STRIP_HEIGHT } from './PerfStrip'
+
+// Split out of the first chunk (slow-connection audit, fix 3): the Design Panel
+// (with DitherPanel, about 90 KB raw) and the Layers view are not needed to
+// paint the hero. Templates and Breakpoints stay in the main chunk: Templates is
+// the first-visit view, and a lazy chunk there would add a round trip.
+const TextInspectorPanel = lazy(() => import('../components/playground/TextInspectorPanel'))
+const LayerExplorer = lazy(() => import('./LayerExplorer'))
 
 const params = new URLSearchParams(window.location.search)
 const activeHero = getHero(params.get('hero'))
@@ -343,7 +348,7 @@ function LabLayout() {
         </div>
       ) : viewMode === 'layers' ? (
         <div style={{ marginRight: panelOffset }}>
-          <LayerExplorer />
+          <Suspense fallback={null}><LayerExplorer /></Suspense>
         </div>
       ) : viewMode === 'breakpoints' ? (
         <div style={{ marginRight: panelOffset }}>
@@ -364,7 +369,7 @@ function LabLayout() {
         </div>
       )}
 
-      {showPanel && <TextInspectorPanel themedRoot={themedNode} paletteName="glass" />}
+      {showPanel && <Suspense fallback={null}><TextInspectorPanel themedRoot={themedNode} paletteName="glass" /></Suspense>}
 
       <HeroSwitcher bottom={chromeBottom} />
 
