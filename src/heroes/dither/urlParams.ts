@@ -5,6 +5,7 @@ import {
   setAnimationConfig,
   setCopyVariant,
   setInitialState,
+  setLayoutConfig,
   setPixelGridConfig,
   setTerminalTheme,
   type CopyVariantId,
@@ -15,7 +16,7 @@ const DEFAULT_SCENE: SceneTemplateId = 'radar-scan'
 const DEFAULT_STATE = 'fix' // green "fix" at rest; ?state=problem flips to pink errors
 
 /* ── URL-param driven state injection ──
-   /?hero=dither&state=<problem|fix>&copy=<id>&scene=<id>&theme=<id>
+   /?hero=dither&state=<problem|fix>&copy=<id>&scene=<id>&theme=<id>&guides=1&baselines=1
    Mutate the Dither store BEFORE React mounts so the hero's initial
    useSyncExternalStore read picks up the right values. */
 export function applyDitherUrlParams(params: URLSearchParams): void {
@@ -46,6 +47,10 @@ export function applyDitherUrlParams(params: URLSearchParams): void {
       tileSizeSpeed: 0.06,
       tileSizeNoise: 1.2,
     })
+    // ?guides=1 / ?baselines=1 turn on the alignment overlays (handy for
+    // headless screenshots of a pinned preview frame).
+    if (params.get('guides') === '1') setLayoutConfig({ showGuides: true })
+    if (params.get('baselines') === '1') setLayoutConfig({ showBaselines: true })
     const theme = params.get('theme')
     if (theme) setTerminalTheme(theme)
     // Apply state last so a scene switch can't clobber the layer swap.

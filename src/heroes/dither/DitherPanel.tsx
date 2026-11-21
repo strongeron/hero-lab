@@ -1677,6 +1677,19 @@ export default function DitherPanel() {
             Draws a magenta line at every text baseline (headline, sub, response, CTAs)
             across the section — check cross-column alignment at a glance.
           </p>
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-[9px] text-white/40">Guides</span>
+            <button
+              onClick={() => setLayoutConfig({ showGuides: !state.layout.showGuides })}
+              className={pill(state.layout.showGuides)}
+            >
+              {state.layout.showGuides ? 'On' : 'Off'}
+            </button>
+          </div>
+          <p className="text-[8px] text-white/25 leading-relaxed">
+            Shades the column grid and draws the content edges: left and right
+            (cyan), the header row and the copy block top and bottom (amber).
+          </p>
         </div>
 
         {/* ─── WTF Title Positions ─── */}
