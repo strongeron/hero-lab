@@ -390,5 +390,8 @@
   &:focus-visible {
     outline: 2px solid var(--color-lab-focus);
     outline-offset: 1px;
+    /* transition-colors also animates outline-color, so the ring would start
+       in the text colour; keep colour transitions, drop the outline one. */
+    transition-property: color, background-color, border-color, opacity;
   }
 }

@@ -48,5 +48,5 @@ the selected option uses `lab-fill-selected` and `lab-fg`. Disabled options sit 
 
 A `role="group"` with the `label` as its name; each option is a native button with
 `aria-pressed`. Keyboard: Tab moves between options, Enter/Space selects. Focus shows
-the `lab-focus` ring. `pill` options are 32 px tall and `box` options 26 px, both
+the `lab-focus` ring. `pill` options are 30 px tall (measured); `box` options must stay at or
 above the 24 px target minimum.
