@@ -1000,6 +1000,10 @@ function buildWarpMask(
   return drew ? canvas.toDataURL() : null
 }
 
+/** Smallest gap the baseline lock leaves between the response line and the
+ *  CTA (px) — matches the 'cta' pin's md:gap-6. */
+const MIN_RESPONSE_CTA_GAP = 24
+
 export default function DitherHero() {
   const { shader: c, edge, copyVariant, hover, multiColor: mc, pixelGrid, animation: anim, layout, button, haptic: hap, terminalTheme: termThemeId, initialState, activeScene, stableColorField } = useDitherStore()
   const reducedMotion = usePrefersReducedMotion()
@@ -1477,7 +1481,7 @@ export default function DitherHero() {
   const lockSubRef = useRef<HTMLParagraphElement>(null)
   const lockResponseWrapRef = useRef<HTMLDivElement>(null)
   const lockCtaRef = useRef<HTMLAnchorElement>(null)
-  const [baselineNudge, setBaselineNudge] = useState({ response: 0, cta: 0 })
+  const [baselineNudge, setBaselineNudge] = useState({ response: 0, cta: 0, subGap: 0 })
   useEffect(() => {
     const content = contentRef.current
     const host = shaderContainerRef.current
@@ -1542,7 +1546,7 @@ export default function DitherHero() {
     const twoCol = window.matchMedia(stackTablet ? '(min-width: 1024px)' : '(min-width: 768px)')
     const measure = () => {
       if (!twoCol.matches) {
-        setBaselineNudge((prev) => (prev.response === 0 && prev.cta === 0 ? prev : { response: 0, cta: 0 }))
+        setBaselineNudge((prev) => (prev.response === 0 && prev.cta === 0 && prev.subGap === 0 ? prev : { response: 0, cta: 0, subGap: 0 }))
         return
       }
       const h1El = lockHeadlineRef.current
@@ -1550,7 +1554,7 @@ export default function DitherHero() {
       const subEl = lockSubRef.current
       const ctaEl = lockCtaRef.current
       setBaselineNudge((prev) => {
-        let { response, cta } = prev
+        let { response, cta, subGap } = prev
         const hB = h1El && lastLineBaseline(h1El)
         const rB = respP && lastLineBaseline(respP)
         if (hB != null && rB != null && Math.abs(hB - rB) > 0.5) response = clampNudge(response + (hB - rB))
@@ -1559,7 +1563,26 @@ export default function DitherHero() {
         // sub's last baseline — the pill edge is the stronger visual line.
         const cEdge = ctaEl ? ctaEl.getBoundingClientRect().bottom : null
         if (sB != null && cEdge != null && Math.abs(sB - cEdge) > 0.5) cta = clampNudge(cta + (sB - cEdge))
-        return response === prev.response && cta === prev.cta ? prev : { response, cta }
+        // Both locks pull the response and the CTA toward each other. When the
+        // headline's last baseline and the sub's last baseline sit closer than
+        // the response + CTA stack needs (a one-line sub), they collide. Open
+        // the headline→sub gap by the overlap instead of breaking either lock:
+        // the headline rises, the response follows it, and both baselines hold.
+        // Negative overlap (spare room) shrinks the extra gap back toward 0.
+        if (copy.responsePin !== 'cta' && respP && ctaEl) {
+          const respBottom = respP.getBoundingClientRect().bottom + (response - prev.response)
+          const ctaTop = ctaEl.getBoundingClientRect().top + (cta - prev.cta)
+          const overlap = respBottom + MIN_RESPONSE_CTA_GAP - ctaTop
+          if (Math.abs(overlap) > 0.5) {
+            const nextGap = Math.max(0, Math.min(200, Math.round((subGap + overlap) * 2) / 2))
+            // The grid is bottom-anchored, so the extra gap lifts the headline
+            // by the same amount: move the response with it in this step, or
+            // the two corrections fight across frames and overshoot.
+            response = clampNudge(response - (nextGap - subGap))
+            subGap = nextGap
+          }
+        }
+        return response === prev.response && cta === prev.cta && subGap === prev.subGap ? prev : { response, cta, subGap }
       })
     }
     // A transform does not wake ResizeObserver, so give the baseline lock a
@@ -1587,7 +1610,7 @@ export default function DitherHero() {
       window.removeEventListener('resize', measure)
       twoCol.removeEventListener('change', measure)
     }
-  }, [copy.layout, copyVariant, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
+  }, [copy.layout, copy.responsePin, copyVariant, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
     containerSize.w])
 
   // Baseline guides — debug overlay for alignment checks. One line per
@@ -1620,6 +1643,48 @@ export default function DitherHero() {
     ro.observe(host)
     return () => ro.disconnect()
   }, [layout.showBaselines, copyVariant, layout, baselineNudge])
+
+  // Layout guides — debug overlay for the frame every element should sit on.
+  // Columns and left/right edges come from CSS (the overlay reuses the copy
+  // container's max-width, padding and grid). Top/bottom edges are measured:
+  // the header row's content box and the copy block's content box.
+  const copyBoxRef = useRef<HTMLDivElement>(null)
+  const [edgeGuides, setEdgeGuides] = useState<{ y: number; label: string }[]>([])
+  useEffect(() => {
+    if (!layout.showGuides) return
+    const host = shaderContainerRef.current
+    const box = copyBoxRef.current
+    if (!host || !box) return
+    const header = document.querySelector<HTMLElement>('header > div')
+    const contentBox = (el: HTMLElement) => {
+      const r = el.getBoundingClientRect()
+      const cs = getComputedStyle(el)
+      return { top: r.top + parseFloat(cs.paddingTop), bottom: r.bottom - parseFloat(cs.paddingBottom) }
+    }
+    const measure = () => {
+      const hostRect = host.getBoundingClientRect()
+      const next: { y: number; label: string }[] = []
+      if (header) {
+        const h = contentBox(header)
+        next.push({ y: Math.round(h.top - hostRect.top), label: 'nav top' })
+        next.push({ y: Math.round(h.bottom - hostRect.top), label: 'nav bottom' })
+      }
+      const c = contentBox(box)
+      next.push({ y: Math.round(c.top - hostRect.top), label: 'copy top' })
+      next.push({ y: Math.round(c.bottom - hostRect.top), label: `copy bottom · ${Math.round(hostRect.bottom - c.bottom)}px to edge` })
+      setEdgeGuides((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(box)
+    ro.observe(host)
+    if (header) ro.observe(header)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [layout.showGuides, copyVariant, layout])
 
   // Directional flow for the point field, read live from driftRef so scene
   // drift/scan/wave pans the dots (12fps for Point sizes, 24fps for snapped
@@ -2630,6 +2695,33 @@ export default function DitherHero() {
         </div>
       )}
 
+      {/* Layout guides — the copy container's column grid and content edges.
+          z-[45] sits above the fixed header (z-40) so the nav row is checked
+          against the same left/right edges as the copy. */}
+      {layout.showGuides && (
+        <div className="absolute inset-0 z-[45] pointer-events-none" aria-hidden="true">
+          <div className="relative h-full max-w-[1440px] mx-auto w-full px-5 sm:px-8 xl:px-16">
+            <div
+              className={`relative h-full grid grid-cols-4 ${copy.layout === 'problem' && stackTablet ? 'lg:grid-cols-12' : 'md:grid-cols-12'}`}
+              style={{ columnGap: layout.gutter, boxShadow: 'inset 1px 0 0 rgba(0, 220, 255, 0.85), inset -1px 0 0 rgba(0, 220, 255, 0.85)' }}
+            >
+              {Array.from({ length: 12 }, (_, i) => (
+                <div
+                  key={i}
+                  className={i < 4 ? '' : (copy.layout === 'problem' && stackTablet ? 'hidden lg:block' : 'hidden md:block')}
+                  style={{ background: 'rgba(0, 220, 255, 0.07)', boxShadow: 'inset 1px 0 0 rgba(0, 220, 255, 0.22), inset -1px 0 0 rgba(0, 220, 255, 0.22)' }}
+                />
+              ))}
+            </div>
+          </div>
+          {edgeGuides.map((g) => (
+            <div key={g.label} className="absolute left-0 right-0" style={{ top: g.y, height: 1, background: 'rgba(255, 184, 0, 0.8)' }}>
+              <span className="absolute right-1 -top-[14px] text-[10px] leading-none font-mono" style={{ color: 'rgba(255, 184, 0, 0.95)' }}>{g.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Bottom content section */}
       <div ref={contentRef} className="relative z-10 mt-auto">
         {edge.mode === 'fade' && !textUnderScene && (
@@ -2643,7 +2735,7 @@ export default function DitherHero() {
               (40px) is larger than any gap INSIDE it (12–16px), so the text
               reads as one unit separated from the shader rather than glued to
               it. The old 12px top was smaller than its own internal gaps. */}
-          <div className="max-w-[1440px] mx-auto w-full px-5 sm:px-8 xl:px-16 pb-10 md:pb-20 pt-10 md:pt-8">
+          <div ref={copyBoxRef} className="max-w-[1440px] mx-auto w-full px-5 sm:px-8 xl:px-16 pb-10 md:pb-20 pt-10 md:pt-8">
             {copy.layout === 'problem' ? (
               <div
                 className={`grid grid-cols-4 items-end [--hl-cols:7] [--rsp-cols:5] xl:[--hl-cols:var(--hl-cols-panel)] xl:[--rsp-cols:var(--rsp-cols-panel)] ${stackTablet ? 'lg:grid-cols-12' : 'md:grid-cols-12'}`}
@@ -2673,7 +2765,7 @@ export default function DitherHero() {
                     {copy.headline}
                   </h1>
                   {copy.sub && (
-                    <p ref={lockSubRef} className="mt-3 md:mt-6 text-[17px] md:text-[20px] max-w-[540px] leading-[1.55] break-words [overflow-wrap:anywhere]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...textReadabilityStyle }}>
+                    <p ref={lockSubRef} className="mt-3 md:mt-6 text-[17px] md:text-[20px] max-w-[65ch] text-pretty leading-[1.55] break-words [overflow-wrap:anywhere]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(baselineNudge.subGap > 0 ? { marginTop: 24 + baselineNudge.subGap } : {}), ...textReadabilityStyle }}>
                       {copy.sub}
                     </p>
                   )}
@@ -2779,7 +2871,7 @@ export default function DitherHero() {
                 </div>
                 <div className="col-span-4 min-w-0 flex flex-col items-start justify-end gap-5 md:gap-8 pb-[2px] mt-6 md:mt-0 md:[grid-column:span_var(--rsp-cols)_/_span_var(--rsp-cols)] [container-type:inline-size] [--rsp-cap:6vw] md:[--rsp-cap:9.7cqw] xl:[--rsp-cap:999px]">
                   {copy.sub && (
-                    <p className="text-[17px] md:text-[20px] max-w-[540px] leading-[1.55] break-words [overflow-wrap:anywhere]" style={{ color: sublineColor }}>
+                    <p className="text-[17px] md:text-[20px] max-w-[65ch] text-pretty leading-[1.55] break-words [overflow-wrap:anywhere]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}) }}>
                       {copy.sub}
                     </p>
                   )}
