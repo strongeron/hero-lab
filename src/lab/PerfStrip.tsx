@@ -76,7 +76,7 @@ const VITALS: { name: VitalName; fmt: (v: number) => string }[] = [
 /** Live performance strip, docked at the bottom of the viewport. Measures the
  *  TOP document only — Breakpoints and Templates render their previews in
  *  iframes, whose own frames, tasks and contexts are not counted here. */
-export default function PerfStrip({ rightOffset, inIframeView, onClose }: { rightOffset: number; inIframeView: boolean; onClose: () => void }) {
+export default function PerfStrip({ rightOffset, inIframeView }: { rightOffset: number; inIframeView: boolean }) {
   const frame = useFrameStats()
   const s = useSampled()
   // Re-render whenever a vital reports a new value.
@@ -130,15 +130,6 @@ export default function PerfStrip({ rightOffset, inIframeView, onClose }: { righ
             <Cell label="net" value={`${s.net.effectiveType ?? '?'}${s.net.saveData ? ' · save-data' : ''}`} />
           )}
         </dl>
-        <button
-          onClick={onClose}
-          aria-label="Hide performance strip"
-          className="ml-auto shrink-0 grid size-6 place-items-center rounded-md cursor-pointer bg-transparent border-0 text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors focus-visible:outline-2 focus-visible:outline-white/70"
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
       </div>
     </section>
   )

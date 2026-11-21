@@ -252,15 +252,8 @@ function LabLayout() {
   // the content, so no offset — shifting the canvas by 320px there would push
   // the thing being edited off-screen behind the panel.
   const panelOffset = showPanel && !isNarrow ? PANEL_WIDTH : 0
-  // Off by default; a returning visitor keeps their choice.
-  const [perfOpen, setPerfOpen] = useState(() => {
-    try { return localStorage.getItem('hero-lab-perf-strip') === '1' } catch { return false }
-  })
-  useEffect(() => {
-    try { localStorage.setItem('hero-lab-perf-strip', perfOpen ? '1' : '0') } catch { /* ignore */ }
-  }, [perfOpen])
-  // Bottom chrome sits above the perf strip while it is shown.
-  const chromeBottom = 16 + (perfOpen ? PERF_STRIP_HEIGHT : 0)
+  // The perf strip is always shown; the bottom chrome sits above it.
+  const chromeBottom = 16 + PERF_STRIP_HEIGHT
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)')
@@ -373,13 +366,10 @@ function LabLayout() {
 
       <HeroSwitcher bottom={chromeBottom} />
 
-      {perfOpen && (
-        <PerfStrip
-          rightOffset={panelOffset}
-          inIframeView={viewMode === 'breakpoints' || viewMode === 'templates'}
-          onClose={() => setPerfOpen(false)}
-        />
-      )}
+      <PerfStrip
+        rightOffset={panelOffset}
+        inIframeView={viewMode === 'breakpoints' || viewMode === 'templates'}
+      />
 
       {/* View toggle — anchored to the VIEWPORT centre, not the content area.
           It used to sit inside the panel-narrowed column (`right: panelOffset`),
@@ -387,7 +377,7 @@ function LabLayout() {
           most visibly on Layers, where the panel is hidden entirely, so the one
           control that is present on every view was the one that moved between
           them. It is global chrome; it should be in the same place everywhere.
-          The pill also carries the Design and Perf toggles, so a closed panel
+          The pill also carries the Design toggle, so a closed panel
           always has a labelled way back in, in every view. At 1440 it spans
           roughly 440–1000px and the panel starts at 1040px, so viewport-centring
           does not put it under the panel. */}
@@ -418,14 +408,6 @@ function LabLayout() {
             className={`${pillBtn} ${showPanel ? pillOn : pillOff} disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-white/60`}
           >
             Design
-          </button>
-          <button
-            onClick={() => setPerfOpen((v) => !v)}
-            aria-pressed={perfOpen}
-            title={`${perfOpen ? 'Hide' : 'Show'} the live performance strip`}
-            className={`${pillBtn} ${perfOpen ? pillOn : pillOff}`}
-          >
-            Perf
           </button>
         </div>
       </div>
