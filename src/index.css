@@ -39,6 +39,28 @@
   --color-indigo: #4F46E5;
   --color-indigo-hover: #4338CA;
 
+  /* ── Lab UI (chrome, toolbars, Design Panel) — see DESIGN.md ──
+     Text never goes below --color-lab-fg-subtle: 0.5 white is 5.4:1 on the
+     lab canvas (AA); 0.4 was 3.8:1 and 0.25 was 2.2:1. */
+  --color-lab-canvas: #0B0C14;
+  --color-lab-toolbar: rgb(11 12 20 / 0.9);
+  --color-lab-surface: rgb(20 21 35 / 0.92);
+  --color-lab-panel: rgb(20 21 35 / 0.97);
+  --color-lab-fg: rgb(255 255 255 / 0.9);
+  --color-lab-fg-muted: rgb(255 255 255 / 0.65);
+  --color-lab-fg-subtle: rgb(255 255 255 / 0.5);
+  --color-lab-fill: rgb(255 255 255 / 0.04);
+  --color-lab-fill-hover: rgb(255 255 255 / 0.08);
+  --color-lab-fill-selected: rgb(255 255 255 / 0.14);
+  --color-lab-border: rgb(255 255 255 / 0.1);
+  --color-lab-border-strong: rgb(255 255 255 / 0.2);
+  --color-lab-focus: rgb(255 255 255 / 0.75);
+  --color-lab-accent: #6EE7B7;
+  --text-lab-2xs: 10px;
+  --text-lab-xs: 11px;
+  --text-lab-sm: 12px;
+  --text-lab-md: 13px;
+
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --font-display: 'Satoshi', 'Inter', sans-serif;
@@ -245,8 +267,8 @@
   --ill-filter: saturate(0) brightness(1.2);
 }
 
-/* ── Inspector slider styling ── */
-[data-inspector-panel] input[type="range"] {
+/* ── Lab range input (SliderRow, Design Panel) ── */
+:is([data-inspector-panel] input[type="range"], input.lab-range) {
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
@@ -254,13 +276,13 @@
   cursor: pointer;
 }
 
-[data-inspector-panel] input[type="range"]::-webkit-slider-runnable-track {
+:is([data-inspector-panel] input[type="range"], input.lab-range)::-webkit-slider-runnable-track {
   height: 3px;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.08);
 }
 
-[data-inspector-panel] input[type="range"]::-webkit-slider-thumb {
+:is([data-inspector-panel] input[type="range"], input.lab-range)::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
@@ -272,19 +294,19 @@
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
-[data-inspector-panel] input[type="range"]::-webkit-slider-thumb:hover {
+:is([data-inspector-panel] input[type="range"], input.lab-range)::-webkit-slider-thumb:hover {
   transform: scale(1.15);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
 }
 
-[data-inspector-panel] input[type="range"]::-moz-range-track {
+:is([data-inspector-panel] input[type="range"], input.lab-range)::-moz-range-track {
   height: 3px;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.08);
   border: none;
 }
 
-[data-inspector-panel] input[type="range"]::-moz-range-thumb {
+:is([data-inspector-panel] input[type="range"], input.lab-range)::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -361,4 +383,12 @@
 .brand-morph { animation: brand-morph 8s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
 @media (prefers-reduced-motion: reduce) {
   .brand-morph { animation: none; border-radius: 28%; }
+}
+
+/* Keyboard focus ring for every lab control (DESIGN.md: required). */
+@utility lab-focus {
+  &:focus-visible {
+    outline: 2px solid var(--color-lab-focus);
+    outline-offset: 1px;
+  }
 }
