@@ -166,3 +166,29 @@ Demo A has no React, so its idle script time (4 ms/s) is far below the lab's 58 
 - Code read: `src/heroes/dither/DitherHero.tsx` (render tree 2225–2570, `drawPointSizeCanvas` 317, `buildWarpMask` 930, noise helpers 120–238, state hooks 1068–1881), `src/heroes/dither/ditherStore.ts` (layers 699–725, templates 1631–1680), `src/heroes/dither/urlParams.ts`, `node_modules/@paper-design/shaders/dist/shader-mount.js` (62, 150–209, 357–361), `dist/shaders/dithering.js`.
 - Commands: `npm run dev -- --port 5174 --strictPort`; puppeteer-core 25.11.0 measurement scripts in `shader-options/bench/`; `npm pack @paper-design/shaders@0.0.82` + `diff` of the dithering shader against 0.0.71; `gh api repos/paper-design/shaders/commits?path=LICENSE`; `npm view` for every library; PIL/numpy pixel diff of frozen screenshots.
 - URLs: the repository links in the §3 table; https://github.com/paper-design/shaders/blob/main/LICENSE; https://bundlephobia.com/api/size?package=…; https://cdn.jsdelivr.net/npm/@paper-design/shaders@0.0.82/+esm; https://cdn.jsdelivr.net/npm/ogl@1.0.11/+esm.
+
+## Applied (perf/single-pass-shader)
+
+Production build, headless Chrome, M4 Pro, 1440×900 at DPR 2, `bench/measure.mjs`. BEFORE = `ab4cb3f` (`bench/results-app.json`), AFTER = `bench/results-app-after.json`. Main thread = CDP TaskDuration, ms per second.
+
+| Scenario | BEFORE hover | AFTER hover |
+|---|---|---|
+| Points (`tile=points&grid=1`) | 30.7 fps, 965 ms/s, 0 GL ctx, 95k 2D fills/s | 60 fps, 47 ms/s, 1 GL ctx, 2 draws/frame |
+| Snapped colour (`tile=color&grid=1`) | 28.6 fps, 963 ms/s | 60.1 fps, 44 ms/s |
+| Full Bleed template | 59.1 fps, 786 ms/s (on `f25b825`) | 60.2 fps, 42 ms/s |
+| Free colour, no grid (problem state) | 60 fps, 133 ms/s — warp did nothing | 60 fps, 374 ms/s — warp now runs |
+| Fine Grain template | 60.3 fps, 33 ms/s — warp did nothing (on `f25b825`) | 60 fps, 382 ms/s, no blink frames |
+| Problem template | 46.6 fps, 439 ms/s (on `f25b825`) | 46.2 fps, 521 ms/s |
+
+What changed, in order of gain:
+
+1. **GPU tile field** (`src/heroes/dither/tileField.ts`, ADR 0001). Points, snapped colour and the Warp hover on top render in one WebGL2 context: a per-tile pass (one texel per tile) and a per-pixel pass. No 2D canvas, no PNG masks, no React commits per frame.
+2. **Paper 0.0.82**: `setUniforms` no longer draws while the mount's loop runs (263 → 181 draws/s idle with 3 mounts); Apache-2.0.
+3. **Drift and mouse influence from refs**: pushed to each Paper mount as uniforms every frame; the hero no longer re-renders at 24 fps (free-colour idle script 58 → 23 ms/s).
+4. **Fine Grain's warp**: the warp needs tiles; with the tile grid off it now uses a warp-only grid on Paper's own dot lattice.
+5. **CPU warp masks** (Paper displays only): resting tiles as one pattern fill, single tiles only in the cursor's box (83k → 5k fills/s); 1× DPR masks for the gapless warp-only grid; up to 60 masks/s at 1×, 30/s at 2×.
+6. `noiseFade` quintic fix (+1 → +10).
+
+Not fixed: the **Problem template stays at ~46 fps on hover**, as before. Its main thread is about half idle, so the limit looks like GPU/compositing of 6 Paper canvases under CSS masks (not measured directly — no GPU timer queries). Merging the free Color/alpha display into the same single-pass renderer (option 4 above) is the next step for it and for removing the CPU warp masks.
+
+Blink check: `bench/blink.mjs` + `bench/blink_analyze.py` take CDP screencast frames during a 3 s sweep and count frames where the reveal colour share around the cursor drops below 25% of the median. Fine Grain: 182 frames, 60.7 fps, 0 mid-sweep drops (the first 2–3 frames are the radius growing in).

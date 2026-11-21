@@ -829,6 +829,9 @@ function buildWarpMask(
  *  paints blank until it lands — every swap blinked the whole grid. */
 /** Min ms between warp-mask encodes (CPU warp path, Paper tile displays). */
 const WARP_MASK_INTERVAL = 1000 / 60
+/** A 2× DPR mask costs ~4× the pixels to encode and decode; 60/s of those
+ *  held the Problem template at ~46fps. */
+const WARP_MASK_INTERVAL_HIDPI = 1000 / 30
 
 function canvasToDataUrl(canvas: HTMLCanvasElement): Promise<string | null> {
   return new Promise((resolve) => {
@@ -1904,7 +1907,7 @@ export default function DitherHero() {
           ].join(':')
           // One encode in flight at a time: while it runs, the loop keeps
           // animating and the next build picks up the latest cursor position.
-          if (!warpEncodingRef.current && now - warpLastStartRef.current >= WARP_MASK_INTERVAL && (Math.abs(a.px - gen.px) >= 2 || Math.abs(a.py - gen.py) >= 2 || Math.abs(a.radius - gen.r) >= 2 || Math.abs(a.radiusY - gen.ry) >= 2 || spreadChanged || gen.key !== maskKey)) {
+          if (!warpEncodingRef.current && now - warpLastStartRef.current >= (warpRef.current.maskDpr > 1 ? WARP_MASK_INTERVAL_HIDPI : WARP_MASK_INTERVAL) && (Math.abs(a.px - gen.px) >= 2 || Math.abs(a.py - gen.py) >= 2 || Math.abs(a.radius - gen.r) >= 2 || Math.abs(a.radiusY - gen.ry) >= 2 || spreadChanged || gen.key !== maskKey)) {
             if (!warpCanvasRef.current) warpCanvasRef.current = document.createElement('canvas')
             const drewBase = buildWarpMask(
               warpCanvasRef.current, a.cw, a.ch, a.px, a.py, a.radius, a.radiusY || a.radius, shape,
