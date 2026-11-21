@@ -11,6 +11,7 @@ import SiteFooter from '../components/SiteFooter'
 import PreviewCanvas from './PreviewCanvas'
 import TemplateGallery from './TemplateGallery'
 import LayerExplorer from './LayerExplorer'
+import PerfStrip, { PERF_STRIP_HEIGHT } from './PerfStrip'
 
 const params = new URLSearchParams(window.location.search)
 const activeHero = getHero(params.get('hero'))
@@ -183,10 +184,10 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
 /** Switch heroes by navigating to `?hero=<id>`. Renders only when there is more
  *  than one hero — a one-item switcher is noise. Adding a second registry entry
  *  lights this up automatically. */
-function HeroSwitcher() {
+function HeroSwitcher({ bottom }: { bottom: number }) {
   if (heroes.length < 2) return null
   return (
-    <div className="fixed bottom-4 left-4 z-[1002] flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+    <div style={{ bottom }} className="fixed left-4 z-[1002] flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
       {heroes.map((h) => {
         const active = h.id === activeHero.id
         const url = new URL(window.location.href)
@@ -209,6 +210,10 @@ function HeroSwitcher() {
 }
 
 type ViewMode = 'live' | 'breakpoints' | 'templates' | 'layers'
+
+const pillBtn = 'shrink-0 text-[12px] font-semibold px-3 py-1.5 rounded-full cursor-pointer border-0 transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70'
+const pillOn = 'bg-white/15 text-white'
+const pillOff = 'bg-transparent text-white/60 hover:text-white/90 hover:bg-white/5'
 
 function LabLayout() {
   const fontPair = fontPairs['jakarta-dm']
@@ -242,6 +247,15 @@ function LabLayout() {
   // the content, so no offset — shifting the canvas by 320px there would push
   // the thing being edited off-screen behind the panel.
   const panelOffset = showPanel && !isNarrow ? PANEL_WIDTH : 0
+  // Off by default; a returning visitor keeps their choice.
+  const [perfOpen, setPerfOpen] = useState(() => {
+    try { return localStorage.getItem('hero-lab-perf-strip') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('hero-lab-perf-strip', perfOpen ? '1' : '0') } catch { /* ignore */ }
+  }, [perfOpen])
+  // Bottom chrome sits above the perf strip while it is shown.
+  const chromeBottom = 16 + (perfOpen ? PERF_STRIP_HEIGHT : 0)
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)')
@@ -352,7 +366,15 @@ function LabLayout() {
 
       {showPanel && <TextInspectorPanel themedRoot={themedNode} paletteName="glass" />}
 
-      <HeroSwitcher />
+      <HeroSwitcher bottom={chromeBottom} />
+
+      {perfOpen && (
+        <PerfStrip
+          rightOffset={panelOffset}
+          inIframeView={viewMode === 'breakpoints' || viewMode === 'templates'}
+          onClose={() => setPerfOpen(false)}
+        />
+      )}
 
       {/* View toggle — anchored to the VIEWPORT centre, not the content area.
           It used to sit inside the panel-narrowed column (`right: panelOffset`),
@@ -360,24 +382,46 @@ function LabLayout() {
           most visibly on Layers, where the panel is hidden entirely, so the one
           control that is present on every view was the one that moved between
           them. It is global chrome; it should be in the same place everywhere.
-          At 1440 the pill spans roughly 505–935px and the panel starts at
-          1040px, so viewport-centring does not put it under the panel. */}
-      <div className="fixed bottom-4 left-0 right-0 z-[1002] flex justify-center pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+          The pill also carries the Design and Perf toggles, so a closed panel
+          always has a labelled way back in, in every view. At 1440 it spans
+          roughly 440–1000px and the panel starts at 1040px, so viewport-centring
+          does not put it under the panel. */}
+      <div style={{ bottom: chromeBottom }} className="fixed left-0 right-0 z-[1002] flex justify-center pointer-events-none px-2">
+        <div className="pointer-events-auto flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] max-w-full overflow-x-auto">
           {([['live', 'Live'], ['breakpoints', 'Breakpoints'], ['templates', 'Templates'], ['layers', 'Layers']] as const).map(([mode, label]) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
               aria-pressed={viewMode === mode}
-              className={`text-[12px] font-semibold px-3 py-1.5 rounded-full cursor-pointer border-0 transition-colors ${
-                viewMode === mode
-                  ? 'bg-white/15 text-white'
-                  : 'bg-transparent text-white/60 hover:text-white/90 hover:bg-white/5'
-              }`}
+              className={`${pillBtn} ${viewMode === mode ? pillOn : pillOff}`}
             >
               {label}
             </button>
           ))}
+          <span aria-hidden="true" className="w-px h-4 mx-0.5 bg-white/15 shrink-0" />
+          {/* Layers hides the panel on purpose (the stack is the control
+              surface there), so the toggle is shown but disabled with the
+              reason, rather than vanishing from one view. */}
+          <button
+            onClick={() => setEnabled(!panelOpen)}
+            disabled={viewMode === 'layers'}
+            aria-pressed={viewMode === 'layers' ? undefined : panelOpen}
+            aria-keyshortcuts="Meta+Shift+E Control+Shift+E"
+            title={viewMode === 'layers'
+              ? 'The Design panel is hidden in Layers — the stack is the control surface here'
+              : `${panelOpen ? 'Close' : 'Open'} the Design panel (⌘/Ctrl + Shift + E)`}
+            className={`${pillBtn} ${showPanel ? pillOn : pillOff} disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-white/60`}
+          >
+            Design
+          </button>
+          <button
+            onClick={() => setPerfOpen((v) => !v)}
+            aria-pressed={perfOpen}
+            title={`${perfOpen ? 'Hide' : 'Show'} the live performance strip`}
+            className={`${pillBtn} ${perfOpen ? pillOn : pillOff}`}
+          >
+            Perf
+          </button>
         </div>
       </div>
     </>
