@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   useDitherStore,
-  setAlphaLayer,
   setShaderConfig,
   setPixelGridConfig,
   setMultiColorConfig,
@@ -13,19 +12,23 @@ import {
   batchDitherUpdates,
   setStableColorField,
   getTabSourceId,
+  getDitherState,
+  defaultEdgeConfig,
+  heroTemplates,
   sceneTemplates,
+  type DitherState,
   type SceneTemplateId,
-  type TileDisplayMode,
 } from '../heroes/dither/ditherStore'
 import LabToolbarTitle from './LabToolbarTitle'
 
-/** Real-shader layer taxonomy, composed as a progressive STACK.
+/** One template, taken apart as a progressive STACK.
  *
- *  Opens on the bare scene — the original Paper dithering shader animating with
- *  nothing else applied — then adds one setting at a time so you can read how
- *  each layer changes the final output. Everything drives the real store, so
- *  the live desktop hero (a synced ?preview iframe, actual WebGL) is the truth.
- *  On leaving the view the active template is restored. */
+ *  Opens on the selected template's bare scene — its own colours, shader and
+ *  motion with every layer removed — then adds the template's layers back one
+ *  at a time, with the template's own values. The last step is the template
+ *  exactly. Layers a template does not use are not shown as steps. Everything
+ *  drives the real store, so the live desktop hero (a synced ?preview iframe,
+ *  actual WebGL) is the truth. On leaving the view the template is restored. */
 
 const DESK = { width: 1440, height: 900 }
 const PAD = 40
@@ -59,99 +62,118 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   const s = useDitherStore()
   const wrapRef = useRef<HTMLDivElement>(null)
   const [availW, setAvailW] = useState(0)
-  const savedOpacity = useRef<number[]>(s.shader.alphaLayers.map((l) => l.opacity || 0.7))
-  s.shader.alphaLayers.forEach((l, i) => { if (l.opacity > 0) savedOpacity.current[i] = l.opacity })
+  // The template being taken apart, as applied (a store snapshot), so every
+  // step can restore that template's own value for its setting.
+  const target = useRef<DitherState | null>(null)
+  const t = target.current ?? s
 
-  // ── The additive stack: each step adds one layer. `on` reads the REAL store
-  //    so the UI stays truthful even when a renderer auto-enables the grid. ──
-  const STACK: { name: string; value: string; verdict: Verdict; vlabel: string; on: boolean; set: (on: boolean) => void }[] = [
+  // Without the grid, the shader's own cell size shows. A gridded template
+  // keeps a large size (16) that only reads through the grid, so the bare step
+  // uses the grid's tile size instead: step 1 then adds the mask and nothing else.
+  const bareSize = t.pixelGrid.enabled ? t.pixelGrid.cell / t.pixelGrid.divisions : t.shader.size
+  const { topInset: _ti, ...bareEdge } = defaultEdgeConfig
+  void _ti
+  const textFlow = t.edge.mode === 'full' || t.edge.textBlend
+  const tileLabel = t.animation.tileDisplay === 'size' ? 'Mask size' : 'Point sizes'
+
+  // ── The additive stack. `used` = the template has this layer; only used
+  //    layers are steps. `on` reads the REAL store so the UI stays truthful. ──
+  const ALL: { name: string; value: string; verdict: Verdict; vlabel: string; used: boolean; on: boolean; set: (on: boolean) => void }[] = [
     {
       name: 'Pixel grid', verdict: 'core', vlabel: 'Core',
-      value: `${s.pixelGrid.cell}px tile ÷ ${s.pixelGrid.divisions} · gap ${s.pixelGrid.gap} · radius ${s.pixelGrid.radius}`,
+      value: `${t.pixelGrid.cell}px tile ÷ ${t.pixelGrid.divisions} · gap ${t.pixelGrid.gap} · radius ${t.pixelGrid.radius}`,
+      used: t.pixelGrid.enabled,
       on: s.pixelGrid.enabled,
-      // Off also drops Points, which draws nothing without the grid.
+      // Off also drops the tile renderer, which draws nothing without the grid.
       set: (on) => {
-        setPixelGridConfig(on ? { enabled: true } : { enabled: false, snap: false })
-        if (!on) setAnimationConfig({ tileDisplay: 'color' })
+        if (on) {
+          setPixelGridConfig({ ...t.pixelGrid, snap: s.pixelGrid.snap })
+          setShaderConfig({ size: t.shader.size })
+        } else {
+          setPixelGridConfig({ enabled: false, snap: false })
+          setShaderConfig({ size: bareSize })
+          setAnimationConfig({ tileDisplay: 'color' })
+        }
       },
     },
     {
       name: 'Snap to grid', verdict: 'situational', vlabel: 'Situational',
-      value: s.pixelGrid.snap ? 'locked — one dot per tile' : 'free — dither flows',
-      on: s.pixelGrid.snap,
-      // Snap needs the grid — enabling it turns the grid on too.
+      value: 'locked — one dot per tile',
+      used: t.pixelGrid.enabled && t.pixelGrid.snap,
+      on: s.pixelGrid.enabled && s.pixelGrid.snap,
       set: (on) => setPixelGridConfig(on ? { enabled: true, snap: true } : { snap: false }),
     },
     {
+      name: tileLabel, verdict: 'core', vlabel: 'Core',
+      value: `dots sized by the dither · spread ${t.animation.tileSizeSpread}`,
+      used: t.pixelGrid.enabled && t.animation.tileDisplay !== 'color',
+      on: s.pixelGrid.enabled && s.animation.tileDisplay === t.animation.tileDisplay,
+      set: (on) => {
+        if (on && !s.pixelGrid.enabled) setPixelGridConfig({ ...t.pixelGrid })
+        setAnimationConfig({ tileDisplay: on ? t.animation.tileDisplay : 'color' })
+      },
+    },
+    {
       name: 'Multi-color', verdict: 'redundant', vlabel: 'Redundant',
-      value: `${s.multiColor.colors.length} extra colors · ${s.multiColor.blend}`,
+      value: `${t.multiColor.colors.length} extra colors · ${t.multiColor.blend}`,
+      used: t.multiColor.enabled,
       on: s.multiColor.enabled,
       set: (on) => setMultiColorConfig({ enabled: on }),
     },
     {
       name: 'Scene behind text', verdict: 'core', vlabel: 'Core',
-      value: `flows around copy · clearance ${s.edge.textPadding}px`,
-      on: s.edge.textBlend,
-      set: (on) => setEdgeConfig({ textBlend: on }),
+      value: t.edge.mode === 'full'
+        ? `fills the hero · flows around each ${t.edge.textRectMode === 'lines' ? 'line' : 'block'} · clearance ${t.edge.fullPadding}px`
+        : `flows around copy · clearance ${t.edge.textPadding}px`,
+      used: textFlow,
+      on: s.edge.mode === t.edge.mode && s.edge.textBlend === t.edge.textBlend,
+      set: (on) => {
+        const { topInset: _keep, ...edge } = t.edge
+        void _keep
+        setEdgeConfig(on ? edge : bareEdge)
+      },
     },
     {
       name: 'Hover reveal', verdict: 'signature', vlabel: 'Signature',
-      value: `${s.hover.mode} · reveals the ${s.initialState === 'problem' ? 'fix (green)' : 'problem (pink)'} · hover the preview`,
+      value: `${t.hover.mode} · reveals the ${t.initialState === 'problem' ? 'fix (green)' : 'problem (pink)'} · hover the preview`,
+      used: t.hover.enabled,
       on: s.hover.enabled,
-      // Warp reveal warps pixel-grid tiles — it needs the grid on to do anything.
-      set: (on) => { if (on && !s.pixelGrid.enabled) setPixelGridConfig({ enabled: true }); setHoverConfig({ enabled: on }) },
+      set: (on) => setHoverConfig({ enabled: on }),
     },
   ]
+  const STACK = ALL.filter((L) => L.used)
+  const unused = ALL.filter((L) => !L.used).map((L) => L.name)
   // Level = how many leading stack layers are on (for the stepper display).
   const level = (() => { let n = 0; for (const L of STACK) { if (L.on) n++; else break } return n })()
 
-  // Strip every "overflow" setting down to a clean, fine, animated Paper dither.
-  // Cell Size (px) is the key: large size + no grid = coarse checkerboard, so we
-  // pin a small size and a mid scale for a proper fine dither at rest.
-  function toBaseline() {
-    batchDitherUpdates(() => {
-      s.shader.alphaLayers.forEach((l, i) => { if (l.opacity <= 0) setAlphaLayer(i, { opacity: savedOpacity.current[i] }) })
-      setShaderConfig({ size: 2, scale: 0.6 })
-      setPixelGridConfig({ enabled: false, snap: false })
-      setMultiColorConfig({ enabled: false })
-      setHoverConfig({ enabled: false })
-      setEdgeConfig({ textBlend: false })
-      setAnimationConfig({ playing: true, tileDisplay: 'color' })
-      if (!LAYER_SCENES.some((x) => x.id === s.activeScene)) applySceneTemplate('gentle-drift')
-    })
-  }
   function applyLevel(lv: number) {
     batchDitherUpdates(() => STACK.forEach((L, i) => L.set(i < lv)))
   }
-  // Full reset to the clean bare scene: re-pins the fine dither + a scene AND
-  // strips every stack layer, so it can never land on the broken coarse state.
-  function resetBare() {
+  // Load a template and strip it to its bare scene.
+  function explore(id: string) {
+    applyHeroTemplate(id)
+    target.current = structuredClone(getDitherState())
+    restoreId.current = id
+    // Calm the screen-blended Color/alpha base while exploring layers — see
+    // DitherState.stableColorField. applyHeroTemplate resets it, so set it after.
+    setStableColorField(true)
+    setAnimationConfig({ playing: true })
+    // Steps are rebuilt from the new target on the next render; strip now
+    // with the same rules, all layers off.
+    const tg = target.current
     batchDitherUpdates(() => {
-      setShaderConfig({ size: 2, scale: 0.6 })
       setPixelGridConfig({ enabled: false, snap: false })
+      setShaderConfig({ size: tg.pixelGrid.enabled ? tg.pixelGrid.cell / tg.pixelGrid.divisions : tg.shader.size })
+      setAnimationConfig({ tileDisplay: 'color' })
       setMultiColorConfig({ enabled: false })
+      if (tg.edge.mode === 'full' || tg.edge.textBlend) setEdgeConfig(bareEdge)
       setHoverConfig({ enabled: false })
-      setEdgeConfig({ textBlend: false })
-      setAnimationConfig({ playing: true, tileDisplay: 'color' })
-      if (!LAYER_SCENES.some((x) => x.id === s.activeScene)) applySceneTemplate('gentle-drift')
     })
   }
-  // On mount: capture the template to restore, drop to bare scene.
+  // On mount: take apart the selected template (Full Bleed if none).
   const restoreId = useRef<string | null>(null)
   useEffect(() => {
-    restoreId.current = s.activeTemplate
-    // Always explore from Fine Grain, whatever template is selected elsewhere.
-    // The stack is meant to read as "one setting at a time"; Full Bleed and
-    // Problem already ship a pixel grid, wide gaps and a tile renderer, so
-    // starting there means the first few steps toggle settings that are
-    // visually already on and the progression stops teaching anything. Fine
-    // Grain is the bare shader, so each step is the only thing that changes.
-    applyHeroTemplate('fine-grain')
-    // Calm the screen-blended Color/alpha base while exploring layers — see
-    // DitherState.stableColorField. Scoped to this view: cleared on leaving so
-    // Live and Templates keep their colour shimmer.
-    setStableColorField(true)
-    toBaseline()
+    explore(s.activeTemplate ?? heroTemplates[0].id)
     return () => {
       setStableColorField(false)
       if (restoreId.current) applyHeroTemplate(restoreId.current)
@@ -188,17 +210,12 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
     return `${window.location.pathname}?${p.toString()}`
   }, [])
 
-  // 'Mask size' is left out: it draws the same sized dots as Point sizes, the
-  // expensive way (a 12fps blob mask over the screen-blended WebGL layers).
-  // It stays in the Design Panel on the Live tab.
-  const tileModes: { id: TileDisplayMode; label: string }[] = [
-    { id: 'color', label: 'Color / alpha' },
-    { id: 'points', label: 'Point sizes' },
-  ]
   const activeScene = LAYER_SCENES.find((x) => x.id === s.activeScene)
   const activeSceneHint = activeScene
     ? `${sceneTemplates[activeScene.id].label} · ${activeScene.moves} · speed ${s.shader.speed}`
-    : `pick a scene · speed ${s.shader.speed}`
+    : s.activeScene
+      ? `${sceneTemplates[s.activeScene].label} · the template's scene · speed ${s.shader.speed}`
+      : `the template's own motion · speed ${s.shader.speed}`
 
   return (
     <div className="h-screen flex flex-col bg-[#0b0c14]">
@@ -206,10 +223,10 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
         <LabToolbarTitle
           onHome={onHome}
           view="Layers"
-          strap="bare scene first — stack one setting at a time on the real shader"
+          strap="one template, taken apart — add its layers back one at a time"
         />
         <div className="flex items-center gap-1.5">
-          <button onClick={resetBare} className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/25 bg-white/[0.03] cursor-pointer transition-colors">Bare scene</button>
+          <button onClick={() => applyLevel(0)} className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/25 bg-white/[0.03] cursor-pointer transition-colors">Bare scene</button>
           <button onClick={() => applyLevel(STACK.length)} className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/25 bg-white/[0.03] cursor-pointer transition-colors">Full stack</button>
         </div>
       </div>
@@ -237,6 +254,18 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
           {/* Controls — one numbered list: step 0 is the scene, every later
               step adds one setting on top of the steps above it. */}
           <div className="w-full xl:flex-1 xl:min-w-[300px] xl:max-w-[440px] flex flex-col gap-4">
+            <div role="group" aria-label="Template to take apart" className="flex gap-1 p-0.5 rounded-lg bg-white/[0.04] border border-white/8">
+              {heroTemplates.map((tp) => (
+                <button
+                  key={tp.id}
+                  onClick={() => explore(tp.id)}
+                  aria-pressed={t.activeTemplate === tp.id}
+                  className={`flex-1 text-[11px] font-medium px-2.5 py-1.5 rounded-md cursor-pointer border-0 transition-colors ${
+                    t.activeTemplate === tp.id ? 'bg-white/12 text-white/90' : 'bg-transparent text-white/40 hover:text-white/70'
+                  }`}
+                >{tp.name}</button>
+              ))}
+            </div>
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/40">Steps — each adds to the output</h3>
@@ -285,27 +314,17 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
                           <span className="block text-[12px] text-white/45 mt-1 leading-snug font-mono">{L.value}</span>
                         </span>
                       </button>
-                      {/* The grid's tiles can draw as flat colour or as dots
-                          sized by the dither. Points needs the grid, so the
-                          choice lives on the grid step, not on the base. */}
-                      {L.name === 'Pixel grid' && on && (
-                        <div className="flex gap-1 px-3 pb-3 pl-[52px]">
-                          {tileModes.map((m) => (
-                            <button key={m.id} onClick={() => setAnimationConfig({ tileDisplay: m.id })} aria-pressed={s.animation.tileDisplay === m.id}
-                              className={`flex-1 text-[10.5px] font-mono py-1.5 px-2 rounded-md border cursor-pointer transition-colors ${
-                                s.animation.tileDisplay === m.id ? 'bg-white/12 border-white/20 text-white/90' : 'bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/70'
-                              }`}>{m.label}</button>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   )
                 })}
               </div>
             </div>
 
+            {unused.length > 0 && (
+              <p className="text-[11px] font-mono text-white/35 leading-relaxed">Not used by this template: {unused.join(' · ')}</p>
+            )}
             <p className="text-[11px] text-white/25 leading-relaxed">
-              Step the stack with ◀ ▶ (or click a row) to watch each setting compose the final image. Leaving the Layers view restores your template.
+              Step the stack with ◀ ▶ (or click a row) to watch each setting compose the final image. Leaving the Layers view restores the template.
             </p>
           </div>
         </div>

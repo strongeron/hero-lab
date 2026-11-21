@@ -667,7 +667,7 @@ export interface DitherHapticConfig {
   debug: boolean;
 }
 
-interface DitherState {
+export interface DitherState {
   headerBg: HeaderBgMode;
   shader: DitherShaderConfig;
   edge: DitherEdgeConfig;
@@ -1369,6 +1369,9 @@ function subscribe(listener: () => void) {
 function getSnapshot() {
   return state;
 }
+
+/** The current state, outside React (e.g. to snapshot a template as applied). */
+export const getDitherState = getSnapshot;
 
 export function useDitherStore() {
   return useSyncExternalStore(subscribe, getSnapshot);
