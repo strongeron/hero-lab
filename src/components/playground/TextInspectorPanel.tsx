@@ -124,18 +124,9 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
     return () => cancelAnimationFrame(id)
   }, [selectedElement, selectedPath, overrides])
 
-  if (!enabled) {
-    return (
-      <button
-        onClick={() => setEnabled(true)}
-        className="fixed top-20 right-6 z-[1001] px-3 py-2 rounded-xl border cursor-pointer transition-colors backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 hover:border-white/20 hover:bg-[rgba(30,31,50,0.95)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] text-[12px] font-semibold text-white/70 hover:text-white/90 flex items-center gap-2"
-        title="Open Design Panel (⌘/Ctrl + Shift + E)"
-      >
-        <SlidersIcon />
-        Design Panel
-      </button>
-    )
-  }
+  // Closed: HeroLab unmounts the panel and the "Design" button in the bottom
+  // view pill is the way back in, so there is nothing to render here.
+  if (!enabled) return null
 
   const pathOverrides = selectedPath ? overrides[selectedPath] || {} : {}
 
@@ -205,6 +196,8 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
           )}
           <button
             onClick={() => setEnabled(false)}
+            aria-label="Close design panel"
+            title="Close design panel (⌘/Ctrl + Shift + E)"
             className="w-6 h-6 rounded-md flex items-center justify-center cursor-pointer bg-transparent border-0 text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
