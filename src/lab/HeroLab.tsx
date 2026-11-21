@@ -345,11 +345,11 @@ function LabLayout() {
         </div>
       ) : viewMode === 'layers' ? (
         <div style={{ marginRight: panelOffset }}>
-          <Suspense fallback={null}><LayerExplorer /></Suspense>
+          <Suspense fallback={null}><LayerExplorer onHome={() => setViewMode('templates')} /></Suspense>
         </div>
       ) : viewMode === 'breakpoints' ? (
         <div style={{ marginRight: panelOffset }}>
-          <PreviewCanvas />
+          <PreviewCanvas onHome={() => setViewMode('templates')} />
         </div>
       ) : (
         <div

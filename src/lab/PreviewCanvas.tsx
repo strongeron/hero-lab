@@ -18,7 +18,7 @@ const LABEL_H = 28
 
 type ZoomMode = 'fit' | 0.5 | 1
 
-export default function PreviewCanvas() {
+export default function PreviewCanvas({ onHome }: { onHome?: () => void }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [availWidth, setAvailWidth] = useState(0)
   const [zoom, setZoom] = useState<ZoomMode>('fit')
@@ -57,6 +57,7 @@ export default function PreviewCanvas() {
       {/* Pinned canvas toolbar */}
       <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
         <LabToolbarTitle
+          onHome={onHome}
           view="Breakpoints"
           strap="the current hero across devices — reflects Live & the selected template"
         />

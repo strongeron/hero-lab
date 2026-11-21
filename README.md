@@ -67,7 +67,6 @@ look you meant, with no flash of the default.
 | `template` | `full-bleed`, `problem`, `fine-grain` |
 | `state` | `problem` or `fix` — which state rests on top |
 | `scene` | motion preset: `orbit`, `radar-scan`, `error-sweep`, … |
-| `logo` | pins the generative logo to one formation, e.g. `?logo=8f3a` |
 
 ## The logo rolls itself
 

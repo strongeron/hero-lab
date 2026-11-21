@@ -55,7 +55,7 @@ const LAYER_SCENES: { id: SceneTemplateId; moves: string }[] = [
   { id: 'radar-scan', moves: 'shape changes · field scans back and forth' },
 ]
 
-export default function LayerExplorer() {
+export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   const s = useDitherStore()
   const wrapRef = useRef<HTMLDivElement>(null)
   const [availW, setAvailW] = useState(0)
@@ -204,6 +204,7 @@ export default function LayerExplorer() {
     <div className="h-screen flex flex-col bg-[#0b0c14]">
       <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
         <LabToolbarTitle
+          onHome={onHome}
           view="Layers"
           strap="bare scene first — stack one setting at a time on the real shader"
         />

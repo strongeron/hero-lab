@@ -5,17 +5,21 @@ import BrandMark from '../components/BrandMark'
  *  `items-baseline` instead of `items-center`, and straps that wrapped instead
  *  of truncating. One component so they cannot drift again.
  *
- *  The mark is the animated one: these toolbars belong to Hero Lab rather than
- *  to the demo brand inside the artboards, and only one view is mounted at a
- *  time, so this costs a single WebGL context. */
-export default function LabToolbarTitle({ view, strap }: { view: string; strap: string }) {
+ *  The mark is Hero Lab's morphing one, not the demo brand's: these toolbars
+ *  belong to the lab rather than to the artboards. Clicking it goes home. */
+export default function LabToolbarTitle({ view, strap, onHome }: {
+  view: string
+  strap: string
+  /** Go to the lab's main page (Templates). Omitted on Templates itself. */
+  onHome?: () => void
+}) {
   // `min-w-0` + `nowrap` so the strap truncates rather than wrapping: without
   // it a narrow viewport turns this row into a tall column and shoves the
   // canvas down the page. The strap is context, not navigation, so it is the
   // first thing to go when space is short.
   return (
     <span className="text-[12px] font-semibold text-white/90 flex items-center gap-2 min-w-0 whitespace-nowrap">
-      <BrandMark size={20} />
+      <BrandMark size={20} onClick={onHome} label={onHome ? 'Hero Lab — go to Templates' : undefined} />
       Hero Lab
       <span className="font-normal text-white/45">{view}</span>
       <span className="hidden lg:inline font-normal text-white/25 truncate">{strap}</span>
