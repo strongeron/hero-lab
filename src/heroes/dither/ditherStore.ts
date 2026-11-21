@@ -1143,7 +1143,7 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
     },
   },
   "deep-breath": {
-    label: "Breath",
+    label: "Deep Breath",
     desc: "Slow, deep meditative breathing",
     shader: {
       speed: 0.06,
@@ -1644,7 +1644,10 @@ export const heroTemplates: HeroTemplate[] = [
       textBlendMotion: 1,
       textBlendSpeed: 0.33,
     },
-    animation: { tileDisplay: "points" },
+    // Points now honours Break loop and colour cycling; pin both off so Full
+    // Bleed keeps the calm look it was designed with (they were no-ops here).
+    shader: { colorCycleSpeed: 0 },
+    animation: { tileDisplay: "points", loopBreak: "none" },
   },
   {
     id: "problem",

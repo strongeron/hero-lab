@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useState, useCallback } from 'react'
+import { useMemo, useRef, useEffect, useState, useCallback, useLayoutEffect } from 'react'
 import { Dithering } from '@paper-design/shaders-react'
 import { useWebHaptics } from 'web-haptics/react'
 import { useDitherStore, copyVariants, warpErrorSnippets, warpFixSnippets, type EdgeMode, type HoverShape, type DitherEdgeConfig, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
@@ -1000,19 +1000,19 @@ function buildWarpMask(
   return drew
 }
 
-/** Encode a mask canvas off the main thread and decode it before use. A sync
- *  toDataURL here was a full-hero PNG encode on every cursor step (~75% of the
- *  main thread during a hover sweep). Decoding first matters: an unloaded
- *  mask-image counts as transparent, so swapping in a raw blob URL would
- *  blank the layer for a frame. */
-function canvasToDecodedUrl(canvas: HTMLCanvasElement): Promise<string | null> {
+/** Encode a mask canvas off the main thread. A sync toDataURL here was a
+ *  full-hero PNG encode on every cursor step (~75% of the main thread during a
+ *  hover sweep). The result must still be a data: URL: Chrome loads a blob:
+ *  mask-image asynchronously even when it is cached, and the masked layer
+ *  paints blank until it lands — every swap blinked the whole grid. */
+function canvasToDataUrl(canvas: HTMLCanvasElement): Promise<string | null> {
   return new Promise((resolve) => {
     canvas.toBlob((blob) => {
       if (!blob) { resolve(null); return }
-      const url = URL.createObjectURL(blob)
-      const img = new Image()
-      img.src = url
-      img.decode().then(() => resolve(url), () => { URL.revokeObjectURL(url); resolve(null) })
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
     })
   })
 }
@@ -1646,15 +1646,17 @@ export default function DitherHero() {
   }, [layout.showBaselines, copyVariant, layout, baselineNudge])
 
   // Directional flow for the point field, read live from driftRef so scene
-  // drift/scan/wave pans the dots (12fps for Point sizes, 24fps for snapped
+  // drift/scan/wave, Break loop pan, rotation, pulse and colour phase all move
+  // the dots — before, Points read only offset + wave, so most scenes and every
+  // Break loop mode looked frozen on this renderer (12fps for Point sizes, 24fps for snapped
   // Color/alpha where smooth continuity is the renderer's main purpose).
   const POINT_FLOW_CELLS = 6
   useEffect(() => {
     if (!pointCanvasMode || !containerSize.w || !pointSizeCanvasRef.current) return
     const d = driftRef.current
-    const flowX = (d.offsetX + d.waveOriginX
+    const flowX = (d.offsetX + d.loopX + d.waveOriginX
       + (snapColorMode ? c.offsetX + (c.originX - 0.5) * 2 : 0)) * POINT_FLOW_CELLS
-    const flowY = (d.offsetY + d.waveOriginY
+    const flowY = (d.offsetY + d.loopY + d.waveOriginY
       + (snapColorMode ? c.offsetY + (c.originY - 0.5) * 2 : 0)) * POINT_FLOW_CELLS
     const baseLayers = c.transparentBg
       ? c.alphaLayers.map(({ color, opacity }) => ({ color, opacity }))
@@ -1675,15 +1677,15 @@ export default function DitherHero() {
       effGrid,
       maskAnimT * spatialMotionScale + (snapColorMode ? c.frame * 0.01 : 0),
       pointSizeMode ? anim.tileSizeSpread : 0,
-      snapColorMode ? c.scale + d.scale : anim.tileSizeNoise,
+      snapColorMode ? c.scale + d.scale : anim.tileSizeNoise * (1 + d.scale),
       canvasLayers,
       edge,
       textRects,
       contentTop ?? undefined,
       flowX,
       flowY,
-      snapColorMode ? d.colorPhase : 0,
-      snapColorMode ? c.rotation + d.rotation : 0,
+      d.colorPhase,
+      snapColorMode ? c.rotation + d.rotation : d.rotation,
     )
   }, [pointCanvasMode, pointSizeMode, snapColorMode, reducedMotion, spatialMotionScale,
     containerSize.w, containerSize.h, effGrid, maskAnimT,
@@ -1707,9 +1709,9 @@ export default function DitherHero() {
       : (c.transparentBg ? c.alphaLayers : [{ color: c.colorFront, opacity: 0.9 }])
           .map((l) => ({ color: hoverFixColor, opacity: l.opacity }))
     const d = driftRef.current
-    const flowX = (d.offsetX + d.waveOriginX
+    const flowX = (d.offsetX + d.loopX + d.waveOriginX
       + (snapColorMode ? (hover.fixOffsetX ?? c.offsetX) + (c.originX - 0.5) * 2 : 0)) * POINT_FLOW_CELLS
-    const flowY = (d.offsetY + d.waveOriginY
+    const flowY = (d.offsetY + d.loopY + d.waveOriginY
       + (snapColorMode ? (hover.fixOffsetY ?? c.offsetY) + (c.originY - 0.5) * 2 : 0)) * POINT_FLOW_CELLS
     drawPointSizeCanvas(
       revealPointsCanvasRef.current,
@@ -1718,15 +1720,15 @@ export default function DitherHero() {
       effGrid,
       maskAnimT * spatialMotionScale + (snapColorMode ? c.frame * 0.01 : 0),
       pointSizeMode ? anim.tileSizeSpread : 0,
-      snapColorMode ? (hover.fixScale ?? c.scale) + d.scale : anim.tileSizeNoise,
+      snapColorMode ? (hover.fixScale ?? c.scale) + d.scale : anim.tileSizeNoise * (1 + d.scale),
       layers,
       edge,
       textRects,
       contentTop ?? undefined,
       flowX,
       flowY,
-      snapColorMode ? d.colorPhase : 0,
-      snapColorMode ? (hover.fixRotation ?? c.rotation) + d.rotation : 0,
+      d.colorPhase,
+      snapColorMode ? (hover.fixRotation ?? c.rotation) + d.rotation : d.rotation,
     )
   }, [warpPointsFix, pointSizeMode, snapColorMode, reducedMotion, spatialMotionScale,
     hover.warpRevealEnabled, hover.hoverLayers, hoverFixColor,
@@ -1914,13 +1916,16 @@ export default function DitherHero() {
   // Each new mask re-renders the hero; ~24 swaps/s looks smooth and halves the commits.
   const warpLastStartRef = useRef(0)
   const warpTokenRef = useRef(0)
-  // Revoke a replaced mask's blob URLs only after the new one has committed.
-  useEffect(() => {
-    if (!warp) return
-    return () => {
-      URL.revokeObjectURL(warp.url)
-      if (warp.sceneUrl) URL.revokeObjectURL(warp.sceneUrl)
-    }
+  // The hover loop shows the fix layer imperatively, but its mask lands with
+  // the next commit; showing it earlier painted the layer unmasked for 1-2
+  // frames on every hover entry. Gate visibility on a committed mask.
+  const warpCommittedRef = useRef(false)
+  useLayoutEffect(() => {
+    warpCommittedRef.current = warp != null
+    // Show the fix layer in the same commit as the masks (before paint); the
+    // hover loop would only flip it a frame later, leaving the base masked out
+    // with nothing behind it.
+    if (warp && fixLayerRef.current) fixLayerRef.current.style.visibility = 'visible'
   }, [warp])
   const dynamicSizeRef = useRef(hover.dynamicSize)
   dynamicSizeRef.current = hover.dynamicSize
@@ -2101,7 +2106,7 @@ export default function DitherHero() {
         const g = pcGridRef.current
         const gen = warpGenRef.current
         if (g.enabled && g.pitch > 1 && a.cw > 0 && (a.radius > 0)) {
-          if (fixEl) fixEl.style.visibility = 'visible'
+          if (fixEl) fixEl.style.visibility = warpCommittedRef.current ? 'visible' : 'hidden'
           const wc = warpRef.current
           const velocitySpread = wc.dynamicSpread
             ? Math.min(a.velocity / 6, 0.75)
@@ -2149,16 +2154,12 @@ export default function DitherHero() {
               warpEncodingRef.current = true
               warpLastStartRef.current = now
               Promise.all([
-                canvasToDecodedUrl(warpCanvasRef.current),
-                drewScene && warpSceneCanvasRef.current ? canvasToDecodedUrl(warpSceneCanvasRef.current) : null,
+                canvasToDataUrl(warpCanvasRef.current),
+                drewScene && warpSceneCanvasRef.current ? canvasToDataUrl(warpSceneCanvasRef.current) : null,
               ]).then(([url, sceneUrl]) => {
                 warpEncodingRef.current = false
                 // Dropped if the warp was cleared or the effect re-ran meanwhile.
-                if (!running || token !== warpTokenRef.current || !url) {
-                  if (url) URL.revokeObjectURL(url)
-                  if (sceneUrl) URL.revokeObjectURL(sceneUrl)
-                  return
-                }
+                if (!running || token !== warpTokenRef.current || !url) return
                 setWarp({ url, sceneUrl, px, py, r })
                 startLoop()
               })
