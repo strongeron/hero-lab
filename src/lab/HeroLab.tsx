@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { TextInspectorProvider, useTextInspector, PANEL_WIDTH } from '../components/playground/TextInspectorContext'
 import { useTextSelection } from '../components/playground/useTextSelection'
 import { useApplyOverrides } from '../components/playground/useApplyOverrides'
@@ -263,7 +263,11 @@ function LabLayout() {
     return () => mq.removeEventListener('change', sync)
   }, [])
   useEffect(() => { setThemedNode(themedRef.current) }, [])
-  useEffect(() => {
+  // A layout effect so the store is set up before any child view's effects
+  // run. As a plain effect it ran after them (parent effects run last), so a
+  // page that loaded straight into Layers reset to the bare scene and then
+  // had the first template laid over it.
+  useLayoutEffect(() => {
     if (isPinnedPreview) {
       // Independent real preview — apply pinned config, no cross-window sync.
       if (pinState) setInitialState(pinState)

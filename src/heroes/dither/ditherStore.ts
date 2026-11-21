@@ -127,10 +127,15 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
       // against hairline joins — echoes that fine grain, and gives the gallery
       // a third typographic voice instead of a third monospace.
       headlineFont: "'Instrument Serif', serif",
-      // The wordmark keeps the serif (it reads elegant at 18px), but CTAs fall
-      // back to the body sans: Instrument Serif ships a 400 weight only, so on a
-      // filled 16px pill it reads fragile where a primary action needs presence.
-      ctaFont: "var(--font-sans, Inter, sans-serif)",
+      // Body and CTA run in Instrument Sans, the serif's own companion family:
+      // same foundry, matched x-height and proportions, so the condensed serif
+      // headline and the sans sub read as one system. Before, the sub fell back
+      // to Inter and the CTA to the panel's body face (DM Sans): two unrelated
+      // sans under one serif. The wordmark keeps the serif (it reads elegant at
+      // 18px); CTAs stay sans because Instrument Serif ships a 400 weight only,
+      // which reads fragile on a filled 16px pill.
+      subFont: "'Instrument Sans', sans-serif",
+      ctaFont: "'Instrument Sans', sans-serif",
       headlineWeight: 400,
       headlineLeading: "1.02",
       headlineTracking: "-0.01em",
@@ -614,6 +619,9 @@ export interface DitherLayoutConfig {
   gutter: number;
   /** Debug overlay: draw baselines of every text/button line to check alignment. */
   showBaselines: boolean;
+  /** Debug overlay: column grid plus the left/right/top/bottom content edges
+   *  (header row and copy block), to check every element sits on one frame. */
+  showGuides: boolean;
 }
 
 /** Position of a single title element (percentage of viewport) */
@@ -842,6 +850,7 @@ export const defaultLayoutConfig: DitherLayoutConfig = {
   responseCols: 4,
   gutter: 55,
   showBaselines: false,
+  showGuides: false,
 };
 
 export const defaultHapticConfig: DitherHapticConfig = {
@@ -1765,6 +1774,9 @@ export function applyHeroTemplate(id: string) {
   const reveal = tmpl.initialState === "fix" ? problemLayers : fixLayers;
   state = {
     ...base,
+    // Debug overlays are a view setting, not part of a template's look: keep
+    // them on while the user flips between templates to compare alignment.
+    layout: { ...base.layout, showBaselines: state.layout.showBaselines, showGuides: state.layout.showGuides },
     shader: {
       ...base.shader,
       ...tmpl.shader,
