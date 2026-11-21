@@ -18,11 +18,11 @@ export default function LabToolbarTitle({ view, strap, onHome }: {
   // canvas down the page. The strap is context, not navigation, so it is the
   // first thing to go when space is short.
   return (
-    <span className="text-[12px] font-semibold text-white/90 flex items-center gap-2 min-w-0 whitespace-nowrap">
+    <span className="text-lab-sm font-semibold text-lab-fg flex items-center gap-2 min-w-0 whitespace-nowrap">
       <BrandMark size={20} onClick={onHome} label={onHome ? 'Hero Lab — go to Templates' : undefined} />
       Hero Lab
-      <span className="font-normal text-white/45">{view}</span>
-      <span className="hidden lg:inline font-normal text-white/25 truncate">{strap}</span>
+      <span className="font-normal text-lab-fg-muted">{view}</span>
+      <span className="hidden lg:inline font-normal text-lab-fg-subtle truncate">{strap}</span>
     </span>
   )
 }

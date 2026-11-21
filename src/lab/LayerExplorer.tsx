@@ -20,6 +20,8 @@ import {
   type SceneTemplateId,
 } from '../heroes/dither/ditherStore'
 import LabToolbarTitle from './LabToolbarTitle'
+import Segmented from './ui/Segmented'
+import SectionLabel from './ui/SectionLabel'
 
 /** One template, taken apart as a progressive STACK.
  *
@@ -218,16 +220,16 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
       : `the template's own motion · speed ${s.shader.speed}`
 
   return (
-    <div className="h-screen flex flex-col bg-[#0b0c14]">
-      <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
+    <div className="h-screen flex flex-col bg-lab-canvas">
+      <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-lab-border bg-lab-toolbar backdrop-blur-xl">
         <LabToolbarTitle
           onHome={onHome}
           view="Layers"
           strap="one template, taken apart — add its layers back one at a time"
         />
         <div className="flex items-center gap-1.5">
-          <button onClick={() => applyLevel(0)} className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/25 bg-white/[0.03] cursor-pointer transition-colors">Bare scene</button>
-          <button onClick={() => applyLevel(STACK.length)} className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/25 bg-white/[0.03] cursor-pointer transition-colors">Full stack</button>
+          <button onClick={() => applyLevel(0)} className="text-lab-xs font-medium px-3 py-1.5 rounded-lg border border-lab-border text-lab-fg-muted hover:text-lab-fg hover:border-lab-border-strong bg-lab-fill cursor-pointer transition-colors lab-focus">Bare scene</button>
+          <button onClick={() => applyLevel(STACK.length)} className="text-lab-xs font-medium px-3 py-1.5 rounded-lg border border-lab-border text-lab-fg-muted hover:text-lab-fg hover:border-lab-border-strong bg-lab-fill cursor-pointer transition-colors lab-focus">Full stack</button>
         </div>
       </div>
 
@@ -239,14 +241,14 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
         <div className="flex flex-col xl:flex-row gap-6 items-start" style={{ padding: PAD }}>
           {/* Live real-shader hero */}
           <div className="shrink-0">
-            <div className="rounded-xl border border-white/10 overflow-hidden bg-black shadow-[0_16px_48px_rgba(0,0,0,0.5)]" style={{ width: DESK.width * scale, height: DESK.height * scale }}>
+            <div className="rounded-xl border border-lab-border overflow-hidden bg-black shadow-[0_16px_48px_black] shadow-black/50" style={{ width: DESK.width * scale, height: DESK.height * scale }}>
               <iframe
                 src={frameSrc}
                 title="Layer explorer — live hero"
                 style={{ width: DESK.width, height: DESK.height, transform: `scale(${scale})`, transformOrigin: 'top left', border: 0, display: 'block' }}
               />
             </div>
-            <p className="mt-2.5 text-[11px] font-mono text-white/30">
+            <p className="mt-2.5 text-lab-xs font-mono text-lab-fg-subtle">
               Live desktop hero · real WebGL · {level === 0 ? 'bare scene (Paper dither + motion)' : `${level} of ${STACK.length} layers stacked`}
             </p>
           </div>
@@ -254,45 +256,37 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
           {/* Controls — one numbered list: step 0 is the scene, every later
               step adds one setting on top of the steps above it. */}
           <div className="w-full xl:flex-1 xl:min-w-[300px] xl:max-w-[440px] flex flex-col gap-4">
-            <div role="group" aria-label="Template to take apart" className="flex gap-1 p-0.5 rounded-lg bg-white/[0.04] border border-white/8">
-              {heroTemplates.map((tp) => (
-                <button
-                  key={tp.id}
-                  onClick={() => explore(tp.id)}
-                  aria-pressed={t.activeTemplate === tp.id}
-                  className={`flex-1 text-[11px] font-medium px-2.5 py-1.5 rounded-md cursor-pointer border-0 transition-colors ${
-                    t.activeTemplate === tp.id ? 'bg-white/12 text-white/90' : 'bg-transparent text-white/40 hover:text-white/70'
-                  }`}
-                >{tp.name}</button>
-              ))}
-            </div>
+            <Segmented
+              size="xs"
+              stretch
+              label="Template to take apart"
+              value={t.activeTemplate}
+              onChange={explore}
+              options={heroTemplates.map((tp) => ({ value: tp.id, label: tp.name }))}
+            />
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/40">Steps — each adds to the output</h3>
+              <SectionLabel className="mb-2" action={
                 <div className="flex items-center gap-1">
-                  <button onClick={() => applyLevel(Math.max(0, level - 1))} className="w-6 h-6 grid place-items-center rounded-md border border-white/10 text-white/60 hover:text-white hover:border-white/25 cursor-pointer text-[13px]" title="Remove top layer" aria-label="Remove top layer">◀</button>
-                  <span className="font-mono text-[11px] text-white/50 w-9 text-center">{level}/{STACK.length}</span>
-                  <button onClick={() => applyLevel(Math.min(STACK.length, level + 1))} className="w-6 h-6 grid place-items-center rounded-md border border-white/10 text-white/60 hover:text-white hover:border-white/25 cursor-pointer text-[13px]" title="Add next layer" aria-label="Add next layer">▶</button>
+                  <button onClick={() => applyLevel(Math.max(0, level - 1))} className="w-6 h-6 grid place-items-center rounded-md border border-lab-border bg-transparent text-lab-fg-muted hover:text-lab-fg hover:border-lab-border-strong cursor-pointer text-lab-md lab-focus" title="Remove top layer" aria-label="Remove top layer">◀</button>
+                  <span className="font-mono text-lab-xs text-lab-fg-subtle w-9 text-center">{level}/{STACK.length}</span>
+                  <button onClick={() => applyLevel(Math.min(STACK.length, level + 1))} className="w-6 h-6 grid place-items-center rounded-md border border-lab-border bg-transparent text-lab-fg-muted hover:text-lab-fg hover:border-lab-border-strong cursor-pointer text-lab-md lab-focus" title="Add next layer" aria-label="Add next layer">▶</button>
                 </div>
-              </div>
+              }>Steps — each adds to the output</SectionLabel>
               <div className="flex flex-col gap-2">
                 {/* Step 0 — the scene. Always on: the animated Paper dither. */}
-                <div className="grid grid-cols-[28px_1fr] gap-3 items-start p-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[0.05]">
-                  <span className="mt-0.5 w-6 h-6 grid place-items-center rounded-md bg-emerald-400/15 text-emerald-300 font-mono text-[11px]">0</span>
+                <div className="grid grid-cols-[28px_1fr] gap-3 items-start p-3 rounded-xl border border-lab-accent/25 bg-lab-accent/5">
+                  <span className="mt-0.5 w-6 h-6 grid place-items-center rounded-md bg-lab-accent/15 text-lab-accent font-mono text-lab-xs">0</span>
                   <span>
-                    <span className="font-mono text-[12.5px] text-white/90">Scene motion</span>
-                    <span className="block text-[12px] text-white/45 mt-1 leading-snug font-mono">{activeSceneHint}</span>
-                    <span className="flex flex-wrap gap-1 mt-2.5">
-                      {LAYER_SCENES.map(({ id }) => (
-                        <button
-                          key={id}
-                          onClick={() => applySceneTemplate(id)}
-                          aria-pressed={s.activeScene === id}
-                          className={`text-[10px] font-mono py-1 px-1.5 rounded-md border cursor-pointer transition-colors ${
-                            s.activeScene === id ? 'bg-white/12 border-white/20 text-white/90' : 'bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/70'
-                          }`}
-                        >{sceneTemplates[id].label}</button>
-                      ))}
+                    <span className="font-mono text-lab-md text-lab-fg">Scene motion</span>
+                    <span className="block text-lab-sm text-lab-fg-subtle mt-1 leading-snug font-mono">{activeSceneHint}</span>
+                    <span className="block mt-2.5">
+                      <Segmented
+                        size="xs"
+                        label="Scene"
+                        value={s.activeScene}
+                        onChange={applySceneTemplate}
+                        options={LAYER_SCENES.map(({ id }) => ({ value: id, label: sceneTemplates[id].label }))}
+                      />
                     </span>
                   </span>
                 </div>
@@ -301,17 +295,17 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
                   return (
                     <div key={L.name}
                       className={`rounded-xl border transition-colors ${
-                        on ? 'border-emerald-400/25 bg-emerald-400/[0.05]' : 'border-white/[0.06] bg-white/[0.02] hover:border-white/15'
+                        on ? 'border-lab-accent/25 bg-lab-accent/5' : 'border-lab-border bg-lab-fill hover:border-lab-border-strong'
                       }`}>
                       <button onClick={() => batchDitherUpdates(() => L.set(!on))} aria-pressed={on}
-                        className="w-full grid grid-cols-[28px_1fr] gap-3 items-start text-left p-3 cursor-pointer">
-                        <span className={`mt-0.5 w-6 h-6 grid place-items-center rounded-md font-mono text-[11px] ${on ? 'bg-emerald-400/15 text-emerald-300' : 'bg-white/[0.06] text-white/40'}`}>{i + 1}</span>
+                        className="w-full grid grid-cols-[28px_1fr] gap-3 items-start text-left p-3 rounded-xl cursor-pointer lab-focus">
+                        <span className={`mt-0.5 w-6 h-6 grid place-items-center rounded-md font-mono text-lab-xs ${on ? 'bg-lab-accent/15 text-lab-accent' : 'bg-lab-fill text-lab-fg-subtle'}`}>{i + 1}</span>
                         <span>
                           <span className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono text-[12.5px] text-white/90">{L.name}</span>
-                            <span className={`font-mono text-[9px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded-full border ${verdictStyle[L.verdict]}`}>{L.vlabel}</span>
+                            <span className="font-mono text-lab-md text-lab-fg">{L.name}</span>
+                            <span className={`font-mono text-lab-2xs uppercase tracking-[0.1em] px-1.5 py-0.5 rounded-full border ${verdictStyle[L.verdict]}`}>{L.vlabel}</span>
                           </span>
-                          <span className="block text-[12px] text-white/45 mt-1 leading-snug font-mono">{L.value}</span>
+                          <span className="block text-lab-sm text-lab-fg-subtle mt-1 leading-snug font-mono">{L.value}</span>
                         </span>
                       </button>
                     </div>
@@ -321,9 +315,9 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
             </div>
 
             {unused.length > 0 && (
-              <p className="text-[11px] font-mono text-white/35 leading-relaxed">Not used by this template: {unused.join(' · ')}</p>
+              <p className="text-lab-xs font-mono text-lab-fg-subtle leading-relaxed">Not used by this template: {unused.join(' · ')}</p>
             )}
-            <p className="text-[11px] text-white/25 leading-relaxed">
+            <p className="text-lab-xs text-lab-fg-subtle leading-relaxed">
               Step the stack with ◀ ▶ (or click a row) to watch each setting compose the final image. Leaving the Layers view restores the template.
             </p>
           </div>

@@ -57,13 +57,13 @@ function useSampled() {
 function Cell({ label, value, rating, title }: { label: string; value: string; rating?: Rating; title?: string }) {
   return (
     <div className="flex items-baseline gap-1.5 shrink-0" title={title}>
-      <dt className="text-white/40">{label}</dt>
-      <dd className={`m-0 font-semibold tabular-nums ${rating ? tone[rating] : 'text-white/85'}`}>{value}</dd>
+      <dt className="text-lab-fg-subtle">{label}</dt>
+      <dd className={`m-0 font-semibold tabular-nums ${rating ? tone[rating] : 'text-lab-fg'}`}>{value}</dd>
     </div>
   )
 }
 
-const Sep = () => <span aria-hidden="true" className="w-px h-3.5 bg-white/10 shrink-0" />
+const Sep = () => <span aria-hidden="true" className="w-px h-3.5 bg-lab-border shrink-0" />
 
 const VITALS: { name: VitalName; fmt: (v: number) => string }[] = [
   { name: 'LCP', fmt: (v) => `${(v / 1000).toFixed(2)}s` },
@@ -89,17 +89,17 @@ export default function PerfStrip({ rightOffset, inIframeView }: { rightOffset: 
   return (
     <section
       aria-label="Performance, this tab"
-      className="fixed bottom-0 left-0 z-[1001] border-t border-white/10 bg-[rgba(11,12,20,0.94)] backdrop-blur-xl text-[11px] text-white/85"
+      className="fixed bottom-0 left-0 z-[1001] border-t border-lab-border bg-lab-toolbar backdrop-blur-xl text-lab-xs text-lab-fg"
       style={{ right: rightOffset, height: PERF_STRIP_HEIGHT }}
     >
       <div className="h-full flex items-center gap-3 px-3 overflow-x-auto whitespace-nowrap">
         <span
-          className="font-semibold text-white/90 shrink-0"
+          className="font-semibold text-lab-fg shrink-0"
           title={inIframeView ? 'Measures this tab’s top document. The previews here run in iframes and are not counted.' : 'Measures this tab’s top document.'}
         >
-          Perf <span className="font-normal text-white/40">this tab{inIframeView ? ', excl. iframes' : ''}</span>
+          Perf <span className="font-normal text-lab-fg-subtle">this tab{inIframeView ? ', excl. iframes' : ''}</span>
         </span>
-        {templateName && <span className="text-white/40 shrink-0">{templateName}</span>}
+        {templateName && <span className="text-lab-fg-subtle shrink-0">{templateName}</span>}
         <Sep />
         <dl className="m-0 flex items-center gap-3">
           <Cell label="FPS" value={frame.fps.toFixed(0)} rating={fpsRating} title="Frames per second over the last 2s" />

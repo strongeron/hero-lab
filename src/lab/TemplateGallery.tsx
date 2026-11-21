@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useDitherStore, applyHeroTemplate, heroTemplates, getTabSourceId } from '../heroes/dither/ditherStore'
 import LabToolbarTitle from './LabToolbarTitle'
 import { DEVICES } from './PreviewCanvas'
+import Segmented from './ui/Segmented'
 
 const GAP = 32
 const PAD = 40
@@ -70,30 +71,24 @@ export default function TemplateGallery() {
   const rowHeight = Math.max(...DEVICES.map((d) => d.height)) * scale
 
   return (
-    <div className="h-screen flex flex-col bg-[#0b0c14]">
+    <div className="h-screen flex flex-col bg-lab-canvas">
       {/* Pinned toolbar */}
-      <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
+      <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-lab-border bg-lab-toolbar backdrop-blur-xl">
         <LabToolbarTitle
           view="Templates"
           strap="baked snapshots — select an artboard to load the live animation & edit in the Design Panel"
         />
-        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-white/[0.04] border border-white/8">
-          {([['fit', `Fit ${Math.round(fitScale * 100)}%`], [0.75, '75%'], [1, '100%']] as const).map(
-            ([mode, label]) => (
-              <button
-                key={String(mode)}
-                onClick={() => setZoom(mode)}
-                className={`text-[11px] font-medium px-2.5 py-1 rounded-md cursor-pointer border-0 transition-colors ${
-                  zoom === mode
-                    ? 'bg-white/12 text-white/90'
-                    : 'bg-transparent text-white/40 hover:text-white/70'
-                }`}
-              >
-                {label}
-              </button>
-            ),
-          )}
-        </div>
+        <Segmented
+          size="xs"
+          label="Zoom"
+          value={zoom}
+          onChange={setZoom}
+          options={[
+            { value: 'fit', label: `Fit ${Math.round(fitScale * 100)}%` },
+            { value: 0.75, label: '75%' },
+            { value: 1, label: '100%' },
+          ]}
+        />
       </div>
 
       {/* Scrollable artboard stack */}
@@ -104,15 +99,15 @@ export default function TemplateGallery() {
             return (
               <div key={t.id}>
                 <div className="flex items-baseline gap-3 mb-2.5">
-                  <span className={`text-[13px] font-semibold ${active ? 'text-emerald-300/90' : 'text-white/80'}`}>
+                  <span className={`text-lab-md font-semibold ${active ? 'text-lab-accent' : 'text-lab-fg'}`}>
                     {t.name}
                   </span>
                   {active && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-400/15 text-emerald-300/80 border border-emerald-400/25">
+                    <span className="text-lab-2xs font-semibold px-2 py-0.5 rounded-full bg-lab-accent/15 text-lab-accent border border-lab-accent/25">
                       Editing
                     </span>
                   )}
-                  <span className="text-[11px] text-white/30">{t.desc}</span>
+                  <span className="text-lab-xs text-lab-fg-subtle">{t.desc}</span>
                 </div>
 
                 <div
@@ -125,7 +120,7 @@ export default function TemplateGallery() {
                     {DEVICES.map((d) => (
                       <div key={d.id} className="shrink-0">
                         <div
-                          className="rounded-xl border border-white/10 overflow-hidden bg-black shadow-[0_16px_48px_rgba(0,0,0,0.5)]"
+                          className="rounded-xl border border-lab-border overflow-hidden bg-black shadow-[0_16px_48px_black] shadow-black/50"
                           style={{ width: d.width * scale, height: d.height * scale }}
                         >
                           {active ? (
@@ -172,9 +167,9 @@ export default function TemplateGallery() {
                     <button
                       onClick={() => applyHeroTemplate(t.id)}
                       aria-label={`Edit ${t.name} in the Design Panel`}
-                      className="absolute inset-0 z-10 rounded-2xl cursor-pointer bg-transparent border-0 group"
+                      className="absolute inset-0 z-10 rounded-2xl cursor-pointer bg-transparent border-0 group lab-focus"
                     >
-                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-semibold px-3 py-1.5 rounded-full bg-[rgba(11,12,20,0.9)] border border-white/15 text-white/85 shadow-[0_8px_24px_rgba(0,0,0,0.5)] whitespace-nowrap">
+                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity text-lab-xs font-semibold px-3 py-1.5 rounded-full bg-lab-toolbar border border-lab-border-strong text-lab-fg shadow-[0_8px_24px_black] shadow-black/50 whitespace-nowrap">
                         Edit in Design Panel
                       </span>
                     </button>

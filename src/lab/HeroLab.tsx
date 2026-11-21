@@ -11,6 +11,7 @@ import { prefersLessData } from '../utils/network'
 import PreviewCanvas from './PreviewCanvas'
 import TemplateGallery from './TemplateGallery'
 import PerfStrip, { PERF_STRIP_HEIGHT } from './PerfStrip'
+import Segmented from './ui/Segmented'
 
 // Split out of the first chunk (slow-connection audit, fix 3): the Design Panel
 // (with DitherPanel, about 90 KB raw) and the Layers view are not needed to
@@ -193,7 +194,7 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
 function HeroSwitcher({ bottom }: { bottom: number }) {
   if (heroes.length < 2) return null
   return (
-    <div style={{ bottom }} className="fixed left-4 z-[1002] flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+    <div style={{ bottom }} className={`fixed left-4 z-[1002] flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-lab-surface border-lab-border ${floatShadow}`}>
       {heroes.map((h) => {
         const active = h.id === activeHero.id
         const url = new URL(window.location.href)
@@ -203,8 +204,9 @@ function HeroSwitcher({ bottom }: { bottom: number }) {
             key={h.id}
             href={url.pathname + url.search}
             title={h.tagline}
-            className={`text-[12px] font-semibold px-3 py-1.5 rounded-full no-underline transition-colors ${
-              active ? 'bg-white/15 text-white' : 'text-white/60 hover:text-white/90 hover:bg-white/5'
+            aria-current={active ? 'page' : undefined}
+            className={`text-lab-sm font-medium px-3 py-1.5 rounded-full no-underline transition-colors lab-focus ${
+              active ? 'bg-lab-fill-selected text-lab-fg' : 'text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover'
             }`}
           >
             {h.name}
@@ -217,9 +219,18 @@ function HeroSwitcher({ bottom }: { bottom: number }) {
 
 type ViewMode = 'live' | 'breakpoints' | 'templates' | 'layers'
 
-const pillBtn = 'shrink-0 text-[12px] font-semibold px-3 py-1.5 rounded-full cursor-pointer border-0 transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70'
-const pillOn = 'bg-white/15 text-white'
-const pillOff = 'bg-transparent text-white/60 hover:text-white/90 hover:bg-white/5'
+const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
+  { value: 'live', label: 'Live' },
+  { value: 'breakpoints', label: 'Breakpoints' },
+  { value: 'templates', label: 'Templates' },
+  { value: 'layers', label: 'Layers' },
+]
+/** Drop shadow of floating chrome. No lab shadow token exists; black at 50 %
+ *  lifts the pill off any hero palette underneath. */
+const floatShadow = 'shadow-[0_8px_32px_black] shadow-black/50'
+/** The Design toggle matches a `Segmented shape="pill"` option. It is a
+ *  separate on/off toggle, not one more view, so it is not in that group. */
+const designBtn = 'shrink-0 cursor-pointer border-0 font-medium transition-colors lab-focus rounded-full px-3 py-1.5 text-lab-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-lab-fg-muted'
 
 function LabLayout() {
   const fontPair = fontPairs['jakarta-dm']
@@ -386,18 +397,9 @@ function LabLayout() {
           roughly 440–1000px and the panel starts at 1040px, so viewport-centring
           does not put it under the panel. */}
       <div style={{ bottom: chromeBottom }} className="fixed left-0 right-0 z-[1002] flex justify-center pointer-events-none px-2">
-        <div className="pointer-events-auto flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] max-w-full overflow-x-auto">
-          {([['live', 'Live'], ['breakpoints', 'Breakpoints'], ['templates', 'Templates'], ['layers', 'Layers']] as const).map(([mode, label]) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              aria-pressed={viewMode === mode}
-              className={`${pillBtn} ${viewMode === mode ? pillOn : pillOff}`}
-            >
-              {label}
-            </button>
-          ))}
-          <span aria-hidden="true" className="w-px h-4 mx-0.5 bg-white/15 shrink-0" />
+        <div className={`pointer-events-auto flex items-center pr-1 rounded-full border backdrop-blur-xl bg-lab-surface border-lab-border ${floatShadow} max-w-full overflow-x-auto`}>
+          <Segmented shape="pill" label="View" options={VIEW_OPTIONS} value={viewMode} onChange={setViewMode} />
+          <span aria-hidden="true" className="w-px h-4 ml-0.5 mr-1.5 bg-lab-border-strong shrink-0" />
           {/* Layers hides the panel on purpose (the stack is the control
               surface there), so the toggle is shown but disabled with the
               reason, rather than vanishing from one view. */}
@@ -409,7 +411,7 @@ function LabLayout() {
             title={viewMode === 'layers'
               ? 'The Design panel is hidden in Layers — the stack is the control surface here'
               : `${panelOpen ? 'Close' : 'Open'} the Design panel (⌘/Ctrl + Shift + E)`}
-            className={`${pillBtn} ${showPanel ? pillOn : pillOff} disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-white/60`}
+            className={`${designBtn} ${showPanel ? 'bg-lab-fill-selected text-lab-fg' : 'bg-transparent text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover'}`}
           >
             Design
           </button>

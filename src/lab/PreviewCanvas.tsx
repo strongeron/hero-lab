@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getTabSourceId } from '../heroes/dither/ditherStore'
 import LabToolbarTitle from './LabToolbarTitle'
+import Segmented from './ui/Segmented'
 
 /** The three breakpoints shown side by side, at true relative scale. Each is a
  *  real same-origin iframe at native device width, so viewport media queries
@@ -53,31 +54,25 @@ export default function PreviewCanvas({ onHome }: { onHome?: () => void }) {
   return (
     // Column layout: the toolbar lives OUTSIDE the scroll container so it stays
     // pinned no matter how far the canvas is panned or zoomed.
-    <div className="h-screen flex flex-col bg-[#0b0c14]">
+    <div className="h-screen flex flex-col bg-lab-canvas">
       {/* Pinned canvas toolbar */}
-      <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
+      <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-lab-border bg-lab-toolbar backdrop-blur-xl">
         <LabToolbarTitle
           onHome={onHome}
           view="Breakpoints"
           strap="the current hero across devices — reflects Live & the selected template"
         />
-        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-white/[0.04] border border-white/8">
-          {([['fit', `Fit ${Math.round(fitScale * 100)}%`], [0.5, '50%'], [1, '100%']] as const).map(
-            ([mode, label]) => (
-              <button
-                key={String(mode)}
-                onClick={() => setZoom(mode)}
-                className={`text-[11px] font-medium px-2.5 py-1 rounded-md cursor-pointer border-0 transition-colors ${
-                  zoom === mode
-                    ? 'bg-white/12 text-white/90'
-                    : 'bg-transparent text-white/40 hover:text-white/70'
-                }`}
-              >
-                {label}
-              </button>
-            ),
-          )}
-        </div>
+        <Segmented
+          size="xs"
+          label="Zoom"
+          value={zoom}
+          onChange={setZoom}
+          options={[
+            { value: 'fit', label: `Fit ${Math.round(fitScale * 100)}%` },
+            { value: 0.5, label: '50%' },
+            { value: 1, label: '100%' },
+          ]}
+        />
       </div>
 
       {/* Scrollable / pannable canvas area */}
@@ -86,13 +81,13 @@ export default function PreviewCanvas({ onHome }: { onHome?: () => void }) {
         {DEVICES.map((d) => (
           <div key={d.id} className="shrink-0">
             <div className="flex items-baseline gap-2" style={{ height: LABEL_H }}>
-              <span className="text-[12px] font-semibold text-white/80">{d.label}</span>
-              <span className="text-[11px] font-mono text-white/35">
+              <span className="text-lab-sm font-semibold text-lab-fg">{d.label}</span>
+              <span className="text-lab-xs font-mono text-lab-fg-subtle">
                 {d.width}×{d.height}
               </span>
             </div>
             <div
-              className="rounded-xl border border-white/10 overflow-hidden bg-black shadow-[0_16px_48px_rgba(0,0,0,0.5)]"
+              className="rounded-xl border border-lab-border overflow-hidden bg-black shadow-[0_16px_48px_black] shadow-black/50"
               style={{ width: d.width * scale, height: d.height * scale }}
             >
               <iframe
