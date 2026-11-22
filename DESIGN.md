@@ -114,3 +114,14 @@ and warp feels under a looping pointer. Shape is hidden on the GPU tile field
 says so. Prism and Aurora give each layer its own hue (the old multi-colour mode
 stays removed).
 
+2026-11-22, Layers previews (`docs/specs/2026-11-22-layers-previews.md`): every
+Layers step row ends in a `LivePreview` thumbnail of the hero after that step,
+drawn by `src/lab/layerSketch.ts` (`stepLook`, `drawStep`) on top of
+`panelSketch.drawField`. Thumbnails zoom in (up to 3×) so one tile is at least
+4 CSS px; all steps of a template share the zoom. The template picker uses the
+Design Panel's "Start from" pick tiles. Layers speaks the Panel's words: Speed is
+the same `Segmented` (Still / Calm / Live / Wild on `animation.speed`), and steps
+are named Tile grid, Snapped colour, Point sizes, Full edge and Hover · warp, with
+the Panel's grain, gap and warp-feel names in their values. Open: the pick-tile
+class string exists in both views; the Panel still says "pieces" for tiles.
+

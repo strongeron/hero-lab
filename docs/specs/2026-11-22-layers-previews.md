@@ -42,7 +42,9 @@ Each step row gets a `LivePreview` that shows the hero **after** that step: the
 stack from step 0 to this step, with the template's own values. The rows read
 top to bottom as a filmstrip of the final image. A preview is a 2D sketch of a
 1440 × 900 hero, scaled to the thumbnail, with the copy drawn as two white bars
-(the same mark the Panel's template tiles use).
+(the same mark the Panel's template tiles use). At true scale a 24px tile is
+1.5 CSS px wide, so the thumbnail zooms in (up to 3×) until one tile is 4 CSS px;
+every step of a template uses the same zoom, so frames stay comparable.
 
 | Step | Preview shows |
 | --- | --- |
