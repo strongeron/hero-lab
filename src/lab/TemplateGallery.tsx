@@ -120,7 +120,7 @@ export default function TemplateGallery() {
                     {DEVICES.map((d) => (
                       <div key={d.id} className="shrink-0">
                         <div
-                          className="rounded-xl border border-lab-border overflow-hidden bg-black shadow-lab-raised"
+                          className="rounded-xl border border-lab-border overflow-hidden bg-lab-artboard shadow-lab-raised"
                           style={{ width: d.width * scale, height: d.height * scale }}
                         >
                           {active ? (

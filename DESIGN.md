@@ -48,6 +48,7 @@ used settings behind a disclosure over adding more rows.
 | Token | Role |
 | --- | --- |
 | `lab-canvas` | Page background of lab views (Templates, Breakpoints, Layers) |
+| `lab-artboard` | Black behind each artboard, before the hero paints |
 | `lab-toolbar` | Sticky view toolbar, translucent over the canvas |
 | `lab-surface` | Floating chrome: bottom view bar, popovers |
 | `lab-panel` | Docked Design Panel |

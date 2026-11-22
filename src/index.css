@@ -43,6 +43,8 @@
      Text never goes below --color-lab-fg-subtle: 0.5 white is 5.4:1 on the
      lab canvas (AA); 0.4 was 3.8:1 and 0.25 was 2.2:1. */
   --color-lab-canvas: #0B0C14;
+  /* Black behind each artboard: the hero's own dark base shows before it paints. */
+  --color-lab-artboard: #000;
   --color-lab-toolbar: rgb(11 12 20 / 0.9);
   --color-lab-surface: rgb(20 21 35 / 0.92);
   --color-lab-panel: rgb(20 21 35 / 0.97);

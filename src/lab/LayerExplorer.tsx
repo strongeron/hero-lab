@@ -273,7 +273,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
         <div className="flex flex-col xl:flex-row gap-6 items-start" style={{ padding: PAD }}>
           {/* Live real-shader hero */}
           <div className="shrink-0">
-            <div className="rounded-xl border border-lab-border overflow-hidden bg-black shadow-lab-raised" style={{ width: DESK.width * scale, height: DESK.height * scale }}>
+            <div className="rounded-xl border border-lab-border overflow-hidden bg-lab-artboard shadow-lab-raised" style={{ width: DESK.width * scale, height: DESK.height * scale }}>
               <iframe
                 src={frameSrc}
                 title="Layer explorer — live hero"

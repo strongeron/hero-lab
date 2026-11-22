@@ -220,7 +220,7 @@ export default function DitherPanel() {
                   <span className="grid gap-0.5"><Dots colors={p.problem} /><Dots colors={p.fix} /></span>
                   <span className="grid min-w-0">
                     <span className="truncate text-lab-xs font-medium">{p.label}</span>
-                    <span className="truncate text-lab-2xs text-lab-fg-subtle">{p.hint}</span>
+                    <span className="truncate text-lab-xs text-lab-fg-subtle">{p.hint}</span>
                   </span>
                 </button>
               )
@@ -253,7 +253,7 @@ export default function DitherPanel() {
             {SHAPES.map((s) => (
               <button key={s} type="button" aria-pressed={c.alphaLayers[layer]?.shape === s} onClick={() => setAlphaLayer(layer, { shape: s })} className={`${card} grid gap-1 p-1`}>
                 <ShapeThumb shape={s} color={c.alphaLayers[layer]?.color ?? '#fff'} back={c.colorBack} />
-                <span className="truncate text-lab-2xs">{s}</span>
+                <span className="truncate text-lab-xs">{s}</span>
               </button>
             ))}
           </div>
@@ -294,10 +294,12 @@ export default function DitherPanel() {
           <div className="grid grid-cols-3 gap-1.5">
             {([null, ...typePairIds] as (TypePairId | null)[]).map((id) => {
               const p = id ? typePairs[id] : null
+              // Scoped exception to "tokens only": "Aa" is a type specimen, drawn
+              // at display size in the pair's own face, not lab UI text.
               return (
                 <button key={id ?? 'auto'} type="button" aria-pressed={state.typePair === id} onClick={() => setTypePair(id)} className={`${card} grid gap-0.5`}>
                   <span className="text-[22px] leading-none text-lab-fg" style={{ fontFamily: p?.headlineFont ?? copyFace, fontWeight: p?.headlineWeight, letterSpacing: p?.headlineTracking }}>Aa</span>
-                  <span className="truncate text-lab-2xs">{p?.label ?? 'Auto'}</span>
+                  <span className="truncate text-lab-xs">{p?.label ?? 'Auto'}</span>
                 </button>
               )
             })}
