@@ -19,7 +19,8 @@ sources:
 - As a strip above a `Segmented` or `SliderRow` to show the current value at
   real size.
 - As a thumbnail at the end of a Recipe step row, showing the hero after that
-  step (`src/lab/layerSketch.ts` `drawStep`, built on `drawField`).
+  step (`src/lab/layerSketch.ts` `drawStep`, built on `drawField`, and on
+  `drawPointField` for Point-size steps).
 
 ## When not to use
 

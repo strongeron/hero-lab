@@ -227,6 +227,23 @@ curve and lets the smallest dots vanish, so dots swing between specks and full
 pieces. Problem's Paper tile path has no per-tile size, so the control does not
 apply there.
 
+2026-11-22, Recipe and the new parts: the Recipe stack gains a **Layout** step
+(`Layout · Centered`, the Layout group's word) only when Centered was applied in
+the Design Panel before Recipe opened; Centered is not part of any template, so
+the target stays the template as authored and "Not used by this template" never
+lists the Layout. Order: Tile grid, Snapped colour, Point sizes, Full edge,
+Layout, Hover. Layout sits after Full edge because it lays its line-hugging
+edge values over the edge below it, and `applyLevel` turns steps off top-down
+before it turns steps on bottom-up, so Layout's Split restore runs before the
+edge step resets. The Point sizes step also owns `tileSizeContrast` (shown in
+its value, restored by the step, 0 below it), and "Template motion" keeps it
+like `tileDisplay`. Step thumbnails (`src/lab/layerSketch.ts`) draw Point sizes
+with `drawPointField` on the hero's clocks, draw the text clearance with
+`drawClearance`, and lift the shape centre 24% on Split with the default edge,
+as the hero's `shapeLift` does (`drawField` takes a `lift`). Leaving Recipe
+still restores the Design Panel snapshot, composition and Size contrast
+included.
+
 2026-11-22, hero text colour rule (every palette and theme): the sub under the
 title uses the title's colour (`sublineColor = headlineColor`), never an accent
 tint. The response line and the CTA share one accent, `CTA_BG` from
@@ -247,3 +264,44 @@ Centered adds a Halo `Segmented` (Tight / Wide). Wild type adds a Letter edge
 `Segmented` (Crisp / Whole tiles) on the GPU tile field only, and a hint that
 points to the heavy type pairs (Heavy, Poster). New templates: Center Stage and
 Wild Type.
+
+2026-11-22, Wild type removed, Centered reworked
+(`docs/specs/2026-11-22-hero-layouts.md`, "2026-11-22 outcome"): Wild type was
+a failed experiment and is gone, with its Letter edge control, the Heavy and
+Poster type pairs, and the Center Stage and Wild Type templates; "Start from"
+shows Full Bleed, Problem and Fine Grain. The Layout group is two pick tiles,
+Split and Centered (`setComposition`), a layout option on top of any template.
+Centered no longer clears a halo box: the field fills the hero and flows round
+each text line, the 'full' edge on centred copy. With Centered picked the group
+shows a `LivePreview` of the field round centred copy at a 2× crop (tiles,
+clearance and rim to one scale; `drawPointField` with Size contrast on Point
+sizes) and four `Segmented` preset rows from `ditherStore.ts`: Clearance
+(`clearanceStops`: Hug 4 / Tight 8 / Snug 16 px), Rim (`rimStops`: Crisp /
+Soft / Feathered = 1 / 2 / 4 rows), Rim motion (`rimMotionStops`, GPU tile
+field only, because the Paper clearance mask is static) and Clear round (Each
+line / Each block). They replace the Halo control. Picking Centered sets Full
+Bleed's line-hugging values and, on Point sizes, Size contrast 0.7 when it is 0;
+Split puts back the template's own values.
+
+
+2026-11-22, warp mode (Roam): the "Hover · warp" group starts with a Warp mode
+`Segmented`, Hover / Roam / Both (`hover.mode`, default Hover, so every template
+keeps its look; `warpModeIds` / `warpModeLabel` in `ditherStore.ts`). Roam drives
+one warp blob with no pointer: it drifts on a non-repeating path
+(`roamPose` in `src/heroes/dither/roam.ts`, two incommensurate sines per axis),
+its radius breathes round Size (about ±28%) and its shape morphs within the warp
+feel (`morphShape`: rotate, round and scale; jitter stays). Both is Roam until the
+pointer is over the hero; the blob eases onto the pointer and back onto the path,
+with no jump. The blob stays in the visible field: under the header and above the
+copy on Split, the whole hero on Centered and 'full'. One code path: the roam
+clock writes the same `hoverAnim` state (px, py, radius) that the GPU tile field,
+the Paper 'mask' path and the Paper 'cells' path already draw. The clock runs only
+while playing (Pause and off-screen stop it), scales with Speed, and holds the
+still pose (t = 0: right of and above the centre, full radius, no morph) under
+reduced motion. The error-text tip names what the pointer touches, so the roaming
+blob shows none (no per-frame commits). The 'mask' path keeps its encode cap
+(`WARP_MASK_INTERVAL`); Roam on Problem measured ~46 encodes/s. The warp-feel
+previews and the Recipe "Hover · warp" thumbnail draw the mode (`previewWarp` in
+`panelSketch.ts`); the Recipe step's value names it. A renderer change now clears
+the reveal layer's old clip and mask, because Roam keeps the reveal mounted
+across a template switch.

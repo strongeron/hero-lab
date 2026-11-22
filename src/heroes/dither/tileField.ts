@@ -63,12 +63,6 @@ export interface TileFieldFrame {
     fullPadding: number
   }
   rects: TileRect[]
-  /** Letter fill (Wild type): the field shows only inside the glyphs drawn
-   *  white on `mask` (a canvas the size of the hero, any scale). `version`
-   *  changes when the mask is redrawn; only then is it uploaded again.
-   *  'crisp' cuts per pixel at the glyph edge, 'tiles' keeps whole tiles whose
-   *  centre is inside a letter. Null = no letter fill. */
-  letters: null | { mask: HTMLCanvasElement; version: number; edge: 'crisp' | 'tiles' }
   /** Warp hover (pixel circle of whole tiles, revealing the hover field), or
    *  null when nothing is under the cursor. */
   warp: null | {
@@ -123,8 +117,6 @@ uniform float u_posPx, u_depthPx, u_motion, u_topInset, u_fullPad, u_rimPx;
 uniform int u_seed;
 uniform vec4 u_rects[MAX_RECTS];
 uniform int u_nRects;
-uniform int u_letterMode;       // 0 off, 1 crisp (pixel pass), 2 whole tiles (here)
-uniform sampler2D u_letters;
 
 uniform bool u_warp;
 uniform vec2 u_hp;
@@ -272,7 +264,6 @@ void main() {
   } else {
     edgeAlpha = bandVisibility(ci, cell.y + .5 * u_pitch);
   }
-  if (u_letterMode == 2 && texture(u_letters, tc / u_size).r < .5) edgeAlpha = 0.;
   float pb, pf;
   o_base = fieldDot(0, ci, edgeAlpha, pb);
   o_fix = fieldDot(1, ci, edgeAlpha, pf);
@@ -293,8 +284,6 @@ uniform bool u_warp;
 uniform vec2 u_wRot;            // cos, sin of the warp rotation
 uniform vec2 u_hp;              // warp centre, css px (same as pass 1)
 uniform float u_hr;             // warp radius, css px
-uniform int u_letterMode;
-uniform sampler2D u_letters;
 out vec4 o;
 ${COMMON}
 // Pixel alignment: a piece is a whole number of device pixels with the same
@@ -312,7 +301,7 @@ float cover(vec2 p, float piece, float r) {
   if (piece <= 0.) return 0.;
   return clamp(.5 - roundedBox(p, vec2(piece * .5), floor(r + .5)) * u_dpr, 0., 1.);
 }
-void field() {
+void main() {
   vec2 css = vec2(gl_FragCoord.x, u_res.y - gl_FragCoord.y) / u_dpr;
   vec2 g = (css - u_align) / u_pitch;
   ivec2 ci = ivec2(floor(g));
@@ -358,11 +347,6 @@ void field() {
     if (w.z > .5) ms = max(ms, c);
   }
   o = mix(base, fixv, ms) * mb;
-}
-void main() {
-  field();
-  // Crisp letter fill: premultiplied output scaled by the glyph coverage.
-  if (u_letterMode == 1) o *= texture(u_letters, gl_FragCoord.xy * vec2(1., -1.) / u_res + vec2(0., 1.)).r;
 }`
 
 function hexToRgb(color: string): [number, number, number] {
@@ -427,8 +411,6 @@ export class TileFieldRenderer {
   private fbo: WebGLFramebuffer
   private vbo: WebGLBuffer | null = null
   private tex: WebGLTexture[]
-  private letterTex: WebGLTexture
-  private letterVersion = -1
   private texSize = [0, 0]
   private vao: WebGLVertexArrayObject
   private lc = new Float32Array(MAX_LAYERS * 2 * 3)
@@ -466,29 +448,6 @@ export class TileFieldRenderer {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
       return t
     })
-    this.letterTex = gl.createTexture()!
-    gl.bindTexture(gl.TEXTURE_2D, this.letterTex)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-  }
-
-  /** Upload the letter mask when it changed. Premultiplied on unpack, so the
-   *  red channel of white glyphs is their coverage, edge pixels included. */
-  private bindLetters(f: TileFieldFrame, unit: number): number {
-    const gl = this.gl
-    gl.activeTexture(gl.TEXTURE0 + unit)
-    gl.bindTexture(gl.TEXTURE_2D, this.letterTex)
-    const l = f.letters
-    if (!l) return 0
-    if (l.version !== this.letterVersion) {
-      this.letterVersion = l.version
-      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, gl.RED, gl.UNSIGNED_BYTE, l.mask)
-      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
-    }
-    return l.edge === 'tiles' ? 2 : 1
   }
 
   get contextLost(): boolean { return this.gl.isContextLost() }
@@ -593,9 +552,6 @@ export class TileFieldRenderer {
     }
     gl.uniform4fv(u.u_rects, this.rects)
     gl.uniform1i(u.u_nRects, n)
-    const letterMode = this.bindLetters(f, 4)
-    gl.uniform1i(u.u_letterMode, letterMode)
-    gl.uniform1i(u.u_letters, 4)
 
     const w = f.warp
     gl.uniform1i(u.u_warp, w ? 1 : 0)
@@ -626,10 +582,6 @@ export class TileFieldRenderer {
     gl.uniform1i(p.u_fix, 1)
     gl.uniform1i(p.u_piece, 2)
     gl.uniform1i(p.u_warpTex, 3)
-    gl.activeTexture(gl.TEXTURE4)
-    gl.bindTexture(gl.TEXTURE_2D, this.letterTex)
-    gl.uniform1i(p.u_letterMode, letterMode)
-    gl.uniform1i(p.u_letters, 4)
     gl.uniform2i(p.u_cell0, colLo, rowLo)
     gl.uniform2i(p.u_cells, cols, rows)
     gl.uniform2f(p.u_res, cw, ch)
@@ -674,7 +626,6 @@ export class TileFieldRenderer {
     gl.deleteBuffer(this.vbo)
     if (this.query) gl.deleteQuery(this.query)
     this.tex.forEach((t) => gl.deleteTexture(t))
-    gl.deleteTexture(this.letterTex)
     gl.deleteFramebuffer(this.fbo)
     gl.deleteProgram(this.tileProg)
     gl.deleteProgram(this.pixelProg)

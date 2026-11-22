@@ -1,4 +1,5 @@
-import type { DitheringShape } from './ditherStore'
+import type { DitheringShape, WarpMode } from './ditherStore'
+import { morphShape, roamPose } from './roam'
 
 /* 2D sketches of the dither field for the Design Panel previews. They are
    approximations of Paper's shapes and the GPU tile field, cheap enough to run
@@ -46,6 +47,9 @@ export interface SketchOpts {
   alpha?: number[]
   /** Only tiles with v (−1 top … 1 bottom) below this draw: a top band. */
   bandTo?: number
+  /** Shape centre above the canvas centre, as a share of H (the hero's
+   *  shapeLift: centred shapes sit mid-band, not behind the copy). */
+  lift?: number
   warp?: SketchWarp
 }
 
@@ -67,7 +71,7 @@ export function drawField(ctx: CanvasRenderingContext2D, W: number, H: number, o
   ctx.fillRect(0, 0, W, H)
   for (let iy = 0; iy < rows; iy++) {
     const y0 = iy * p
-    const v = (y0 + p / 2 - H / 2) / md
+    const v = (y0 + p / 2 - H / 2 + (o.lift ?? 0) * H) / md
     if (o.bandTo != null && (y0 + p / 2) / H > o.bandTo) break
     for (let ix = 0; ix < cols; ix++) {
       const x0 = ix * p
@@ -132,6 +136,21 @@ export function drawField(ctx: CanvasRenderingContext2D, W: number, H: number, o
 /** A looping pointer path inside a W×H box (device px). */
 export function loopPointer(t: number, W: number, H: number) {
   return { x: W * (0.5 + 0.32 * Math.sin(t * 0.9)), y: H * (0.5 + 0.28 * Math.sin(t * 1.4 + 0.6)) }
+}
+
+/** A warp preview for a mode, in a W×H box: Hover follows the looping
+ *  pointer; Roam follows the hero's roam path (sped up to read in a small
+ *  box) with a breathing radius and a morphing shape; Both hands over between
+ *  the two every few seconds. `r` is the radius at rest. */
+export function previewWarp<S extends { rotate: number; round: number }>(mode: WarpMode, t: number, W: number, H: number, r: number, shape: S): { x: number; y: number; r: number } & S {
+  if (mode === 'hover') return { ...loopPointer(t, W, H), r, ...shape }
+  const p = roamPose(t * 3)
+  // Both: 0 = roaming, 1 = on the pointer, eased in and out.
+  const f = mode === 'both' ? 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, Math.sin(t * 0.7) * 2))) : 0
+  const lp = loopPointer(t, W, H)
+  const rx = W * (0.1 + 0.8 * p.x), ry = H * (0.1 + 0.8 * p.y)
+  const m = morphShape({ ...shape, scale: 1 }, p, 1 - f)
+  return { ...shape, rotate: m.rotate, round: m.round, x: rx + (lp.x - rx) * f, y: ry + (lp.y - ry) * f, r: r * (p.breath + (1 - p.breath) * f) }
 }
 
 /* ── Paper-faithful sketch ──
@@ -393,5 +412,77 @@ export function drawPointField(ctx: CanvasRenderingContext2D, W: number, H: numb
       ctx.fill()
     }
   }
+  ctx.globalAlpha = 1
+}
+
+export interface SketchRect { x: number; y: number; w: number; h: number }
+
+/** Centered copy at thumbnail size, device px: two headline lines, the sub
+ *  and the CTA, in the middle (Layout previews, Recipe thumbnails). */
+export function centredCopyLines(W: number, H: number): SketchRect[] {
+  const r = (x: number, y: number, w: number, h: number) => ({ x: Math.round(W * x), y: Math.round(H * y), w: Math.round(W * w), h: Math.max(2, Math.round(H * h)) })
+  return [r(0.2, 0.24, 0.6, 0.12), r(0.3, 0.39, 0.4, 0.12), r(0.33, 0.57, 0.34, 0.05), r(0.42, 0.68, 0.16, 0.1)]
+}
+
+/** One bounding box round all `rects` ('box' text rects). */
+export function boundingRect(rects: SketchRect[]): SketchRect {
+  const x = Math.min(...rects.map((r) => r.x)), y = Math.min(...rects.map((r) => r.y))
+  return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y }
+}
+
+export interface ClearanceOpts {
+  back: string
+  /** Tile pitch and the lattice origin, device px. */
+  pitch: number
+  ox?: number
+  oy?: number
+  /** edge.fullPadding and the rim (dissolveDepth rows × pitch), device px. */
+  pad: number
+  rim: number
+  /** edge.textBlendMotion and the motion clock: the rim breathes. */
+  motion?: number
+  t?: number
+}
+
+/** The hero's text clearance ('full' edge, Centered), as the GPU field's
+ *  clearance(): paint the back colour over every tile that touches a rect
+ *  grown by `pad`; tiles within `rim` of it thin out with distance by a
+ *  seeded hash, nudged by noise over time when `motion` > 0. */
+export function drawClearance(ctx: CanvasRenderingContext2D, W: number, H: number, rects: SketchRect[], o: ClearanceOpts) {
+  const p = Math.max(1, Math.round(o.pitch))
+  const ox = o.ox ?? 0, oy = o.oy ?? 0
+  const rim = Math.max(p, o.rim)
+  const motion = o.motion ?? 0
+  ctx.globalAlpha = 1
+  ctx.fillStyle = o.back
+  ctx.beginPath()
+  for (let y = oy; y < H; y += p) {
+    for (let x = ox; x < W; x += p) {
+      let minD = Infinity
+      let inside = false
+      for (const r of rects) {
+        const ax = r.x - o.pad, ay = r.y - o.pad, bx = r.x + r.w + o.pad, by = r.y + r.h + o.pad
+        if (x + p > ax && x < bx && y + p > ay && y < by) { inside = true; break }
+        const dx = Math.max(ax - (x + p / 2), 0, x + p / 2 - bx)
+        const dy = Math.max(ay - (y + p / 2), 0, y + p / 2 - by)
+        minD = Math.min(minD, Math.hypot(dx, dy))
+      }
+      if (!inside) {
+        if (minD >= rim) continue
+        const ix = Math.round((x - ox) / p), iy = Math.round((y - oy) / p)
+        const th = Math.min(1, Math.max(0, tileHash(ix, iy, 1) + (motion > 0 ? (fbm(ix * 0.33, iy * 0.33, (o.t ?? 0) * 0.8, 89) - 0.5) * motion * 0.55 : 0)))
+        if (minD / rim > th) continue
+      }
+      ctx.rect(x, y, p, p)
+    }
+  }
+  ctx.fill()
+}
+
+/** White copy bars over a sketch (headline, sub, CTA). */
+export function drawCopyBars(ctx: CanvasRenderingContext2D, rects: SketchRect[]) {
+  ctx.globalAlpha = 0.9
+  ctx.fillStyle = '#fff'
+  for (const r of rects) ctx.fillRect(r.x, r.y, r.w, r.h)
   ctx.globalAlpha = 1
 }

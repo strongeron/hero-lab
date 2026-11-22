@@ -1,9 +1,10 @@
 import { useMemo, useRef, useEffect, useState } from 'react'
 import { Dithering } from '@paper-design/shaders-react'
-import { useDitherStore, resolveCopy, palettes, haloPad, heroCtaColors, warpErrorSnippets, warpFixSnippets, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
+import { useDitherStore, resolveCopy, palettes, heroCtaColors, warpErrorSnippets, warpFixSnippets, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
 import { getThemeById } from '../../themes/terminalThemes'
 import { TileFieldRenderer, type TileFieldFrame } from './tileField'
-import { useHeadlineFit, useDisplayFit } from './useHeadlineFit'
+import { useHeadlineFit } from './useHeadlineFit'
+import { morphShape, roamPose } from './roam'
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
@@ -458,63 +459,55 @@ function canvasToDataUrl(canvas: HTMLCanvasElement): Promise<string | null> {
   })
 }
 
-/** Centered halo on the Paper paths: a static mask that hides the field
- *  around the copy block. On a tile grid the hole snaps outward to whole
- *  tiles (a soft edge would cut tiles); without a grid (a fine continuous
- *  field) it is a soft ellipse. Built once per layout change, never per frame. */
-function buildHaloMask(r: TextRect, pad: number, w: number, h: number, g: TileGrid | null): string {
+/** Text clearance on the Paper paths ('full' edge, Centered): a static mask
+ *  that hides the field round each measured text rect, like the GPU field's
+ *  clearance(). On a tile grid it works in whole tiles: a tile that touches a
+ *  rect grown by `pad` is cleared, and tiles within `rim` px of it thin out
+ *  by the same seeded hash as the dissolve band (static: no rim motion on
+ *  Paper). Without a grid (a fine continuous field) each rect is a rounded
+ *  hole with a blurred rim. A luminance mask inside the SVG, so overlapping
+ *  holes never cancel. Built once per layout change, never per frame. */
+function buildClearanceMask(rects: TextRect[], pad: number, rim: number, w: number, h: number, g: TileGrid | null, seed: number): string {
+  const holes: string[] = []
   if (!g) {
-    const cx = r.x + r.w / 2, cy = r.y + r.h / 2
-    // The box's corners sit at 1/√2 of these radii; clear until 72 %.
-    const rx = (r.w / 2 + pad) * Math.SQRT2, ry = (r.h / 2 + pad) * Math.SQRT2
-    return `radial-gradient(${Math.round(rx)}px ${Math.round(ry)}px at ${Math.round(cx)}px ${Math.round(cy)}px, transparent 72%, black 100%)`
-  }
-  const p = g.pitch
-  const x0 = Math.floor((r.x - pad - g.alignX) / p) * p + g.alignX
-  const y0 = Math.floor((r.y - pad - g.alignY) / p) * p + g.alignY
-  const x1 = Math.ceil((r.x + r.w + pad - g.alignX) / p) * p + g.alignX
-  const y1 = Math.ceil((r.y + r.h + pad - g.alignY) / p) * p + g.alignY
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'><path fill='white' fill-rule='evenodd' d='M0 0H${w}V${h}H0Z M${x0} ${y0}H${x1}V${y1}H${x0}Z'/></svg>`
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
-}
-
-/** Letter fill mask (Wild type): the headline's glyphs, white on
- *  transparent, on a canvas the size of the hero at `scale` px per CSS px.
- *  Each glyph is drawn at the position the DOM measured for it, so canvas and
- *  DOM text agree even where tracking or kerning differ. The DOM headline
- *  stays the real text (screen readers, selection, fit). */
-function buildLetterMask(el: HTMLElement, host: HTMLElement, scale: number, out?: HTMLCanvasElement): HTMLCanvasElement | null {
-  const hostRect = host.getBoundingClientRect()
-  if (!hostRect.width || !hostRect.height) return null
-  const canvas = out ?? document.createElement('canvas')
-  canvas.width = Math.round(hostRect.width * scale)
-  canvas.height = Math.round(hostRect.height * scale)
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return null
-  const cs = getComputedStyle(el)
-  ctx.setTransform(scale, 0, 0, scale, 0, 0)
-  ctx.clearRect(0, 0, hostRect.width, hostRect.height)
-  ctx.fillStyle = '#fff'
-  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
-  ctx.textBaseline = 'alphabetic'
-  const share = ascentShare(cs)
-  const range = document.createRange()
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const text = node.textContent ?? ''
-    for (let i = 0; i < text.length;) {
-      const ch = String.fromCodePoint(text.codePointAt(i)!)
-      const next = i + ch.length
-      if (ch.trim()) {
-        range.setStart(node, i)
-        range.setEnd(node, next)
-        const r = Array.from(range.getClientRects()).find((q) => q.width > 0)
-        if (r) ctx.fillText(ch, r.left - hostRect.left, r.top - hostRect.top + r.height * share)
+    for (const r of rects) {
+      const x = Math.round(r.x - pad), y = Math.round(r.y - pad)
+      const rw = Math.round(r.w + 2 * pad), rh = Math.round(r.h + 2 * pad)
+      holes.push(`<rect x='${x}' y='${y}' width='${rw}' height='${rh}' rx='${Math.round(Math.min(pad + rim / 2, rh / 2))}'/>`)
+    }
+  } else {
+    const p = g.pitch
+    const seen = new Map<string, number>()
+    for (const r of rects) {
+      const ax = r.x - pad, ay = r.y - pad, bx = r.x + r.w + pad, by = r.y + r.h + pad
+      const i0 = Math.floor((ax - rim - g.alignX) / p), i1 = Math.ceil((bx + rim - g.alignX) / p)
+      const j0 = Math.floor((ay - rim - g.alignY) / p), j1 = Math.ceil((by + rim - g.alignY) / p)
+      for (let j = j0; j < j1; j++) {
+        for (let i = i0; i < i1; i++) {
+          const x = g.alignX + i * p, y = g.alignY + j * p
+          let keep: number
+          if (x + p > ax && x < bx && y + p > ay && y < by) keep = 0
+          else {
+            const dx = Math.max(ax - (x + p / 2), 0, x + p / 2 - bx)
+            const dy = Math.max(ay - (y + p / 2), 0, y + p / 2 - by)
+            const gd = Math.hypot(dx, dy) / rim
+            if (gd >= 1) continue
+            keep = gd > tileThreshold(i, j, seed) ? Math.max(0.45, gd) : 0
+          }
+          const k = `${i},${j}`
+          seen.set(k, Math.min(seen.get(k) ?? 1, keep))
+        }
       }
-      i = next
+    }
+    for (const [k, keep] of seen) {
+      if (keep >= 1) continue
+      const [i, j] = k.split(',').map(Number)
+      holes.push(`<rect x='${g.alignX + i * p}' y='${g.alignY + j * p}' width='${p}' height='${p}'${keep > 0 ? ` fill-opacity='${(1 - keep).toFixed(2)}'` : ''}/>`)
     }
   }
-  return canvas
+  const blur = g ? '' : `<filter id='b' x='-5%' y='-5%' width='110%' height='110%'><feGaussianBlur stdDeviation='${Math.max(1, Math.round(rim / 2))}'/></filter>`
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'><defs>${blur}<mask id='m' maskUnits='userSpaceOnUse' x='0' y='0' width='${w}' height='${h}'><rect width='${w}' height='${h}' fill='white'/><g fill='black'${g ? '' : " filter='url(#b)'"}>${holes.join('')}</g></mask></defs><rect width='${w}' height='${h}' fill='white' mask='url(#m)'/></svg>`
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
 
 /** Smallest gap the baseline lock leaves between the response line and the
@@ -529,10 +522,12 @@ export default function DitherHero() {
   // Off-screen heroes read as paused: this stops the drift and mask loops and
   // sets the Paper speed to 0, which stops Paper's own rAF.
   const [inView, setInView] = useState(true)
-  // Wild type pauses the field under reduced motion: motion inside letters
-  // reads as moving text, which the 0.15× spatial scale does not prevent.
-  const comp = composition.mode
-  const anim = inView && !(comp === 'wild' && reducedMotion) ? storeAnim : { ...storeAnim, playing: false }
+  const anim = inView ? storeAnim : { ...storeAnim, playing: false }
+  // Centered: copy in the middle, the field fills the hero and flows round
+  // each text line ('full' edge). Any other mode reads as Split.
+  const centered = composition.mode === 'centered'
+  /** The field fills the hero and clears the text (Centered, or 'full' edge). */
+  const fullField = centered || edge.mode === 'full'
   // Reduced motion shrinks how far things move; Speed scales how fast.
   const spatialMotionScale = reducedMotion ? 0.15 : 1
   const timeScale = Math.max(0, anim.speed)
@@ -615,7 +610,7 @@ export default function DitherHero() {
   const paperCell = tileMaskPath ? gridPitch : Math.max(1, Math.round(c.size))
 
   // ── Dissolve edge (Paper + CSS tile grid only; the GPU field draws its own) ──
-  const dissolveOn = gridOn && !pointCanvasMode && edge.mode === 'dissolve' && comp === 'split'
+  const dissolveOn = gridOn && !pointCanvasMode && edge.mode === 'dissolve' && !centered
   const [maskAnimT, setMaskAnimT] = useState(0)
   // Accumulated motion time lives in a ref so slider tweaks (which re-run the
   // rAF effect) resume from the current phase instead of snapping back to 0.
@@ -854,21 +849,14 @@ export default function DitherHero() {
   const lockSubRef = useRef<HTMLParagraphElement>(null)
   const lockResponseWrapRef = useRef<HTMLDivElement>(null)
   const lockCtaRef = useRef<HTMLAnchorElement>(null)
-  /** Centered: the copy block whose box is the halo. */
-  const haloBlockRef = useRef<HTMLDivElement>(null)
-  /** Wild type: the display headline, the source of the letter mask. */
-  const wildHeadlineRef = useRef<HTMLHeadingElement>(null)
-  useHeadlineFit(lockHeadlineRef, `${comp}|${copyVariant}|${typePair}|${copy.headlineSize}`)
-  useDisplayFit(wildHeadlineRef, `${comp}|${copyVariant}|${typePair}`)
+  useHeadlineFit(lockHeadlineRef, `${centered}|${copyVariant}|${typePair}|${copy.headlineSize}`)
   const fontsLoaded = useFontsLoaded()
   const [baselineNudge, setBaselineNudge] = useState({ response: 0, cta: 0, subGap: 0 })
   useEffect(() => {
     const content = contentRef.current
     const host = shaderContainerRef.current
     if (!content || !host) return
-    // Centered: one rect, the copy block (the halo). Wild type: none, the
-    // letter mask decides where the field shows.
-    const needRects = comp === 'centered' || (comp === 'split' && edge.mode === 'full')
+    const needRects = fullField
     const measure = () => {
       const hostRect = host.getBoundingClientRect()
       setContentTop((prev) => {
@@ -880,13 +868,6 @@ export default function DitherHero() {
         return
       }
       const rects: TextRect[] = []
-      const block = haloBlockRef.current
-      if (comp === 'centered' && block) {
-        const r = block.getBoundingClientRect()
-        rects.push({ x: r.left - hostRect.left, y: r.top - hostRect.top, w: r.width, h: r.height })
-        setTextRects((prev) => (JSON.stringify(prev) === JSON.stringify(rects) ? prev : rects))
-        return
-      }
       content.querySelectorAll('h1, p, a').forEach((el) => {
         // Buttons and bubbled text keep their element box — the pill IS the
         // visual. In 'lines' mode plain text contributes one rect PER RENDERED
@@ -918,48 +899,8 @@ export default function DitherHero() {
     return () => ro.disconnect()
     // baselineNudge: transforms don't fire the ResizeObserver, so re-measure
     // the exclusion rects after the baseline lock shifts the right column.
-  }, [comp, edge.mode, edge.textRectMode, copyVariant, typePair, layout, baselineNudge, fontsLoaded])
+  }, [fullField, centered, edge.textRectMode, copyVariant, typePair, layout, baselineNudge, fontsLoaded])
 
-  // ── Letter fill (Wild type) ──
-  // One mask for every renderer: the GPU field uploads the canvas as a
-  // texture, the Paper paths get it once as a static data: URL mask (a blob:
-  // mask loads async and blinks). Rebuilt only on layout change: the fit, a
-  // font load, copy, type pair or resize. Never per frame.
-  const letterCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  const letterVersionRef = useRef(0)
-  const [letterMask, setLetterMask] = useState<{ version: number; url: string | null } | null>(null)
-  useEffect(() => {
-    const el = wildHeadlineRef.current
-    const host = shaderContainerRef.current
-    if (comp !== 'wild' || !el || !host) {
-      setLetterMask(null)
-      return
-    }
-    let live = true
-    let raf = 0
-    const build = () => {
-      const canvas = buildLetterMask(el, host, Math.min(2, Math.max(1, window.devicePixelRatio || 1)), letterCanvasRef.current ?? undefined)
-      if (!canvas) return
-      letterCanvasRef.current = canvas
-      const version = ++letterVersionRef.current
-      if (pointCanvasMode) {
-        setLetterMask({ version, url: null })
-        return
-      }
-      canvasToDataUrl(canvas).then((url) => {
-        if (live && version === letterVersionRef.current) setLetterMask({ version, url })
-      })
-    }
-    // Coalesce: the fit, the font swap and the observer can all fire in one frame.
-    const schedule = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(build) }
-    schedule()
-    const ro = new ResizeObserver(schedule)
-    ro.observe(el)
-    ro.observe(host)
-    return () => { live = false; cancelAnimationFrame(raf); ro.disconnect() }
-  }, [comp, pointCanvasMode, copyVariant, typePair, fontsLoaded])
-  /** Wild type before its mask exists: hide the field, or it flashes unmasked. */
-  const lettersPending = comp === 'wild' && (!letterMask || (!pointCanvasMode && !letterMask.url))
 
   // Baseline lock (problem layout) — the right column snaps to the left one:
   // the response's last line shares the headline's last baseline, the CTA
@@ -967,7 +908,7 @@ export default function DitherHero() {
   // (target minus current, measured post-transform) so the lock converges and
   // then holds across font, size, and copy changes.
   useEffect(() => {
-    if (comp !== 'split') return
+    if (centered) return
     // Generous bound: at wide viewports the CTA's natural distance from the
     // sub's last baseline can exceed 50px — a tight clamp saturates just
     // short of the target and the lock visibly misses.
@@ -1043,7 +984,7 @@ export default function DitherHero() {
       window.removeEventListener('resize', measure)
       twoCol.removeEventListener('change', measure)
     }
-  }, [comp, copy.responsePin, copyVariant, typePair, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
+  }, [centered, copy.responsePin, copyVariant, typePair, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
     containerSize.w, fontsLoaded])
 
   // Baseline guides — debug overlay for alignment checks. One line per
@@ -1223,11 +1164,27 @@ export default function DitherHero() {
   /** Lowest y (container px) the warp answers to. Infinity = everywhere. */
   const hoverBandRef = useRef(Infinity)
   const [tip, setTip] = useState<Tip | null>(null)
-  const hoverAnim = useRef({ radius: 0, px: 0, py: 0, hovering: false, rafId: 0, cw: 0, ch: 0 })
+  // px/py: the warp centre every renderer draws. mx/my: the last pointer.
+  // follow: 0 = on the roam path, 1 = on the pointer (eased in Both).
+  const hoverAnim = useRef({ radius: 0, px: 0, py: 0, mx: 0, my: 0, follow: 1, hovering: false, rafId: 0, cw: 0, ch: 0 })
   const radiusRef = useRef(hover.radius)
   radiusRef.current = hover.radius
-  const warpShapeRef = useRef<WarpShape>({ rotate: 0, round: 0, scale: 1, spread: 0 })
-  warpShapeRef.current = { rotate: hover.warpRotate, round: hover.warpRound, scale: hover.warpScale, spread: hover.warpJitter }
+  /** The warp feel as set; warpShapeRef is what draws (morphed while roaming). */
+  const warpBaseRef = useRef<WarpShape>({ rotate: 0, round: 0, scale: 1, spread: 0 })
+  warpBaseRef.current = { rotate: hover.warpRotate, round: hover.warpRound, scale: hover.warpScale, spread: hover.warpJitter }
+  const warpShapeRef = useRef<WarpShape>(warpBaseRef.current)
+  // ── Roam: the warp's own clock. It feeds hoverAnim, so all three renderers
+  // draw the roaming blob through the hover code below, nothing parallel.
+  // The clock runs only while playing (Pause and off-screen stop it), scales
+  // with Speed, and holds the still pose (t = 0) under reduced motion.
+  const ROAM = useRef({ t: 0, last: 0 }).current
+  const roamCfgRef = useRef({ mode: hover.mode ?? 'hover', playing: anim.playing, speed: timeScale, reduced: reducedMotion })
+  roamCfgRef.current = { mode: hover.mode ?? 'hover', playing: anim.playing, speed: timeScale, reduced: reducedMotion }
+  /** The visible field the blob roams in (container px): set below the layout. */
+  const roamBoxRef = useRef({ top: 0, bottom: Infinity })
+  const containerSizeRef = useRef(containerSize)
+  containerSizeRef.current = containerSize
+  const hoverKickRef = useRef<() => void>(() => {})
   // 'mask' path grid; the PNG masks are drawn at device DPR (max 2) for crisp tile edges.
   const maskGridRef = useRef(grid)
   maskGridRef.current = grid
@@ -1278,13 +1235,15 @@ export default function DitherHero() {
     function handleMove(e: MouseEvent) {
       const rect = el!.getBoundingClientRect()
       const a = hoverAnim.current
-      a.px = e.clientX - rect.left
-      a.py = e.clientY - rect.top
+      a.mx = e.clientX - rect.left
+      a.my = e.clientY - rect.top
       a.cw = rect.width
       a.ch = rect.height
+      // Roam ignores the pointer.
+      if (roamCfgRef.current.mode === 'roam') return
       // Below the field band (gridded Problem): no warp over the copy. The
       // warp shrinks where it is, as on leave, and grows again on re-entry.
-      if (a.py > hoverBandRef.current) {
+      if (a.my > hoverBandRef.current) {
         a.hovering = false
         startLoop()
         return
@@ -1300,6 +1259,9 @@ export default function DitherHero() {
 
     function handleLeave() {
       hoverAnim.current.hovering = false
+      startLoop()
+      // Roam and Both keep the reveal mounted: the blob still shows.
+      if (roamCfgRef.current.mode !== 'hover') return
       if (hoverReleaseTimer.current) clearTimeout(hoverReleaseTimer.current)
       hoverReleaseTimer.current = window.setTimeout(() => {
         hoverReleaseTimer.current = 0
@@ -1312,13 +1274,47 @@ export default function DitherHero() {
       const a = hoverAnim.current
       a.rafId = 0
       const now = performance.now()
-      const target = a.hovering ? radiusRef.current : 0
+      const cfg = roamCfgRef.current
+      const roam = cfg.mode !== 'hover'
+      // Roam clock: dt capped so a hidden tab or a long frame never jumps.
+      const clockOn = roam && cfg.playing && !cfg.reduced && cfg.speed > 0
+      if (clockOn) ROAM.t += Math.min(50, now - (ROAM.last || now)) / 1000 * cfg.speed
+      ROAM.last = clockOn ? now : 0
+      const pose = roamPose(cfg.reduced ? 0 : ROAM.t)
+      // follow: Hover = the pointer; Roam = the path; Both eases between them,
+      // so the blob never jumps on enter or leave.
+      const followTarget = cfg.mode === 'hover' ? 1 : cfg.mode === 'both' && a.hovering ? 1 : 0
+      a.follow = cfg.mode === 'hover' ? 1 : a.follow + (followTarget - a.follow) * 0.08
+      // No blob showing yet (Roam just picked): start on the path, not the pointer.
+      if (Math.abs(followTarget - a.follow) < 0.002 || (a.radius === 0 && !a.hovering)) a.follow = followTarget
+      if (roam) {
+        if (!hoverActiveRef.current) setHoverActive(true)
+        const size = containerSizeRef.current
+        a.cw = size.w; a.ch = size.h
+        const box = roamBoxRef.current
+        const bottom = Math.min(box.bottom, size.h)
+        const r = radiusRef.current
+        const mx = Math.min(r * 0.3, size.w / 2), my = Math.min(r * 0.3, Math.max(0, bottom - box.top) / 2)
+        const rx = mx + pose.x * (size.w - 2 * mx)
+        const ry = box.top + my + pose.y * Math.max(0, bottom - box.top - 2 * my)
+        a.px = rx + (a.mx - rx) * a.follow
+        a.py = ry + (a.my - ry) * a.follow
+      } else if (a.hovering) {
+        // Hover: on the pointer; after a leave the warp shrinks where it is.
+        a.px = a.mx; a.py = a.my
+      }
+      warpShapeRef.current = roam ? morphShape(warpBaseRef.current, pose, 1 - a.follow) : warpBaseRef.current
+      const target = !roam ? (a.hovering ? radiusRef.current : 0)
+        : radiusRef.current * (pose.breath + (1 - pose.breath) * a.follow)
       a.radius += (target - a.radius) * 0.08
       if (a.radius < 1 && target === 0) a.radius = 0
+      const settled = Math.abs(target - a.radius) < 0.3 && a.follow === followTarget
       tileDirtyRef.current = true
+      let maskPending = false
 
-      // Error-text tip, 12 commits/s at most.
-      if (a.radius <= 0) {
+      // Error-text tip, 12 commits/s at most. It names what the pointer
+      // touches, so the roaming blob (follow < 0.5) shows none.
+      if (a.radius <= 0 || a.follow < 0.5) {
         if (tipShown) { tipShown = false; setTip(null) }
       } else if (now - lastTipUpdate >= 1000 / 12) {
         lastTipUpdate = now
@@ -1345,6 +1341,8 @@ export default function DitherHero() {
           const key = [g.pitch, g.alignX, g.alignY, g.piece, g.inset, g.radius, w.rotate, w.round, w.scale, w.spread, dprM].join(':')
           const moved = Math.abs(a.px - gen.px) >= 2 || Math.abs(a.py - gen.py) >= 2 || Math.abs(a.radius - gen.r) >= 2
           // One encode in flight at a time; the next build picks up the latest cursor.
+          // A move held back by the interval keeps the loop alive to send it.
+          if ((moved || gen.key !== key) && !warpEncodingRef.current && now - warpLastStartRef.current < WARP_MASK_INTERVAL) maskPending = true
           if (!warpEncodingRef.current && now - warpLastStartRef.current >= WARP_MASK_INTERVAL && (moved || gen.key !== key)) {
             revealCanvasRef.current ??= document.createElement('canvas')
             const px = a.px, py = a.py, r = a.radius
@@ -1384,8 +1382,9 @@ export default function DitherHero() {
         }
       }
 
-      if (a.radius > 0.5 || a.hovering) a.rafId = requestAnimationFrame(animate)
+      if (a.hovering || clockOn || !settled || maskPending) a.rafId = requestAnimationFrame(animate)
     }
+    hoverKickRef.current = startLoop
 
     // Listen on the section: the copy sits above the field and would
     // otherwise swallow every move over the headline.
@@ -1402,15 +1401,38 @@ export default function DitherHero() {
       }
       target.removeEventListener('mousemove', handleMove)
       target.removeEventListener('mouseleave', handleLeave)
+      hoverKickRef.current = () => {}
     }
   }, [hover.enabled])
 
-  // Leaving the 'mask' path (template or renderer change) drops a stale cover.
+  // Mode, Pause, Speed, reduced motion or the warp feel changed: run the
+  // loop once more so the blob starts, settles or picks up the new shape.
+  // Back on Hover with no pointer, the reveal unmounts as after a leave.
   useEffect(() => {
-    if (hoverPath === 'mask') return
+    if (!hover.enabled) return
+    hoverKickRef.current()
+    if ((hover.mode ?? 'hover') !== 'hover' || hoverAnim.current.hovering) return
+    const id = window.setTimeout(() => { if (!hoverAnim.current.hovering) setHoverActive(false) }, 2000)
+    return () => clearTimeout(id)
+  }, [hover.enabled, hover.mode, anim.playing, timeScale, reducedMotion, hover.radius, hover.warpRotate, hover.warpRound, hover.warpScale, hover.warpJitter])
+
+  // A renderer change (template or Grid) drops the old path's cover, clip and
+  // mask. The reveal can stay mounted across it (Roam keeps it), and a stale
+  // warped-tile mask under the 'cells' clip shows only the old tile shapes.
+  // Hidden until the new path draws; the kick redraws a showing blob there.
+  useEffect(() => {
     warpGenRef.current = { px: -1, py: -1, r: -1, key: '' }
     warpTokenRef.current++
     if (coverRef.current) coverRef.current.style.visibility = 'hidden'
+    const fix = fixLayerRef.current
+    if (fix) {
+      fix.style.visibility = 'hidden'
+      fix.style.clipPath = ''
+      fix.style.maskImage = ''; fix.style.webkitMaskImage = ''
+      fix.style.maskPosition = ''; fix.style.webkitMaskPosition = ''
+      fix.style.maskSize = ''; fix.style.webkitMaskSize = ''
+    }
+    hoverKickRef.current()
   }, [hoverPath])
 
   // ── GPU tile field (Point sizes, snapped colour, and the warp on top) ──
@@ -1447,8 +1469,7 @@ export default function DitherHero() {
       base: field(c.alphaLayers),
       fix: field(hover.hoverLayers),
       edge: {
-        // Centered and Wild type fill the hero; Centered clears the halo.
-        mode: comp === 'split' ? edge.mode : 'full',
+        mode: centered ? 'full' : edge.mode,
         // The solid copy background starts at the measured content top; clamp
         // the band to it so no dot is flat-cut.
         posPx: contentTop != null ? Math.min(posPct, contentTop) : posPct,
@@ -1456,12 +1477,9 @@ export default function DitherHero() {
         dissolveSeed: edge.dissolveSeed,
         textBlendMotion: edge.textBlendMotion,
         topInset: edge.topInset,
-        fullPadding: comp === 'centered' ? haloPad[composition.halo] : edge.fullPadding,
+        fullPadding: edge.fullPadding,
       },
       rects: textRects,
-      letters: comp === 'wild' && letterMask && letterCanvasRef.current
-        ? { mask: letterCanvasRef.current, version: letterMask.version, edge: composition.letterEdge }
-        : null,
       warp: hover.enabled && a.radius > 0 && a.cw > 0 ? {
         px: a.px, py: a.py, r: a.radius,
         rotateDeg: w2.rotate, round: w2.round, scale: w2.scale, spread: Math.min(1.5, w2.spread),
@@ -1488,8 +1506,9 @@ export default function DitherHero() {
     const frame = () => {
       raf = requestAnimationFrame(frame)
       if (document.hidden) return
-      const a = hoverAnim.current
-      const moving = anim.playing || a.radius > 0 || a.hovering
+      // The hover loop marks each warp frame dirty, so a blob held still
+      // under Pause costs no draws.
+      const moving = anim.playing || hoverAnim.current.hovering
       if (!moving && !tileDirtyRef.current) return
       // Clear the flag only once a frame is drawn: right after load the host
       // can still be 0×0, and a paused hero would otherwise stay blank.
@@ -1508,7 +1527,7 @@ export default function DitherHero() {
   // the copy's top. Paper adds u_offsetY to the object UV before scale and
   // rotation, in units of max(W, H) for fit cover, so the shift is
   // (f − 0.5) × H / max(W, H) for a band centre f (share of H from the top).
-  const shapeLift = contentTop != null && edge.mode !== 'full' && comp === 'split' && containerSize.h > 0
+  const shapeLift = contentTop != null && !fullField && containerSize.h > 0
     ? (((edge.topInset || 0) + contentTop) / 2 / containerSize.h - 0.5) * containerSize.h / Math.max(containerSize.w, containerSize.h)
     : 0
 
@@ -1582,32 +1601,31 @@ export default function DitherHero() {
       )
     })
 
-  // Centered (halo) and Wild type (letters) on the Paper paths: one more
-  // static layer in the container's mask stack. The GPU field draws both itself.
-  const haloRect = comp === 'centered' && !pointCanvasMode ? textRects[0] : undefined
-  const haloMask = useMemo(
-    () => haloRect ? buildHaloMask(haloRect, haloPad[composition.halo], containerSize.w, containerSize.h, tileMaskPath ? grid : null) : null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [haloRect?.x, haloRect?.y, haloRect?.w, haloRect?.h, composition.halo, containerSize.w, containerSize.h, tileMaskPath, grid],
+  // Text clearance on the Paper paths ('full' edge, Centered): one more
+  // static layer in the container's mask stack. The GPU field draws its own.
+  const clearanceRim = Math.max(paperCell, Math.round(edge.dissolveDepth) * paperCell)
+  const clearanceMask = useMemo(
+    () => fullField && !pointCanvasMode && textRects.length && containerSize.w > 0
+      ? buildClearanceMask(textRects, edge.fullPadding, clearanceRim, containerSize.w, containerSize.h, tileMaskPath ? grid : null, edge.dissolveSeed)
+      : null,
+    [fullField, pointCanvasMode, textRects, edge.fullPadding, clearanceRim, edge.dissolveSeed, containerSize.w, containerSize.h, tileMaskPath, grid],
   )
-  const letterUrl = comp === 'wild' && !pointCanvasMode && letterMask?.url ? `url("${letterMask.url}")` : null
-  const compositionMask = haloMask ?? letterUrl
-  const containerStyle: React.CSSProperties | undefined = {
-    ...(compositionMask ? intersectMask(restMaskStyle, compositionMask) : restMaskStyle),
-    ...(lettersPending ? { visibility: 'hidden' } : {}),
-  }
+  const containerStyle = clearanceMask ? intersectMask(restMaskStyle, clearanceMask) : restMaskStyle
   // The cover only ever shows on the 'mask' path; the reveal escapes the
   // dissolve band, so the hover works over the whole hero, text included.
   const maskBase: React.CSSProperties = { maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat' }
   // A terminal theme reveals one themed colour instead of the other state's layers.
   const revealColor = (color: string) => (activeTheme ? responseColor : color)
-  const textUnderScene = edge.mode === 'full' || comp !== 'split'
+  const textUnderScene = fullField
   // Gridded Paper (Problem, Split): the warp is a tile effect, so it stays in
   // the tile band above the copy, both for the pointer and as a clip at the
   // band edge. Grid-off (Fine Grain) keeps its reveal over the copy on
-  // purpose; Centered and Wild type put the text under the scene, so no band.
+  // purpose; Centered and 'full' put the text under the scene, so no band.
   const bandOnly = hoverPath === 'mask' && !textUnderScene && contentTop != null
   hoverBandRef.current = bandOnly ? contentTop! : Infinity
+  // Roam stays in the visible field: below the header, and above the copy
+  // on banded layouts (any renderer); Centered and 'full' roam the whole hero.
+  roamBoxRef.current = { top: edge.topInset || 0, bottom: !textUnderScene && contentTop != null ? contentTop : Infinity }
   const bandClip: React.CSSProperties | undefined = bandOnly
     ? { clipPath: `inset(0 0 calc(100% - ${contentTop}px) 0)` }
     : undefined
@@ -1624,11 +1642,7 @@ export default function DitherHero() {
     lineHeight: copy.headlineLeading || '0.95',
     fontStretch: copy.headlineFont ? undefined : 'var(--font-display-stretch, normal)',
   }
-  // Wild type letter tint: solid when the GPU field failed (no fill at all).
-  const wildFill = pointCanvasMode && tileFieldFailed
-    ? headlineColor
-    : `color-mix(in oklch, ${c.alphaLayers[0]?.color ?? headlineColor} 22%, transparent)`
-  /** The hero CTA for Centered and Wild type (Split keeps its baseline-locked one). */
+  /** The Centered hero CTA (Split keeps its baseline-locked one). */
   const heroCta = (className: string) => (
     <a
       href="#"
@@ -1686,7 +1700,7 @@ export default function DitherHero() {
           resting mask, so it is not cut by the dissolve band. */}
       {hover.enabled && hoverActive && !pointCanvasMode && (
         <div key={`hover-gl${glEpoch}`} className="absolute inset-0 z-[6] pointer-events-none" aria-hidden="true"
-          style={comp === 'wild' ? (letterUrl ? intersectMask(undefined, letterUrl) : { visibility: 'hidden' }) : bandClip}>
+          style={bandClip}>
           <div
             ref={fixLayerRef}
             className="absolute inset-0"
@@ -1793,7 +1807,7 @@ export default function DitherHero() {
       )}
 
       {/* Bottom content section */}
-      <div ref={contentRef} className={`relative z-10 ${comp === 'split' ? 'mt-auto' : 'my-auto'}`}>
+      <div ref={contentRef} className={`relative z-10 ${centered ? 'my-auto' : 'mt-auto'}`}>
         {/* The copy's solid background is drawn by copyBg (section level) once
             measured, so the hover reveal can sit between it and the text. */}
         <div style={{ backgroundColor: textUnderScene || contentTop != null ? 'transparent' : c.colorBack }}>
@@ -1802,7 +1816,7 @@ export default function DitherHero() {
               reads as one unit separated from the shader rather than glued to
               it. The old 12px top was smaller than its own internal gaps. */}
           <div ref={copyBoxRef} className="max-w-[1440px] mx-auto w-full px-5 sm:px-8 xl:px-16 pb-10 md:pb-20 pt-10 md:pt-8">
-            {comp === 'split' ? (
+            {!centered ? (
               <div
                 className={`grid grid-cols-4 items-end [--hl-cols:7] [--rsp-cols:5] xl:[--hl-cols:var(--hl-cols-panel)] xl:[--rsp-cols:var(--rsp-cols-panel)] ${stackTablet ? 'lg:grid-cols-12' : 'md:grid-cols-12'}`}
                 style={{ columnGap: layout.gutter, '--hl-cols-panel': layout.headlineCols, '--rsp-cols-panel': layout.responseCols } as React.CSSProperties}
@@ -1914,8 +1928,8 @@ export default function DitherHero() {
                   </a>
                 </div>
               </div>
-            ) : comp === 'centered' ? (
-              <div ref={haloBlockRef} className="mx-auto flex max-w-[62rem] flex-col items-center text-center">
+            ) : (
+              <div className="mx-auto flex max-w-[62rem] flex-col items-center text-center">
                 <h1
                   ref={lockHeadlineRef}
                   className="text-balance break-words [overflow-wrap:anywhere]"
@@ -1929,33 +1943,6 @@ export default function DitherHero() {
                   </p>
                 )}
                 {heroCta('mt-8 md:mt-10')}
-              </div>
-            ) : (
-              <div>
-                {/* Wild type: the letters are the only window onto the field.
-                    The DOM text stays real (screen readers, selection, the
-                    fit) and carries a faint tint, the floor that keeps each
-                    letter readable when the dither inside it is sparse. */}
-                <h1
-                  ref={wildHeadlineRef}
-                  className="text-balance"
-                  style={{
-                    ...headlineStyle,
-                    color: wildFill,
-                    fontSize: 'var(--hl-fit-size, min(22vw, 20rem))',
-                    lineHeight: copy.headlineLeading || '0.9',
-                  }}
-                >
-                  {copy.shortHeadline ?? copy.headline}
-                </h1>
-                <div className="mt-6 md:mt-10 flex flex-col items-start gap-5 md:flex-row md:items-center md:gap-10">
-                  {copy.sub && (
-                    <p className="text-[17px] md:text-[20px] max-w-[46ch] text-pretty leading-[1.55]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(copy.subSize ? { fontSize: copy.subSize } : {}) }}>
-                      {copy.sub}
-                    </p>
-                  )}
-                  {heroCta('shrink-0')}
-                </div>
               </div>
             )}
           </div>

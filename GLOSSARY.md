@@ -15,15 +15,12 @@ _Avoid_: preset, scene preset
 A named combination of copy, composition, scene template and initial state shown in the Canvas view.
 
 **Composition**:
-Where the copy sits and how the background meets it: Split (headline left, response and CTA right, at the bottom), Centered or Wild type. The Design Panel calls it Layout.
+Where the copy sits: Split (headline left, response and CTA right, at the bottom) or Centered (headline, sub and CTA in the middle, the background flows round each text line). A layout option on top of any hero template. The Design Panel calls it Layout.
 _Avoid_: layout (in prose; `DitherLayoutConfig` is the Split column grid)
 
-**Halo**:
-In the Centered composition, the clear zone around the whole copy block. Tight or Wide.
-
-**Letter fill**:
-In the Wild type composition, the background shows only inside the headline's letters.
-_Avoid_: text mask, clip text
+**Clearance**:
+The clear space the background keeps round each text line (or block) when it fills the hero: Full edge and Centered. `edge.fullPadding` in px, plus a rim of `dissolveDepth` tile rows that thins out.
+_Avoid_: halo (the old Centered box round the whole copy block, removed 2026-11-22)
 
 **Layer**:
 One colour in the background, with its own shape and opacity. Layers combine by screen blending.
@@ -60,6 +57,12 @@ The hover effect that keeps the resting pattern and changes only its colour insi
 
 **Warp**:
 The hover effect that rotates, rounds and resizes whole tiles inside the cursor area; it can also reveal or recolor them.
+
+**Warp mode**:
+What drives the warp: **Hover** (the pointer), **Roam** or **Both**.
+
+**Roam**:
+The warp mode in which one warp blob drifts across the visible field by itself, on a path that does not repeat, with a breathing radius and a morphing shape. It follows Pause and Speed and holds still under reduced motion. In **Both**, the pointer takes the blob while it is over the hero; on leave the blob eases back to its path.
 
 **Overlay**:
 The hover effect that lays a flat colour over the cursor area.

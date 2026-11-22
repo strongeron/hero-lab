@@ -6,6 +6,7 @@ import {
   setHoverConfig,
   setAnimationConfig,
   setEdgeConfig,
+  setComposition,
   applyHeroTemplate,
   applySceneTemplate,
   batchDitherUpdates,
@@ -13,7 +14,9 @@ import {
   getTabSourceId,
   getDitherState,
   defaultEdgeConfig,
+  centeredEdge,
   heroTemplates,
+  CENTERED_SIZE_CONTRAST,
   sceneTemplates,
   grainIds,
   grainPitch,
@@ -21,8 +24,10 @@ import {
   gapFor,
   gridPitch,
   warpFeels,
+  warpModeLabel,
   warpFeelIds,
   type DitherState,
+  type WarpMode,
   type DitherAnimationConfig,
   type SceneTemplateId,
   snapshotDitherState,
@@ -98,6 +103,10 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   // The template being taken apart, as applied (a store snapshot), so every
   // step can restore that template's own value for its setting.
   const target = useRef<DitherState | null>(null)
+  /** Centered was applied when Recipe opened (see `centered`). */
+  const centeredRef = useRef(false)
+  /** The warp mode when Recipe opened (Hover / Roam / Both). */
+  const warpModeRef = useRef<WarpMode>('hover')
   const t = target.current ?? s
   // Speed stops shared with the Design Panel; animation.speed scales every loop.
   const speed = speedStop(s.animation)?.value ?? null
@@ -111,6 +120,15 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   const { topInset: _ti, ...bareEdge } = defaultEdgeConfig
   void _ti
   const textFlow = t.edge.mode === 'full'
+  // Centered is a Layout option, not part of a template: it is a step only
+  // when it was applied in the Design Panel before opening Recipe, and the
+  // target stays the template as authored (Split).
+  const centered = centeredRef.current
+  /** The look the step thumbnails draw: the target, with Centered if applied. */
+  // The warp mode is a live pick (Design Panel), carried in on open.
+  const warpMode = t.hover.mode ?? 'hover'
+  const lookSrc: typeof t = centered ? { ...t, composition: { mode: 'centered' } } : t
+  const pointsLook = t.pixelGrid.enabled && t.animation.tileDisplay === 'points'
 
   // ── The additive stack. `used` = the template has this layer; only used
   //    layers are steps. `on` reads the REAL store so the UI stays truthful. ──
@@ -148,12 +166,15 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
     },
     {
       id: 'points', name: 'Point sizes', verdict: 'core', vlabel: 'Core',
-      value: `dots grow and shrink with the dither · spread ${t.animation.tileSizeSpread}`,
+      value: `dots grow and shrink with the field · spread ${t.animation.tileSizeSpread} · size contrast ${t.animation.tileSizeContrast ?? 0}`,
       used: t.pixelGrid.enabled && t.animation.tileDisplay !== 'color',
       on: s.pixelGrid.enabled && s.animation.tileDisplay === t.animation.tileDisplay,
+      // Size contrast acts on Point sizes only, so this step owns it too.
       set: (on) => {
         if (on && !s.pixelGrid.enabled) setPixelGridConfig({ ...t.pixelGrid })
-        setAnimationConfig({ tileDisplay: on ? t.animation.tileDisplay : 'color' })
+        setAnimationConfig(on
+          ? { tileDisplay: t.animation.tileDisplay, tileSizeContrast: t.animation.tileSizeContrast ?? 0 }
+          : { tileDisplay: 'color', tileSizeContrast: 0 })
       },
     },
     {
@@ -168,33 +189,49 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
       },
     },
     {
+      // After Full edge: Centered lays its line-hugging edge values over the
+      // edge below it, and Split (off) puts back the template's own.
+      id: 'layout', name: 'Layout · Centered', verdict: 'signature', vlabel: 'Signature',
+      value: `copy in the middle · field flows round each line · ${centeredEdge.fullPadding}px clearance, ${centeredEdge.dissolveDepth}-row rim${pointsLook ? ` · size contrast ${t.animation.tileSizeContrast || CENTERED_SIZE_CONTRAST}` : ''}`,
+      used: centered,
+      on: s.composition.mode === 'centered',
+      set: (on) => setComposition(on ? 'centered' : 'split'),
+    },
+    {
       id: 'hover', name: 'Hover · warp', verdict: 'signature', vlabel: 'Signature',
-      value: `${feel ? warpFeels[feel].label : 'Custom'} warp · ${t.hover.radius}px · hover reveals ${t.initialState === 'problem' ? 'fix' : 'problem'}`,
+      value: `${warpModeLabel[warpMode]} · ${feel ? warpFeels[feel].label : 'Custom'} warp · ${t.hover.radius}px · ${warpMode === 'roam' ? 'a roaming blob' : warpMode === 'both' ? 'a roaming blob, or the pointer,' : 'hover'} reveals ${t.initialState === 'problem' ? 'fix' : 'problem'}`,
       used: t.hover.enabled,
       on: s.hover.enabled,
       set: (on) => setHoverConfig({ enabled: on }),
     },
   ]
   const STACK = ALL.filter((L) => L.used)
-  const unused = ALL.filter((L) => !L.used).map((L) => L.name)
+  // Layout is not a template part, so it is never listed as unused.
+  const unused = ALL.filter((L) => !L.used && L.id !== 'layout').map((L) => L.name)
   // Level = how many leading stack layers are on (for the stepper display).
   const level = (() => { let n = 0; for (const L of STACK) { if (L.on) n++; else break } return n })()
 
+  /** Steps 1…lv on, the rest off. Off runs top-down first, so a step that
+   *  restores values (Layout) does so before the steps under it reset theirs. */
   function applyLevel(lv: number) {
-    batchDitherUpdates(() => STACK.forEach((L, i) => L.set(i < lv)))
+    batchDitherUpdates(() => {
+      for (let i = STACK.length - 1; i >= lv; i--) STACK[i].set(false)
+      for (let i = 0; i < lv; i++) STACK[i].set(true)
+    })
   }
   /** Step 0: a scene (null = the template's own motion). Speed and play state
    *  are kept unless `speed` is given (the "Template motion" reset passes 1). */
   function applyMotion(scene: SceneTemplateId | null, speed?: number) {
     const tg = target.current
     if (!tg) return
-    const { playing, speed: current, tileDisplay } = getDitherState().animation
+    const { playing, speed: current, tileDisplay, tileSizeContrast } = getDitherState().animation
     batchDitherUpdates(() => {
       if (scene) applySceneTemplate(scene)
       else {
         setShaderConfig({ speed: tg.shader.speed, colorCycleSpeed: tg.shader.colorCycleSpeed })
-        // tileDisplay is a step (Point sizes), not motion: keep the current one.
-        setAnimationConfig({ ...tg.animation, tileDisplay })
+        // tileDisplay and Size contrast belong to a step (Point sizes), not
+        // motion: keep the current ones.
+        setAnimationConfig({ ...tg.animation, tileDisplay, tileSizeContrast })
       }
       setAnimationConfig(speed == null ? { playing, speed: current } : { playing: true, speed })
     })
@@ -205,6 +242,8 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   // Load a template and strip it to its bare scene.
   function explore(id: string) {
     applyHeroTemplate(id)
+    // The warp mode is a live pick like Centered: carry it into the template.
+    setHoverConfig({ mode: warpModeRef.current })
     target.current = structuredClone(getDitherState())
     restoreId.current = id
     // Calm the screen-blended Color/alpha base while exploring layers — see
@@ -217,7 +256,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
     batchDitherUpdates(() => {
       setPixelGridConfig({ enabled: false, snap: false })
       setShaderConfig({ size: tg.pixelGrid.enabled ? tg.pixelGrid.cell / tg.pixelGrid.divisions : tg.shader.size })
-      setAnimationConfig({ tileDisplay: 'color' })
+      setAnimationConfig({ tileDisplay: 'color', tileSizeContrast: 0 })
       if (tg.edge.mode === 'full') setEdgeConfig(bareEdge)
       setHoverConfig({ enabled: false })
     })
@@ -229,11 +268,15 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   useEffect(() => {
     const entry = snapshotDitherState()
     const entryId = s.activeTemplate ?? heroTemplates[0].id
+    centeredRef.current = entry.composition.mode === 'centered'
+    warpModeRef.current = entry.hover.mode ?? 'hover'
     explore(entryId)
     return () => {
       if (restoreId.current && restoreId.current !== entryId) {
         setStableColorField(false)
         applyHeroTemplate(restoreId.current)
+        if (centeredRef.current) setComposition('centered')
+        setHoverConfig({ mode: warpModeRef.current })
       } else restoreDitherState(entry)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -308,7 +351,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
             </div>
             <p className="mt-2.5 text-lab-xs font-mono text-lab-fg-subtle" aria-live="polite">
               Live desktop hero · real WebGL · {level === 0
-                ? 'bare scene: Paper dither, scene motion, default edge'
+                ? 'bare scene: Paper dither, scene motion, Split layout, default edge'
                 : `step ${level} of ${STACK.length} · ${STACK[level - 1].name} added`}
             </p>
           </div>
@@ -356,7 +399,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
                     </span>
                     <span className="block text-lab-sm text-lab-fg-subtle mt-1 leading-snug font-mono">{activeSceneHint}</span>
                   </span>
-                  <LivePreview className={thumb} rate={tempo} draw={(ctx, time, W, H, dpr) => drawStep(ctx, time, W, H, dpr, stepLook(t, NO_STEPS))} />
+                  <LivePreview className={thumb} rate={tempo} draw={(ctx, time, W, H, dpr) => drawStep(ctx, time, W, H, dpr, stepLook(lookSrc, NO_STEPS))} />
                   <span className="col-start-2 col-span-2 flex flex-col gap-2 mt-2.5 min-w-0">
                     {/* Scrolls on a phone instead of pushing past the card;
                         the padding keeps the focus ring inside the clip. */}
@@ -384,7 +427,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
                   const on = L.on
                   // The newest step in the stack: what the last ◀ ▶ changed.
                   const top = i === level - 1
-                  const look = stepLook(t, new Set(STACK.slice(0, i + 1).map((x) => x.id)))
+                  const look = stepLook(lookSrc, new Set(STACK.slice(0, i + 1).map((x) => x.id)))
                   return (
                     <div key={L.id}
                       className={`rounded-xl border transition-colors duration-150 ease-out ${
@@ -417,7 +460,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
               <p className="text-lab-xs font-mono text-lab-fg-subtle leading-relaxed">Not used by this template: {unused.join(' · ')}</p>
             )}
             <p className="text-lab-xs text-lab-fg-subtle leading-relaxed">
-              Step the stack with ◀ ▶ (or click a row) to watch each setting compose the final image. Leaving the Layers view restores the template.
+              Step the stack with ◀ ▶ (or click a row) to watch each setting compose the final image. Leaving Recipe brings back the Design Panel look, or opens the template picked here as authored (Centered stays on if it was applied).
             </p>
           </div>
         </div>

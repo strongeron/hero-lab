@@ -9,7 +9,8 @@ import {
   setCopyVariant,
   setLayoutConfig,
   setButtonConfig,
-  setCompositionConfig,
+  setComposition,
+  setEdgeConfig,
   setPalette,
   setTypePair,
   setGrain,
@@ -30,12 +31,18 @@ import {
   gapFor,
   gridPitch,
   warpFeels,
+  warpModeIds,
+  warpModeLabel,
+  warpModeTitle,
   warpFeelIds,
   resolveCopy,
   speedStops,
   speedStop,
   problemLayers,
   fixLayers,
+  clearanceStops,
+  rimStops,
+  rimMotionStops,
   type CompositionId,
   type DitheringShape,
   type TypePairId,
@@ -46,7 +53,7 @@ import SectionLabel from '../../lab/ui/SectionLabel'
 import Toggle from '../../lab/ui/Toggle'
 import LivePreview from '../../lab/ui/LivePreview'
 import { pickTile } from '../../lab/ui/pickTile'
-import { drawField, drawHero, drawPointField, loopPointer, type SketchLayer } from './panelSketch'
+import { boundingRect, centredCopyLines, drawClearance, drawCopyBars, drawField, drawHero, drawPointField, previewWarp, type SketchLayer } from './panelSketch'
 
 /* The Design Panel offers curated choices only: every option keeps the resting
    state and the hover intact. Renderer, edge, scene and hover mode belong to
@@ -97,45 +104,11 @@ const TEMPLATE_LOOK: Record<string, { pitch: number; gap: number; round: number;
   'full-bleed': { pitch: 5, gap: 1, round: 1 },
   problem: { pitch: 6, gap: 2, round: 0, band: 0.5 },
   'fine-grain': { pitch: 2, gap: 0, round: 0, band: 0.55 },
-  'center-stage': { pitch: 5, gap: 1, round: 1 },
-  'wild-type': { pitch: 2, gap: 0, round: 0, band: 0.55 },
 }
 const COMPOSITIONS: { id: CompositionId; label: string }[] = [
   { id: 'split', label: 'Split' },
   { id: 'centered', label: 'Centered' },
-  { id: 'wild', label: 'Wild type' },
 ]
-/** A composition at thumbnail size: where the copy sits and where the field shows. */
-function drawComposition(ctx: CanvasRenderingContext2D, W: number, H: number, id: CompositionId, field: (bandTo?: number) => void, back: string) {
-  if (id === 'split') {
-    field(0.55)
-    headline(ctx, W, H)
-    return
-  }
-  field()
-  ctx.globalAlpha = 1
-  if (id === 'centered') {
-    // The halo: a clear box round two centred bars.
-    ctx.fillStyle = back
-    ctx.fillRect(Math.round(W * 0.2), Math.round(H * 0.24), Math.round(W * 0.6), Math.round(H * 0.52))
-    ctx.globalAlpha = 0.9
-    ctx.fillStyle = '#fff'
-    ctx.fillRect(Math.round(W * 0.27), Math.round(H * 0.36), Math.round(W * 0.46), Math.max(2, Math.round(H * 0.11)))
-    ctx.fillRect(Math.round(W * 0.38), Math.round(H * 0.55), Math.round(W * 0.24), Math.max(2, Math.round(H * 0.09)))
-    ctx.globalAlpha = 1
-    return
-  }
-  // Wild type: the field survives only inside big letters.
-  ctx.globalCompositeOperation = 'destination-in'
-  ctx.font = `900 ${Math.round(H * 0.95)}px Anybody, Inter, sans-serif`
-  ctx.textBaseline = 'middle'
-  ctx.textAlign = 'center'
-  ctx.fillText('Aa', W / 2, H * 0.55)
-  ctx.globalCompositeOperation = 'destination-over'
-  ctx.fillStyle = back
-  ctx.fillRect(0, 0, W, H)
-  ctx.globalCompositeOperation = 'source-over'
-}
 const recolor = (layers: SketchLayer[], colors: readonly string[]) => layers.map((l, i) => ({ ...l, color: colors[i] ?? l.color }))
 /** Two white bars where the headline sits, so a template preview reads as a hero. */
 function headline(ctx: CanvasRenderingContext2D, W: number, H: number) {
@@ -154,6 +127,7 @@ export default function DitherPanel() {
   const pg = state.pixelGrid
   const a = state.animation
   const h = state.hover
+  const mode = h.mode ?? 'hover'
   const [copied, setCopied] = useState(false)
   const [copyFailed, setCopyFailed] = useState(false)
   const [layer, setLayer] = useState(0)
@@ -203,8 +177,24 @@ export default function DitherPanel() {
   // shapeLift in DitherHero). ponytail: a fixed 24% of the height stands in
   // for the measured band (header to copy top, ~0.26 of 900px on desktop);
   // pass the hero's measured value if the copy block moves a lot.
-  const lift = state.edge.mode === 'full' || state.composition.mode !== 'split' ? 0 : HERO.h * 0.24
+  const lift = state.edge.mode === 'full' || state.composition.mode === 'centered' ? 0 : HERO.h * 0.24
   const heroSketch = { lift, back: c.colorBack, scale: c.scale, rotation: c.rotation, spread: c.alphaSpread, heroW: HERO.w, heroH: HERO.h, ...tile }
+  /** Layout previews: the field at preview pitch `pp` (device px), point
+   *  sizes or the template's tile look. Returns the lattice origin, so a
+   *  clearance drawn on top hits whole tiles. */
+  const layoutField = (ctx: CanvasRenderingContext2D, W: number, H: number, time: number, pp: number, bandTo?: number) => {
+    if (pointMode && bandTo == null) {
+      drawPointField(ctx, W, H, { back: c.colorBack, layers: c.alphaLayers, pitch: pp, gap: Math.round((pp * pg.gap) / pitch), ...pointField(time) })
+      return { ox: (W - Math.floor(W / pp) * pp) / 2, oy: (H - Math.floor(H / pp) * pp) / 2 }
+    }
+    drawField(ctx, W, H, {
+      back: c.colorBack, layers: c.alphaLayers, t: time, pitch: pp, bandTo,
+      gap: pg.enabled ? Math.round((pp * pg.gap) / pitch) : 0,
+      round: pointMode ? 1 : pg.enabled ? Math.min(1, (2 * pg.radius) / pitch) : 0,
+    })
+    return { ox: 0, oy: 0 }
+  }
+  const layoutRate = pointMode ? tempo : 0.6 * tempo
   const pairShown = typePairs[state.typePair ?? 'editorial']
   const copyFace = resolveCopy(state.copyVariant, null).headlineFont
 
@@ -285,28 +275,56 @@ export default function DitherPanel() {
         </Group>
 
         <Group title="Layout" value={COMPOSITIONS.find((x) => x.id === state.composition.mode)?.label}>
-          <div role="group" aria-label="Layout" className="grid grid-cols-3 gap-1.5">
+          <div role="group" aria-label="Layout" className="grid grid-cols-2 gap-1.5">
             {COMPOSITIONS.map(({ id, label }) => (
-              <button key={id} type="button" aria-pressed={state.composition.mode === id} onClick={() => setCompositionConfig({ mode: id })} className={`${card} grid gap-1 p-1`}>
-                <LivePreview className="w-full h-10 rounded-sm" rate={0.6 * tempo} draw={(ctx, time, W, H, dpr) => {
-                  drawComposition(ctx, W, H, id, (bandTo) => drawField(ctx, W, H, {
-                    back: c.colorBack, layers: c.alphaLayers, t: time, pitch: 3 * dpr, gap: dpr, round: a.tileDisplay === 'points' ? 1 : 0, bandTo,
-                  }), c.colorBack)
+              <button key={id} type="button" aria-pressed={state.composition.mode === id} onClick={() => setComposition(id)} className={`${card} grid gap-1 p-1`}>
+                <LivePreview className="w-full h-10 rounded-sm" rate={layoutRate} draw={(ctx, time, W, H, dpr) => {
+                  const pp = 3 * dpr
+                  if (id === 'split') {
+                    layoutField(ctx, W, H, time, pp, 0.55)
+                    headline(ctx, W, H)
+                    return
+                  }
+                  const o = layoutField(ctx, W, H, time, pp)
+                  const lines = centredCopyLines(W, H)
+                  drawClearance(ctx, W, H, [boundingRect(lines.slice(0, 2)), lines[2], lines[3]], { back: c.colorBack, pitch: pp, ...o, pad: dpr, rim: 2 * pp })
+                  drawCopyBars(ctx, lines)
                 }} />
                 <span className="truncate px-0.5 text-lab-xs font-medium">{label}</span>
               </button>
             ))}
           </div>
           {state.composition.mode === 'centered' && (
-            <Segmented size="xs" stretch label="Halo" value={state.composition.halo} onChange={(halo) => setCompositionConfig({ halo })}
-              options={[{ value: 'tight', label: 'Tight halo' }, { value: 'wide', label: 'Wide halo' }]} />
-          )}
-          {state.composition.mode === 'wild' && gpuPath && (
-            <Segmented size="xs" stretch label="Letter edge" value={state.composition.letterEdge} onChange={(letterEdge) => setCompositionConfig({ letterEdge })}
-              options={[{ value: 'crisp', label: 'Crisp edge' }, { value: 'tiles', label: 'Whole tiles' }]} />
-          )}
-          {state.composition.mode === 'wild' && (
-            <p className={hint}>Heavy faces read best: try the Heavy or Poster type pair.</p>
+            <>
+              {/* The 'full' edge that shapes Centered, at a 2× crop of the
+                  hero's middle: tiles, clearance and rim to one scale. */}
+              <LivePreview className="w-full h-24 rounded-md border border-lab-border" rate={layoutRate} draw={(ctx, time, W, H, dpr) => {
+                const heroPitch = pg.enabled ? pitch : c.size
+                const pp = Math.max(3 * dpr, Math.round((heroPitch * W) / (HERO.w / 2)))
+                const u = pp / heroPitch
+                const o = layoutField(ctx, W, H, time, pp)
+                const lines = centredCopyLines(W, H)
+                drawClearance(ctx, W, H, state.edge.textRectMode === 'lines' ? lines : [boundingRect(lines)], {
+                  back: c.colorBack, pitch: pp, ...o,
+                  pad: state.edge.fullPadding * u,
+                  rim: Math.max(1, Math.round(state.edge.dissolveDepth)) * pp,
+                  motion: gpuPath ? state.edge.textBlendMotion : 0,
+                  t: time,
+                })
+                drawCopyBars(ctx, lines)
+              }} />
+              <Segmented size="xs" stretch label="Clearance" value={state.edge.fullPadding} onChange={(fullPadding) => setEdgeConfig({ fullPadding })}
+                options={clearanceStops.map((x) => ({ value: x.value, label: `${x.label} ${x.value}px` }))} />
+              <Segmented size="xs" stretch label="Rim" value={state.edge.dissolveDepth} onChange={(dissolveDepth) => setEdgeConfig({ dissolveDepth })}
+                options={rimStops.map((x) => ({ value: x.value, label: x.label }))} />
+              {gpuPath && (
+                <Segmented size="xs" stretch label="Rim motion" value={state.edge.textBlendMotion} onChange={(textBlendMotion) => setEdgeConfig({ textBlendMotion })}
+                  options={rimMotionStops.map((x) => ({ value: x.value, label: x.label }))} />
+              )}
+              <Segmented size="xs" stretch label="Clear round" value={state.edge.textRectMode} onChange={(textRectMode) => setEdgeConfig({ textRectMode })}
+                options={[{ value: 'lines', label: 'Each line' }, { value: 'box', label: 'Each block' }]} />
+              {pointMode && <p className={hint}>Centered raises Size contrast (Grid) so dots swing between specks and full pieces.</p>}
+            </>
           )}
         </Group>
 
@@ -409,6 +427,8 @@ export default function DitherPanel() {
         </Group>
 
         <Group title="Hover · warp">
+          <Segmented size="xs" stretch label="Warp mode" value={mode} onChange={(m) => setHoverConfig({ mode: m })}
+            options={warpModeIds.map((m) => ({ value: m, label: warpModeLabel[m], title: warpModeTitle[m] }))} />
           <SliderRow label="Size" value={h.radius} min={40} max={400} step={10} suffix="px" onChange={(v) => setHoverConfig({ radius: v })} />
           {pg.enabled ? (
             <div role="group" aria-label="Warp feel" className="grid grid-cols-4 gap-1.5">
@@ -419,7 +439,7 @@ export default function DitherPanel() {
                     <LivePreview className="w-full aspect-square rounded-sm" rate={0.8} draw={(ctx, time, W, H, dpr) => {
                       drawField(ctx, W, H, {
                         back: c.colorBack, layers: c.alphaLayers, t: 1.3, pitch: 7 * dpr, gap: dpr, round: 0.3,
-                        warp: { ...loopPointer(time, W, H), r: H * (0.18 + 0.32 * (h.radius - 40) / 360), layers: h.hoverLayers, rotate: wf.warpRotate, round: wf.warpRound, jitter: wf.warpJitter },
+                        warp: { ...previewWarp(mode, time, W, H, H * (0.18 + 0.32 * (h.radius - 40) / 360), { rotate: wf.warpRotate, round: wf.warpRound }), layers: h.hoverLayers, jitter: wf.warpJitter },
                       })
                     }} />
                     <span className="truncate px-0.5 text-lab-xs">{wf.label}</span>
@@ -432,7 +452,7 @@ export default function DitherPanel() {
               <LivePreview className="w-full h-16 rounded-md border border-lab-border" rate={0.8} draw={(ctx, time, W, H, dpr) => {
                 drawField(ctx, W, H, {
                   back: c.colorBack, layers: c.alphaLayers, t: 1.3, pitch: 2 * dpr, gap: 0,
-                  warp: { ...loopPointer(time, W, H), r: H * (0.2 + 0.3 * (h.radius - 40) / 360), layers: h.hoverLayers, rotate: 0, round: 0, jitter: 0 },
+                  warp: { ...previewWarp(mode, time, W, H, H * (0.2 + 0.3 * (h.radius - 40) / 360), { rotate: 0, round: 0 }), layers: h.hoverLayers, jitter: 0 },
                 })
               }} />
               <p className={hint}>Without tiles the warp reveals whole dots of the field itself.</p>

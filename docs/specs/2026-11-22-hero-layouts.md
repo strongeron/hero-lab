@@ -257,3 +257,33 @@ Contrast of the tint floor alone against `#0A1714` (sRGB mix): 1.6:1 on the fix
 green, 1.2:1 on the problem pink. It fails the 3:1 target; the full dots pass
 (9.7:1 green, 4.4:1 pink). Letter legibility rests on the dots, not the tint.
 Open: raise the tint (it washes out the field) or accept it for display text.
+
+## 2026-11-22 outcome
+
+- **Wild type dropped** as a failed experiment. The letter fill read as noise
+  more than as type, and it needed its own type pairs, short headlines and a
+  second fit routine. Removed: the `'wild'` composition, the letter mask
+  (GPU texture and Paper CSS mask), the Letter edge control, the Wild Type and
+  Center Stage templates with their posters, the Heavy and Poster type pairs,
+  `shortHeadline` and `useDisplayFit`.
+- **Centered is a layout option only**, on top of any template (Layout:
+  Split / Centered). "Start from" keeps Full Bleed, Problem and Fine Grain.
+- **Centered hugs the lines.** The halo box is gone. Centered is the 'full'
+  edge on centred copy: the field fills the hero and clears each text line
+  (headline lines, sub lines, CTA box) by `edge.fullPadding`, with a rim of
+  `dissolveDepth` rows. Picking Centered sets Full Bleed's values (8px, 2 rows,
+  Lively rim); Split puts back the template's own. The GPU field uses its
+  `clearance()`; the Paper paths get a static SVG mask from the same measured
+  rects (`buildClearanceMask`: whole tiles with a seeded rim on the tile grid,
+  rounded blurred holes on grid-off Fine Grain; no rim motion on Paper).
+- **Controls:** the Layout group shows Clearance (Hug 4 / Tight 8 / Snug 16
+  px), Rim (Crisp 1 / Soft 2 / Feathered 4 rows), Rim motion (Still / Calm /
+  Lively, GPU field only) and Clear round (Each line / Each block), with a
+  live preview of the field round centred copy. They replace the Halo control.
+- **Liveliness:** on Point sizes, Centered raises Size contrast to 0.7 when it
+  is 0. Paper templates have no per-tile size, so the lever does not apply
+  there.
+- **Measured** (smoke, 1440 × 900, paused, copy hidden): field on the text
+  lines 0.00 % on all three templates; field in the band just past the
+  clearance vs far away: Full Bleed 9.28 % vs 9.63 %, Problem 9.40 % vs
+  17.03 %, Fine Grain 48.45 % vs 83.16 %.

@@ -32,9 +32,6 @@ export type DitherCopyColorMode = "current" | "white";
 
 export interface DitherCopy {
   headline: string;
-  /** 2–4 word headline for the Wild type composition, where the headline is
-   *  set huge and the shader plays inside the letters. Omit = `headline`. */
-  shortHeadline?: string;
   sub: string | null;
   response: string | null;
   cta: string;
@@ -118,7 +115,6 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     "fine-grain": {
       label: "Fine Grain",
       headline: "Something broke. You should already know what.",
-      shortHeadline: "Something broke.",
       sub: "Errors, performance, and logs — one place. Five-minute install.",
       response: "Caught everything. Start at line 42.",
       cta: "Start free in 5 minutes",
@@ -153,7 +149,6 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     "full-bleed": {
       label: "Full Bleed",
       headline: "Something broke. You should already know what.",
-      shortHeadline: "Something broke.",
       sub: "Errors, performance, and logs — one place. Five-minute install.",
       response: "Caught everything. Start at line\u00A042.",
       cta: "Start free in 5 minutes",
@@ -178,7 +173,6 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     provocateur: {
       label: "Provocateur",
       headline: "Every error tells a\u00A0story. Most tools miss the\u00A0plot.",
-      shortHeadline: "Every error tells.",
       sub: "Errors, performance, and logs in one place. Five-minute install. No credit card.",
       response: "We read every line.",
       cta: "Start free in 5 minutes",
@@ -224,7 +218,6 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     ai: {
       label: "AI",
       headline: "Your AI built the app. Who's watching it\u00A0run?",
-      shortHeadline: "Who's watching?",
       // Focused: concrete signals, then the AI-native benefit that ties back to
       // the headline's "who's watching it run". No em dash.
       sub: "Errors, performance, and logs in one place. Ask what happened in plain language, no dashboard required.",
@@ -286,7 +279,6 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     "broke-fixed": {
       label: "Broke / Fixed",
       headline: "Something broke. You should already know what.",
-      shortHeadline: "Something broke.",
       sub: "Errors, performance, and logs — one place. Five-minute install.",
       response: "Caught everything. Start at line\u00A042.",
       cta: "Start free in 5 minutes",
@@ -367,8 +359,13 @@ export type TileDisplayMode = "color" | "points";
 
 /** The hover: warp reveal inside a pixel circle of whole tiles. Tiles under the
  *  cursor rotate, round and resize and show the other state's layers. */
+/** What drives the warp: the pointer, a roaming blob, or both (pointer wins). */
+export type WarpMode = "hover" | "roam" | "both";
+
 export interface DitherHoverConfig {
   enabled: boolean;
+  /** Hover = pointer only; Roam = one blob drifts by itself; Both = Roam, the pointer takes over. */
+  mode: WarpMode;
   /** The other state's layers, revealed under the cursor */
   hoverLayers: DitherAlphaLayer[];
   /** Radius of the pixel circle in px (snaps to whole tile rings) */
@@ -502,24 +499,47 @@ export interface DitherLayoutConfig {
   showGuides: boolean;
 }
 
-/** Where the copy sits and how the shader meets it. 'split': headline left,
- *  response + CTA right, at the bottom (the original hero). 'centered':
- *  headline, sub and CTA in the middle, the field all around, kept clear of
- *  the copy block by a halo. 'wild': a huge short headline whose letters are
- *  the only place the field shows (a letter fill). */
-export type CompositionId = "split" | "centered" | "wild";
+/** Where the copy sits. 'split': headline left, response + CTA right, at the
+ *  bottom (the original hero). 'centered': headline, sub and CTA in the
+ *  middle; the field fills the hero and flows round each text line (the
+ *  'full' edge, shaped by the same edge controls). A layout option on top of
+ *  any template, never a template of its own. */
+export type CompositionId = "split" | "centered";
 export interface DitherCompositionConfig {
   mode: CompositionId;
-  /** Centered: how far the clear zone reaches past the copy block. */
-  halo: HaloId;
-  /** Wild type, GPU tile field only: 'crisp' cuts tiles at the glyph edge,
-   *  'tiles' keeps whole tiles whose centre is inside a letter. */
-  letterEdge: "crisp" | "tiles";
 }
-export type HaloId = "tight" | "wide";
-/** Halo padding (CSS px) around the copy block. */
-export const haloPad: Record<HaloId, number> = { tight: 24, wide: 72 };
-export const defaultCompositionConfig: DitherCompositionConfig = { mode: "split", halo: "tight", letterEdge: "crisp" };
+export const defaultCompositionConfig: DitherCompositionConfig = { mode: "split" };
+/** The 'full' edge values Centered starts from: Full Bleed's line-hugging
+ *  look (8px clearance, a 2-row rim that moves). */
+export const centeredEdge = {
+  fullPadding: 8,
+  textRectMode: "lines",
+  dissolveDepth: 2,
+  textBlendMotion: 1,
+  textBlendSpeed: 0.33,
+} satisfies Partial<DitherEdgeConfig>;
+/** Size contrast Centered uses on a point field whose template authored none,
+ *  so dots swing between specks and full pieces round the copy. */
+export const CENTERED_SIZE_CONTRAST = 0.7;
+/** Centered's edge stops in the Design Panel (opinionated presets). Clearance
+ *  = edge.fullPadding (CSS px), rim = edge.dissolveDepth (tile rows), rim
+ *  motion = edge.textBlendMotion (GPU tile field only: the Paper clearance
+ *  mask is static). */
+export const clearanceStops = [
+  { value: 4, label: "Hug" },
+  { value: 8, label: "Tight" },
+  { value: 16, label: "Snug" },
+] as const;
+export const rimStops = [
+  { value: 1, label: "Crisp" },
+  { value: 2, label: "Soft" },
+  { value: 4, label: "Feathered" },
+] as const;
+export const rimMotionStops = [
+  { value: 0, label: "Still" },
+  { value: 0.5, label: "Calm" },
+  { value: 1, label: "Lively" },
+] as const;
 
 export interface DitherState {
   headerBg: HeaderBgMode;
@@ -629,6 +649,7 @@ export const warpFixSnippets: string[] = [
 // back to the fix (or vice versa) with log fragments below.
 export const defaultHoverConfig: DitherHoverConfig = {
   enabled: true,
+  mode: "hover",
   hoverLayers: fixLayers.map((l) => ({ ...l })),
   radius: 100,
   warpRotate: 35,
@@ -1021,7 +1042,11 @@ type DitherStoreWindow = Window & {
 const storeWindow = typeof window === "undefined" ? null : window as DitherStoreWindow;
 // Fast Refresh replaces this module but not `window`. Reuse the live snapshot
 // so editing store or scene code cannot flash the preview back to defaults.
-let state: DitherState = storeWindow?.__ditherState ?? structuredClone(defaults);
+// A hot update keeps the previous state on window; it may predate new keys.
+const kept = storeWindow?.__ditherState;
+let state: DitherState = kept
+  ? { ...kept, composition: { ...defaults.composition, ...kept.composition }, animation: { ...defaults.animation, ...kept.animation }, hover: { ...defaults.hover, ...kept.hover } }
+  : structuredClone(defaults);
 if (storeWindow) {
   storeWindow.__ditherState = state;
   storeWindow.__dither = () => state;
@@ -1248,8 +1273,23 @@ export function setLayoutConfig(patch: Partial<DitherLayoutConfig>) {
   emit();
 }
 
-export function setCompositionConfig(patch: Partial<DitherCompositionConfig>) {
-  state.composition = { ...state.composition, ...patch };
+/** Switch the layout. Centered sets the line-hugging edge values and, when
+ *  the size contrast is 0, a lively one; Split puts back the active
+ *  template's authored values (the defaults without a template). */
+export function setComposition(mode: CompositionId) {
+  if (state.composition.mode === mode) return;
+  if (mode === "centered") {
+    state.edge = { ...state.edge, ...centeredEdge };
+    const points = state.pixelGrid.enabled && state.animation.tileDisplay === "points";
+    if (points && !state.animation.tileSizeContrast) state.animation = { ...state.animation, tileSizeContrast: CENTERED_SIZE_CONTRAST };
+  } else {
+    const tmpl = heroTemplates.find((t) => t.id === state.activeTemplate);
+    const authored = { ...defaultEdgeConfig, ...tmpl?.edge };
+    const keys = Object.keys(centeredEdge) as (keyof typeof centeredEdge)[];
+    state.edge = { ...state.edge, ...Object.fromEntries(keys.map((k) => [k, authored[k]])) };
+    state.animation = { ...state.animation, tileSizeContrast: tmpl?.animation?.tileSizeContrast ?? defaultAnimationConfig.tileSizeContrast };
+  }
+  state.composition = { mode };
   emit();
 }
 
@@ -1407,7 +1447,7 @@ export function setPalette(id: PaletteId) {
   emit();
 }
 
-export type TypePairId = "editorial" | "geometric" | "grotesk" | "quirky" | "soft" | "terminal" | "heavy" | "poster";
+export type TypePairId = "editorial" | "geometric" | "grotesk" | "quirky" | "soft" | "terminal";
 export interface TypePair {
   label: string;
   hint: string;
@@ -1425,10 +1465,6 @@ export const typePairs: Record<TypePairId, TypePair> = {
   grotesk: { label: "Grotesk", hint: "Space Grotesk + Inter", headlineFont: "'Space Grotesk', Inter, sans-serif", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.0", headlineTracking: "-0.03em" },
   quirky: { label: "Quirky", hint: "Bricolage + Inter", headlineFont: "'Bricolage Grotesque', Inter, sans-serif", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.0", headlineTracking: "-0.03em" },
   soft: { label: "Soft serif", hint: "Fraunces + DM Sans", headlineFont: "'Fraunces', Georgia, serif", bodyFont: "'DM Sans', Inter, sans-serif", headlineWeight: 500, headlineLeading: "1.04", headlineTracking: "-0.02em" },
-  // Heavy display faces for the Wild type composition: thick stems give the
-  // letter fill room for several tiles. Both load in index.html.
-  heavy: { label: "Heavy", hint: "Anybody Black + Inter", headlineFont: "'Anybody', Inter, sans-serif", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 900, headlineLeading: "0.9", headlineTracking: "-0.03em" },
-  poster: { label: "Poster", hint: "Dela Gothic + Inter", headlineFont: "'Dela Gothic One', Inter, sans-serif", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 400, headlineLeading: "0.95", headlineTracking: "-0.02em" },
   terminal: { label: "Terminal", hint: "Geist Mono + Inter", headlineFont: "'Geist Mono', ui-monospace, monospace", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.08", headlineTracking: "-0.04em", headlineSize: "clamp(2.25rem, 3.4vw + 1rem, 3.875rem)" },
 };
 export const typePairIds = Object.keys(typePairs) as TypePairId[];
@@ -1437,8 +1473,9 @@ export const typePairIds = Object.keys(typePairs) as TypePairId[];
  *  over its own when one is picked. */
 export function resolveCopy(id: CopyVariantId, pair: TypePairId | null): DitherCopy {
   const copy = copyVariants[id];
-  if (!pair) return copy;
-  const p = typePairs[pair];
+  // A state from an older tab can name a pair that no longer exists.
+  const p = pair ? typePairs[pair] : undefined;
+  if (!p) return copy;
   return {
     ...copy,
     headlineFont: p.headlineFont,
@@ -1517,6 +1554,14 @@ export const warpFeels: Record<WarpFeelId, { label: string } & WarpFeel> = {
 };
 export const warpFeelIds = Object.keys(warpFeels) as WarpFeelId[];
 
+export const warpModeIds: WarpMode[] = ["hover", "roam", "both"];
+export const warpModeLabel: Record<WarpMode, string> = { hover: "Hover", roam: "Roam", both: "Both" };
+export const warpModeTitle: Record<WarpMode, string> = {
+  hover: "The pointer drives the warp",
+  roam: "One warp blob drifts by itself, breathing and morphing",
+  both: "Roams by itself; the pointer takes over while it is on the hero",
+};
+
 /* ─── Hero templates ─── */
 
 /** A template is a curated snapshot: defaults + a small patch, applied
@@ -1535,9 +1580,6 @@ export interface HeroTemplate {
   animation?: Partial<DitherAnimationConfig>;
   pixelGrid?: Partial<DitherPixelGridConfig>;
   copyVariant?: CopyVariantId;
-  composition?: Partial<DitherCompositionConfig>;
-  /** Type pair laid over the copy's own faces (omit = the copy's own). */
-  typePair?: TypePairId;
   scene?: SceneTemplateId | null;
   button?: Partial<DitherButtonConfig>;
 }
@@ -1632,35 +1674,6 @@ export const heroTemplates: HeroTemplate[] = [
       tileSizeNoise: 1.7,
     },
   },
-  {
-    // Centered composition: headline, sub and CTA in the middle; the point
-    // field fills the hero and keeps a wide halo clear around the copy block.
-    id: "center-stage",
-    name: "Center Stage",
-    desc: "Headline, sub and CTA in the middle of the hero; round point dots all around, held back by a wide halo with a lively 2-row rim.",
-    swatch: ["#E6307A", "#FF6B2B", "#FF3366"],
-    initialState: "problem",
-    copyVariant: "value",
-    composition: { mode: "centered", halo: "wide" },
-    edge: { dissolveDepth: 2, textBlendMotion: 1, textBlendSpeed: 0.33 },
-    shader: { colorCycleSpeed: 0 },
-    animation: { tileDisplay: "points", loopBreak: "none" },
-  },
-  {
-    // Wild type composition: the field shows only inside a huge, heavy
-    // headline. A fine 8px snapped-colour grid keeps several tiles across
-    // each stem, so the letters read even on a phone.
-    id: "wild-type",
-    name: "Wild Type",
-    desc: "A huge black headline in Anybody; the green fix field plays only inside the letters on a fine 8px snapped grid. Hover warps the problem state through the glyphs.",
-    swatch: ["#2DD4A8", "#3ECF8E", "#1A8A70"],
-    initialState: "fix",
-    copyVariant: "broke-fixed",
-    typePair: "heavy",
-    composition: { mode: "wild", letterEdge: "crisp" },
-    pixelGrid: { cell: 32, divisions: 4, gap: 1, radius: 2, snap: true },
-    animation: { tileDisplay: "color", loopBreak: "none" },
-  },
 ];
 
 /** The Speed control's stops (animation.speed; 0 = paused). Design Panel and
@@ -1717,13 +1730,12 @@ export function applyHeroTemplate(id: string) {
     animation: { ...base.animation, ...tmpl.animation },
     pixelGrid: { ...base.pixelGrid, ...tmpl.pixelGrid },
     button: { ...base.button, ...tmpl.button },
-    composition: { ...base.composition, ...tmpl.composition },
     copyVariant: tmpl.copyVariant ?? base.copyVariant,
     initialState: tmpl.initialState,
     activeScene: tmpl.scene !== undefined ? tmpl.scene : base.activeScene,
     activeTemplate: id,
     palette: "signal",
-    typePair: tmpl.typePair ?? null,
+    typePair: null,
   };
   // A baked-in scene contributes its motion overlay on top of the template's
   // look (same motion-only contract as picking the scene in the panel).
@@ -1782,8 +1794,14 @@ function configurePreviewSync(templateId: string | null, expectSourceId: string 
     const json = JSON.stringify(message.state);
     if (json === syncBridge.lastAppliedJson) return;
     syncBridge.lastAppliedJson = json;
+    // A tab still running older code can send state without keys added
+    // since (composition, animation.tileSizeContrast, hover.mode): fill them
+    // from the defaults so no reader meets undefined.
     state = {
       ...incoming,
+      composition: { ...defaults.composition, ...incoming.composition },
+      animation: { ...defaults.animation, ...incoming.animation },
+      hover: { ...defaults.hover, ...incoming.hover },
       edge: { ...incoming.edge, topInset: state.edge.topInset },
     };
     emit();
