@@ -284,7 +284,6 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
         <LabToolbarTitle
           onHome={onHome}
           view="Recipe"
-          strap="how the hero is made — one template, taken apart, then built back step by step"
         />
         <div className="flex items-center gap-1.5">
           <button onClick={() => applyLevel(0)} disabled={level === 0} className={topBtn}>Bare scene</button>

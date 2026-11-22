@@ -7,24 +7,21 @@ import BrandMark from '../components/BrandMark'
  *
  *  The mark is Hero Lab's morphing one, not the demo brand's: these toolbars
  *  belong to the lab rather than to the artboards. Clicking it goes home. */
-export default function LabToolbarTitle({ view, strap, onHome }: {
+export default function LabToolbarTitle({ view, onHome }: {
   view: string
-  strap: string
   /** Go to the lab's main page (Canvas). Omitted on Canvas itself. */
   onHome?: () => void
 }) {
-  // `min-w-0` + `nowrap` so the strap truncates rather than wrapping: without
-  // it a narrow viewport turns this row into a tall column and shoves the
-  // canvas down the page. The strap is context, not navigation, so it is the
-  // first thing to go when space is short.
+  // No strap: the bottom bar already names the view, and a sentence of
+  // explanation in every toolbar was noise. Mark, product, view — that's all.
   return (
-    // h1: the view's own title, so Canvas, Breakpoints and Layers each have a
+    // h1: the view's own title, so Canvas, Breakpoints and Recipe each have a
     // top-level heading for screen-reader navigation.
-    <h1 className="m-0 text-lab-sm font-semibold text-lab-fg flex items-center gap-2 min-w-0 whitespace-nowrap">
-      <BrandMark size={20} onClick={onHome} label={onHome ? 'Hero Lab — go to Canvas' : undefined} />
+    <h1 className="m-0 text-lab-sm font-semibold text-lab-fg flex items-center gap-2.5 min-w-0 whitespace-nowrap">
+      <BrandMark size={24} onClick={onHome} label={onHome ? 'Hero Lab — go to Canvas' : undefined} />
       Hero Lab
+      <span aria-hidden="true" className="font-normal text-lab-fg-subtle">/</span>
       <span className="font-normal text-lab-fg-muted">{view}</span>
-      <span className="hidden lg:inline font-normal text-lab-fg-subtle truncate">{strap}</span>
     </h1>
   )
 }

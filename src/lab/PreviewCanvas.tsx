@@ -63,7 +63,6 @@ export default function PreviewCanvas({ onHome, actions }: { onHome?: () => void
         <LabToolbarTitle
           onHome={onHome}
           view="Breakpoints"
-          strap="the current hero across devices — reflects Live & the selected template"
         />
         <div className="flex items-center gap-2">
         <Segmented

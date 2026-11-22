@@ -55,7 +55,7 @@
   --color-lab-panel: var(--color-lab-site);
   /* One height for every top bar: the demo site header, lab view toolbars and
      the Design Panel header, so their bottom lines meet across the page. */
-  --spacing-lab-bar: 68px;
+  --spacing-lab-bar: 56px;
   --color-lab-fg: rgb(255 255 255 / 0.9);
   --color-lab-fg-muted: rgb(255 255 255 / 0.65);
   --color-lab-fg-subtle: rgb(255 255 255 / 0.5);

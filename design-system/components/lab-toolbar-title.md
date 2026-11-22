@@ -1,9 +1,9 @@
 ---
-sourcesHash: fbc9d7736d53de2f101a72044a2d56c651f4191c2dfc2c501f5a23af0a5c7543
+sourcesHash: caa9fe63f4009431d032388c30e913caef1a47919b929bff4f5b67120768d470
 id: lab-toolbar-title
 description: >-
-  Identify the current lab view at the start of its toolbar: the Hero Lab mark,
-  the view name and a one-line explanation, with the mark linking home.
+  Identify the current lab view at the start of its toolbar: the Hero Lab mark
+  (24px), the product name and the view name, with the mark linking home.
 status: discoverable
 sources:
   - src/lab/LabToolbarTitle.tsx
@@ -25,15 +25,15 @@ sources:
 | Prop | Meaning |
 | --- | --- |
 | `view` | View name, e.g. "Recipe" |
-| `strap` | One-line explanation; hidden below `lg` and truncated, never wrapped |
 | `onHome` | Go to Canvas; omit on Canvas itself |
 
 ## Behaviour and states
 
-The strap is context, not navigation, so it is the first thing to go when space is
-short. The row never wraps.
+Mark, "Hero Lab", a subtle slash, then the view name. No explanatory strap: the
+bottom bar already names the view (removed 2026-11-22). The row never wraps.
 
 ## Accessibility
 
 The mark is a button named "Hero Lab — go to Canvas" when `onHome` is set,
-otherwise decorative. View name text is `lab-fg-muted`, strap `lab-fg-subtle`.
+otherwise decorative. View name text is `lab-fg-muted`; the slash is
+`aria-hidden`.

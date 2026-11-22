@@ -77,7 +77,6 @@ export default function TemplateGallery({ actions }: { actions?: ReactNode }) {
       <div className="shrink-0 z-10 h-lab-bar flex items-center justify-between px-6 border-b border-lab-border bg-lab-toolbar">
         <LabToolbarTitle
           view="Canvas"
-          strap="baked snapshots — select an artboard to load the live animation & edit in the Design Panel"
         />
         <div className="flex items-center gap-2">
         <Segmented

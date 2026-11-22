@@ -186,7 +186,7 @@ by default). HeroLab writes it on `<html>` when `colorBack` changes, so the
 chrome follows a theme or palette. `--color-lab-canvas` is one OKLCH step darker
 and `--color-lab-surface` one step lighter, both derived from it. The demo site
 header, the lab view toolbars and the Design Panel header share one height,
-`h-lab-bar` (68px), so their bottom lines meet across the page.
+`h-lab-bar` (56px since the 2026-11-22 trim; was 68px), so their bottom lines meet across the page. Lab toolbars carry no strap: mark (24px), "Hero Lab", a slash and the view name.
 
 2026-11-22, monospace scale: a mono face reads ~15% larger than a proportional
 one at the same px (fixed advance), so mono copy runs ~0.85× the sans sizes.
