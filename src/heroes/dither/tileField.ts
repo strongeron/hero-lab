@@ -47,6 +47,9 @@ export interface TileFieldFrame {
   colorPhase: number
   /** Dot-size spread in [0,1] (0 = every dot is a full piece: snapped colour). */
   spread: number
+  /** Size contrast in [0,1]: pushes dots toward tiny or full, lets the
+   *  smallest vanish, and weights the travelling wave so the pulse reads. */
+  contrast: number
   base: TileFieldSet
   fix: TileFieldSet
   edge: {
@@ -99,7 +102,7 @@ uniform ivec2 u_cell0;          // (colLo, rowLo)
 uniform vec2 u_size;            // css w, h
 uniform float u_pitch, u_gap, u_radius;
 uniform vec2 u_align;           // alignX, alignY (Top start already applied)
-uniform float u_t, u_colorPhase, u_spread;
+uniform float u_t, u_colorPhase, u_spread, u_contrast;
 
 // [0] = resting field, [1] = hover field
 uniform vec3 u_lc[MAX_LAYERS * 2];
@@ -191,7 +194,14 @@ vec4 fieldDot(int f, ivec2 ci, float edgeAlpha, out float piece) {
   // tileSizeMapValue
   float organic = fbm(fc * (.095 / width), t * .8, 2401);
   float wave = .5 + .5 * sin(fc.x * .33 + fc.y * .21 + t * PI * 2. * .55);
-  float sizeV = .18 + .82 * easeIO(clamp(organic * .72 + wave * .28, 0., 1.));
+  // Size contrast (k): more wave weight, a steeper curve around 0.5 and a
+  // floor that falls to 0, so dots swing between specks and full pieces.
+  float k = u_contrast;
+  float ww = .28 + .27 * k;
+  float v = clamp(organic * (1. - ww) + wave * ww, 0., 1.);
+  v = clamp((v - .5) * (1. + 3. * k) + .5, 0., 1.);
+  float floorV = .18 * (1. - k);
+  float sizeV = floorV + (1. - floorV) * easeIO(v);
   // tilePointAlpha
   float an = fbm(fc * (.08 / width) + vec2(19., -7.), t * .55, 3119);
   float aw = .5 + .5 * sin(fc.x * .16 - fc.y * .27 + t * PI * 1.2);
@@ -199,6 +209,7 @@ vec4 fieldDot(int f, ivec2 ci, float edgeAlpha, out float piece) {
   // scaledGridPiece
   float maxPiece = u_pitch - u_gap;
   float minScale = u_spread <= 0. ? 1. : max(u_gap / max(1., maxPiece), 1. - min(1., u_spread));
+  if (u_spread > 0.) minScale *= 1. - k;
   piece = maxPiece * (minScale + (1. - minScale) * sizeV);
   if (piece < .5) { piece = 0.; return vec4(0.); }
   // Colour: interpolate neighbouring layers as the phase advances.
@@ -494,6 +505,7 @@ export class TileFieldRenderer {
     gl.uniform1f(u.u_t, f.t)
     gl.uniform1f(u.u_colorPhase, f.colorPhase)
     gl.uniform1f(u.u_spread, Math.max(0, Math.min(1, f.spread)) * 0.65)
+    gl.uniform1f(u.u_contrast, Math.max(0, Math.min(1, f.contrast)))
 
     const sets = [f.base, f.fix]
     const ln = [0, 0]

@@ -44,7 +44,7 @@ import SectionLabel from '../../lab/ui/SectionLabel'
 import Toggle from '../../lab/ui/Toggle'
 import LivePreview from '../../lab/ui/LivePreview'
 import { pickTile } from '../../lab/ui/pickTile'
-import { drawField, drawHero, loopPointer, type SketchLayer } from './panelSketch'
+import { drawField, drawHero, drawPointField, loopPointer, type SketchLayer } from './panelSketch'
 
 /* The Design Panel offers curated choices only: every option keeps the resting
    state and the hover intact. Renderer, edge, scene and hover mode belong to
@@ -140,6 +140,17 @@ export default function DitherPanel() {
   const tile = pg.enabled
     ? { pitch, gap: pg.gap, radius: a.tileDisplay === 'points' ? pitch / 2 : pg.radius }
     : { pitch: c.size, gap: 0, radius: 0 }
+  /** Point sizes: the hero is the GPU field, which ignores the layer shapes.
+   *  Previews then draw drawPointField on the hero's own clocks: field time
+   *  runs at tileSizeSpeed × Speed, colour phase at colorCycleSpeed × Speed. */
+  const pointMode = pg.enabled && a.tileDisplay === 'points'
+  const pointField = (time: number) => ({
+    t: 1.3 + time * a.tileSizeSpeed,
+    phase: time * c.colorCycleSpeed,
+    spread: a.tileSizeSpread,
+    contrast: a.tileSizeContrast ?? 0,
+    mapScale: a.tileSizeNoise,
+  })
   /** Palette strips wear the hero's tile look, scaled down: dots for Point
    *  sizes, the grid's corner radius otherwise, and the grid's gap share. */
   const swatchPitch = pg.enabled ? Math.round(Math.min(8, Math.max(4, pitch / 4))) : 3
@@ -247,7 +258,11 @@ export default function DitherPanel() {
                   {/* The picked look in this palette's colours: the layer shapes
                       move at the hero's pace (still while paused), tiles follow
                       the grid, and one reveal glides across in the hover colours. */}
-                  <LivePreview className="w-full h-9 rounded-sm" rate={0.35 * tempo} draw={(ctx, time, W, H, dpr) => {
+                  <LivePreview className="w-full h-9 rounded-sm" rate={pointMode ? tempo : 0.35 * tempo} draw={(ctx, time, W, H, dpr) => {
+                    if (pointMode) {
+                      drawPointField(ctx, W, H, { back: p.back, layers: recolor(c.alphaLayers, p[state.initialState]), pitch: swatchTile.pitch * dpr, gap: swatchTile.gap * dpr, ...pointField(time) })
+                      return
+                    }
                     drawField(ctx, W, H, {
                       back: p.back, t: 1.3 + time, pitch: swatchTile.pitch * dpr, gap: swatchTile.gap * dpr, round: swatchTile.round, zoom: 0.9,
                       layers: recolor(c.alphaLayers, p[state.initialState]),
@@ -266,8 +281,12 @@ export default function DitherPanel() {
 
         <Group title="Grid"
           value={pg.enabled ? `${pitch}px tiles · ${pg.gap}px gap` : `${c.size}px dots`}>
-          <LivePreview className="w-full h-20 rounded-md border border-lab-border" rate={shapeRate} draw={(ctx, time, W, H, dpr) => {
+          <LivePreview className="w-full h-20 rounded-md border border-lab-border" rate={pointMode ? tempo : shapeRate} draw={(ctx, time, W, H, dpr) => {
             // 1:1 crop of the hero's top band, whole tiles only, centred.
+            if (pointMode) {
+              drawPointField(ctx, W, H, { back: c.colorBack, layers: c.alphaLayers, pitch: pitch * dpr, gap: pg.gap * dpr, ...pointField(time) })
+              return
+            }
             drawHero(ctx, W, H, dpr, { ...heroSketch, layers: c.alphaLayers, t: time, zoom: 1, cy: HERO.h / 2 - 80, whole: true })
           }} />
           <Segmented size="xs" stretch label="Tile size" value={grain} onChange={setGrain}
@@ -275,6 +294,10 @@ export default function DitherPanel() {
           {pg.enabled && (
             <Segmented size="xs" stretch label="Gap" value={gap} onChange={setGap}
               options={gapIds.map((g) => ({ value: g, label: GAP_LABELS[g] }))} />
+          )}
+          {pointMode && (
+            <SliderRow label="Size contrast" value={a.tileSizeContrast ?? 0} min={0} max={1} step={0.05}
+              onChange={(v) => setAnimationConfig({ tileSizeContrast: v })} />
           )}
         </Group>
 

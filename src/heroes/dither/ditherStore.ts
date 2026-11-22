@@ -481,6 +481,9 @@ export interface DitherAnimationConfig {
   tileSizeSpeed: number;
   /** Perlin noise spatial scale for tile sizes. */
   tileSizeNoise: number;
+  /** Point sizes only: 0 = authored sizes, 1 = dots swing between specks and
+   *  full pieces, with the travelling wave weighted up so the pulse reads. */
+  tileSizeContrast: number;
 }
 
 /** CTA / button styling shared by header and hero buttons. */
@@ -666,6 +669,7 @@ export const defaultAnimationConfig: DitherAnimationConfig = {
   tileSizeSpread: 0.55,
   tileSizeSpeed: 0.12,
   tileSizeNoise: 1.2,
+  tileSizeContrast: 0,
 };
 
 export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {

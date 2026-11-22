@@ -212,3 +212,24 @@ mode `full` keeps the centre. Panel previews pass the same lift to `drawHero`
 teal-led cool trio on hover, the same `#2DD4A8` CTA). Prism is now RGB → CMY on
 neutral black with its own violet accent (`cta: "#6D5BFF"`, white text); Aurora is
 sunset → aurora on a night blue and keeps a mint CTA (`#3DFFB0`, dark text).
+
+2026-11-22, point-size previews and Size contrast: on Point sizes the hero is the
+GPU field, which ignores layer shapes and moves on its own clocks, while the
+Grid and Palette previews drew Paper shapes on `shader.speed` — so preview and
+hero disagreed on pattern and pace. `drawPointField` in `panelSketch.ts` ports
+the tile pass (`fieldDot`: same hash, value-noise fbm, size, alpha and colour
+maths), and those previews run it on the hero's clocks: field time at
+`tileSizeSpeed × Speed`, colour phase at `colorCycleSpeed × Speed`. Not ported:
+the scene drift pan (flow), so a preview may show a still crop where the hero
+pans. New `animation.tileSizeContrast` (0–1, default 0, Point sizes only, slider
+"Size contrast" in Grid): weights the travelling wave up, steepens the size
+curve and lets the smallest dots vanish, so dots swing between specks and full
+pieces. Problem's Paper tile path has no per-tile size, so the control does not
+apply there.
+
+2026-11-22, hero text colour rule (every palette and theme): the sub under the
+title uses the title's colour (`sublineColor = headlineColor`), never an accent
+tint. The response line and the CTA share one accent, `CTA_BG` from
+`heroCtaColors`, so the line reads as the button's lead-in. Every palette's
+`CTA_BG` is ≥ 4.29:1 on its background; the response is large text (≥ 28px, needs
+3:1). Only `responseColorMode: 'white'` (no template uses it) opts out.

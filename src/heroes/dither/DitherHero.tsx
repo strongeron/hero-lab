@@ -493,12 +493,12 @@ export default function DitherHero() {
   const headlineColor = activeTheme
     ? activeTheme.fg
     : (copy.headlineColorMode === 'white' ? '#FFFFFF' : (copy.layout === 'problem' ? palettes[palette].problem[0] : palettes[palette].fix[0]))
-  const responseColor = activeTheme
-    ? CTA_BG
-    : (copy.responseColorMode === 'white' ? '#FFFFFF' : palettes[palette].fix[0])
-  const sublineColor = activeTheme
-    ? `oklch(from ${activeTheme.accent} calc(l + 0.15) calc(c * 0.6) h)`
-    : `color-mix(in oklch, ${CTA_BG} 45%, white)`
+  // One accent per theme: the response line and the CTA share CTA_BG, so the
+  // line reads as the button's lead-in. Every palette's CTA_BG is ≥ 4.29:1 on
+  // its background, and the response is large text (≥ 28px, needs 3:1).
+  const responseColor = copy.responseColorMode === 'white' && !activeTheme ? '#FFFFFF' : CTA_BG
+  // The sub is the title's colour, never a tint of the accent.
+  const sublineColor = headlineColor
 
   // ── Renderer choice (see docs/architecture/2026-11-21-state-machines.md) ──
   //   grid off                    → Paper stack, warp reveals whole dither cells
@@ -1313,6 +1313,8 @@ export default function DitherHero() {
       t: maskAnimTRef.current * spatialMotionScale,
       colorPhase: d.colorPhase,
       spread: pointSizeMode ? anim.tileSizeSpread : 0,
+      // ?? 0: a state synced from an older tab has no contrast key.
+      contrast: pointSizeMode ? (anim.tileSizeContrast ?? 0) : 0,
       base: field(c.alphaLayers),
       fix: field(hover.hoverLayers),
       edge: {

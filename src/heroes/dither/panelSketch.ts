@@ -309,3 +309,89 @@ export function drawHero(ctx: CanvasRenderingContext2D, W: number, H: number, dp
     ctx.fill()
   }
 }
+
+/* ── GPU point field, ported from tileField.ts (TILE_FRAG fieldDot) ──
+   Templates on the GPU path (Point sizes) never use the layer shapes: each dot
+   takes its size, alpha and colour from the tile field's own noise. Previews
+   of those templates draw this port so they move like the hero, on the same
+   clock (field time = maskAnimT, colour phase = colorPhase). */
+const u32 = (n: number) => n >>> 0
+function tileHash(cx: number, cy: number, seed: number) {
+  let h = u32(Math.imul(cx, 374761393) + Math.imul(cy, 668265263) + Math.imul(seed, 2246822519 | 0))
+  h = u32(Math.imul(h ^ (h >>> 13), 1274126177))
+  return u32(h ^ (h >>> 16)) / 4294967296
+}
+const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10)
+function valueNoise(x: number, y: number, seed: number) {
+  const fx = Math.floor(x), fy = Math.floor(y)
+  const ux = fade(x - fx), uy = fade(y - fy)
+  const a = tileHash(fx, fy, seed), b = tileHash(fx + 1, fy, seed)
+  const c = tileHash(fx, fy + 1, seed), d = tileHash(fx + 1, fy + 1, seed)
+  return a + (b - a) * ux + (c - a + (a - b - c + d) * ux) * uy
+}
+const fbm = (x: number, y: number, t: number, seed: number) =>
+  valueNoise(x + t * 0.4, y + t * 0.25, seed) * 0.55
+  + valueNoise(x * 2.1 + t * 0.7, y * 2.1, seed + 1) * 0.3
+  + valueNoise(x * 4.3, y * 4.3 + t * 0.35, seed + 2) * 0.15
+const easeIO = (t: number) => t * t * (3 - 2 * t)
+
+export interface PointFieldOpts {
+  back: string
+  layers: { color: string; opacity: number }[]
+  /** Field time and colour phase, as the hero's tile frame. */
+  t: number
+  phase: number
+  /** Tile pitch and gap in device px; dot size scales the hero's piece. */
+  pitch: number
+  gap: number
+  /** animation.tileSizeSpread / tileSizeContrast / tileSizeNoise. */
+  spread: number
+  contrast: number
+  mapScale: number
+}
+
+export function drawPointField(ctx: CanvasRenderingContext2D, W: number, H: number, o: PointFieldOpts) {
+  ctx.globalAlpha = 1
+  ctx.fillStyle = o.back
+  ctx.fillRect(0, 0, W, H)
+  const layers = o.layers.filter((l) => l.opacity > 0)
+  const n = layers.length
+  if (!n) return
+  const p = Math.max(2, o.pitch)
+  const cols = Math.floor(W / p), rows = Math.floor(H / p)
+  const ox = (W - cols * p) / 2, oy = (H - rows * p) / 2
+  const width = Math.min(3, Math.max(0.4, o.mapScale))
+  const k = Math.min(1, Math.max(0, o.contrast))
+  const spread = Math.min(1, Math.max(0, o.spread)) * 0.65
+  const maxPiece = p - Math.min(p - 1, Math.max(0, o.gap))
+  let minScale = spread <= 0 ? 1 : Math.max(o.gap / Math.max(1, maxPiece), 1 - spread)
+  if (spread > 0) minScale *= 1 - k
+  const cols3 = layers.map((l) => rgb(l.color))
+  for (let iy = 0; iy < rows; iy++) {
+    for (let ix = 0; ix < cols; ix++) {
+      const organic = fbm(ix * (0.095 / width), iy * (0.095 / width), o.t * 0.8, 2401)
+      const wave = 0.5 + 0.5 * Math.sin(ix * 0.33 + iy * 0.21 + o.t * Math.PI * 2 * 0.55)
+      const ww = 0.28 + 0.27 * k
+      let v = Math.min(1, Math.max(0, organic * (1 - ww) + wave * ww))
+      v = Math.min(1, Math.max(0, (v - 0.5) * (1 + 3 * k) + 0.5))
+      const floorV = 0.18 * (1 - k)
+      const sizeV = floorV + (1 - floorV) * easeIO(v)
+      const piece = maxPiece * (minScale + (1 - minScale) * sizeV)
+      if (piece < 0.5) continue
+      const an = fbm(ix * (0.08 / width) + 19, iy * (0.08 / width) - 7, o.t * 0.55, 3119)
+      const aw = 0.5 + 0.5 * Math.sin(ix * 0.16 - iy * 0.27 + o.t * Math.PI * 1.2)
+      const alphaV = Math.min(1, Math.max(0, an * 0.65 + aw * 0.35))
+      const pos = ((tileHash(ix, iy, 701) * n + o.phase * n) % n + n) % n
+      const li = Math.floor(pos), ni = li + 1 === n ? 0 : li + 1
+      const m = easeIO(pos - li)
+      const c = cols3[li].map((ch, j) => Math.round(ch + (cols3[ni][j] - ch) * m))
+      const op = layers[li].opacity + (layers[ni].opacity - layers[li].opacity) * m
+      ctx.globalAlpha = Math.min(0.95, (0.28 + alphaV * 0.72) * op)
+      ctx.fillStyle = `rgb(${c[0]} ${c[1]} ${c[2]})`
+      ctx.beginPath()
+      ctx.arc(ox + (ix + 0.5) * p, oy + (iy + 0.5) * p, piece / 2, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+  ctx.globalAlpha = 1
+}
