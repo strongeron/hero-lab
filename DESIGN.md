@@ -180,11 +180,11 @@ budget. "rAF capped" shows when frames are even at about 30 fps: the browser cap
 rAF (Low Power Mode, battery saver), and the page is not the cause.
 
 
-2026-11-22, lab chrome colour and bar height: toolbars and the Design Panel use
-`--color-lab-site`, the website's own background (the hero `colorBack`, `#0A1714`
-by default). HeroLab writes it on `<html>` when `colorBack` changes, so the
-chrome follows a theme or palette. `--color-lab-canvas` is one OKLCH step darker
-and `--color-lab-surface` one step lighter, both derived from it. The demo site
+2026-11-22, lab chrome colour and bar height: the chrome is a fixed neutral dark
+in three OKLCH steps, `--color-lab-canvas` (L 0.145) < `-toolbar` / `-panel`
+(L 0.175) < `-surface` (L 0.215), with a faint hint of the site's hue 178
+(chroma ≤ 0.007). An earlier version bound the chrome to the hero `colorBack`;
+that tinted the whole lab per palette (maroon, blue) and was reverted. The demo site
 header, the lab view toolbars and the Design Panel header share one height,
 `h-lab-bar` (56px since the 2026-11-22 trim; was 68px), so their bottom lines meet across the page. Lab toolbars carry no strap: mark (24px), "Hero Lab", a slash and the view name.
 

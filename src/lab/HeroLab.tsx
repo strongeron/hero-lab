@@ -229,11 +229,6 @@ const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
 export default function HeroLab() {
   const fontPair = fontPairs['jakarta-dm']
   const heroState = useDitherStore()
-  // Lab chrome wears the site's background (see --color-lab-site in index.css).
-  const siteBg = heroState.shader.colorBack
-  useEffect(() => {
-    document.documentElement.style.setProperty('--color-lab-site', siteBg)
-  }, [siteBg])
   // Open by default; the choice persists per browser.
   const [panelOpen, setPanelOpen] = useState(() => {
     try { return localStorage.getItem(PANEL_OPEN_KEY) !== '0' } catch { return true }

@@ -42,17 +42,16 @@
   /* ── Lab UI (chrome, toolbars, Design Panel) — see DESIGN.md ──
      Text never goes below --color-lab-fg-subtle: 0.5 white is 5.4:1 on the
      lab canvas (AA); 0.4 was 3.8:1 and 0.25 was 2.2:1.
-     --color-lab-site is the website's own background (the hero colorBack,
-     #0A1714 by default). HeroLab overwrites it on <html> whenever colorBack
-     changes, so toolbars and the Design Panel always wear the site's colour
-     and the canvas sits one step darker behind the artboards. */
-  --color-lab-site: #0A1714;
-  --color-lab-canvas: oklch(from var(--color-lab-site) calc(l - 0.035) c h);
+     Neutral and fixed: the chrome never follows the hero's colorBack, which
+     tinted the whole lab maroon or blue per palette. A faint hint of the
+     site's hue 178 (chroma ≤ 0.007) keeps it from reading cold next to the
+     default green-black hero. Three steps: canvas < toolbar/panel < surface. */
+  --color-lab-canvas: oklch(0.145 0.004 178);
   /* Black behind each artboard: the hero's own dark base shows before it paints. */
   --color-lab-artboard: #000;
-  --color-lab-toolbar: var(--color-lab-site);
-  --color-lab-surface: oklch(from var(--color-lab-site) calc(l + 0.035) c h / 0.95);
-  --color-lab-panel: var(--color-lab-site);
+  --color-lab-toolbar: oklch(0.175 0.006 178);
+  --color-lab-surface: oklch(0.215 0.007 178 / 0.95);
+  --color-lab-panel: oklch(0.175 0.006 178);
   /* One height for every top bar: the demo site header, lab view toolbars and
      the Design Panel header, so their bottom lines meet across the page. */
   --spacing-lab-bar: 56px;
