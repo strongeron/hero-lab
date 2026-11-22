@@ -36,6 +36,7 @@ import {
   warpModeTitle,
   warpFeelIds,
   resolveCopy,
+  heroCtaColors,
   speedStops,
   speedStop,
   problemLayers,
@@ -119,6 +120,26 @@ function headline(ctx: CanvasRenderingContext2D, W: number, H: number) {
   ctx.globalAlpha = 1
 }
 
+/** A palette swatch's copy accents, as the hero paints them: title and sub
+ *  bars on top in the title colour, the response line and the CTA pill at
+ *  the bottom in the palette's accent. */
+function paletteAccents(ctx: CanvasRenderingContext2D, W: number, H: number, dpr: number, title: string, cta: { bg: string; text: string }) {
+  const u = Math.max(2, Math.round(2 * dpr)), x = Math.round(5 * dpr)
+  ctx.fillStyle = title
+  ctx.fillRect(x, Math.round(5 * dpr), Math.round(W * 0.42), u + Math.round(dpr))
+  ctx.globalAlpha = 0.7
+  ctx.fillRect(x, Math.round(11 * dpr), Math.round(W * 0.28), u)
+  ctx.globalAlpha = 1
+  const ph = Math.round(9 * dpr), pw = Math.round(W * 0.22), py = H - ph - Math.round(4 * dpr)
+  ctx.fillStyle = cta.bg
+  ctx.fillRect(x, py + Math.round((ph - u) / 2), Math.round(W * 0.3), u)
+  ctx.beginPath()
+  ctx.roundRect(W - pw - x, py, pw, ph, Math.round(2 * dpr))
+  ctx.fill()
+  ctx.fillStyle = cta.text
+  ctx.fillRect(W - pw - x + Math.round(pw * 0.2), py + Math.round((ph - u) / 2), Math.round(pw * 0.6), u)
+}
+
 const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length)]
 
 export default function DitherPanel() {
@@ -197,6 +218,7 @@ export default function DitherPanel() {
   const layoutRate = pointMode ? tempo : 0.6 * tempo
   const pairShown = typePairs[state.typePair ?? 'editorial']
   const copyFace = resolveCopy(state.copyVariant, null).headlineFont
+  const headlineMode = resolveCopy(state.copyVariant, null).headlineColorMode
 
   async function copyConfig() {
     const { activeTemplate, initialState, activeScene, palette, typePair, composition, shader, edge, hover, pixelGrid, animation, layout, button, copyVariant } = state
@@ -337,14 +359,17 @@ export default function DitherPanel() {
           <div className="grid grid-cols-2 gap-1.5">
             {paletteIds.map((id) => {
               const p = palettes[id]
+              const cta = heroCtaColors(id)
+              const title = headlineMode === 'white' ? '#FFFFFF' : p.problem[0]
               return (
                 <button key={id} type="button" aria-pressed={state.palette === id} onClick={() => setPalette(id)} className={`${card} grid gap-1 p-1`}>
                   {/* The picked look in this palette's colours: the layer shapes
                       move at the hero's pace (still while paused), tiles follow
                       the grid, and one reveal glides across in the hover colours. */}
-                  <LivePreview className="w-full h-9 rounded-sm" rate={pointMode ? tempo : 0.35 * tempo} draw={(ctx, time, W, H, dpr) => {
+                  <LivePreview className="w-full h-12 rounded-sm" rate={pointMode ? tempo : 0.35 * tempo} draw={(ctx, time, W, H, dpr) => {
                     if (pointMode) {
                       drawPointField(ctx, W, H, { back: p.back, layers: recolor(c.alphaLayers, p[state.initialState]), pitch: swatchTile.pitch * dpr, gap: swatchTile.gap * dpr, ...pointField(time) })
+                      paletteAccents(ctx, W, H, dpr, title, cta)
                       return
                     }
                     drawField(ctx, W, H, {
@@ -352,6 +377,7 @@ export default function DitherPanel() {
                       layers: recolor(c.alphaLayers, p[state.initialState]),
                       warp: { x: W * (0.5 + 0.4 * Math.sin(time)), y: H / 2, r: H * 0.75, layers: recolor(h.hoverLayers, p[otherState]), rotate: 0, round: swatchTile.round, jitter: 0 },
                     })
+                    paletteAccents(ctx, W, H, dpr, title, cta)
                   }} />
                   <span className="flex min-w-0 items-baseline justify-between gap-1 px-0.5">
                     <span className="truncate text-lab-xs font-medium">{p.label}</span>
