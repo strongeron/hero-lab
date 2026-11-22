@@ -1552,6 +1552,20 @@ export const heroTemplates: HeroTemplate[] = [
   },
 ];
 
+/** The Speed control's stops (animation.speed; 0 = paused). Design Panel and
+ *  Layers use the same four. */
+export const speedStops = [
+  { value: 0, label: "Still" },
+  { value: 0.5, label: "Calm" },
+  { value: 1, label: "Live" },
+  { value: 2, label: "Wild" },
+] as const;
+/** The stop for the current animation, or null for an off-stop speed. */
+export function speedStop(a: Pick<DitherAnimationConfig, "playing" | "speed">) {
+  const v = a.playing ? a.speed : 0;
+  return speedStops.find((s) => s.value === v) ?? null;
+}
+
 /** A copy of the whole state, to put back later with restoreDitherState. */
 export function snapshotDitherState(): DitherState {
   return structuredClone(state);

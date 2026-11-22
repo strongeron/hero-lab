@@ -31,6 +31,8 @@ import {
   warpFeels,
   warpFeelIds,
   resolveCopy,
+  speedStops,
+  speedStop,
   problemLayers,
   fixLayers,
   type DitheringShape,
@@ -41,6 +43,7 @@ import SliderRow from '../../lab/ui/SliderRow'
 import SectionLabel from '../../lab/ui/SectionLabel'
 import Toggle from '../../lab/ui/Toggle'
 import LivePreview from '../../lab/ui/LivePreview'
+import { pickTile } from '../../lab/ui/pickTile'
 import { drawField, drawHero, loopPointer, type SketchLayer } from './panelSketch'
 
 /* The Design Panel offers curated choices only: every option keeps the resting
@@ -49,8 +52,6 @@ import { drawField, drawHero, loopPointer, type SketchLayer } from './panelSketc
    size and font values are replaced by checked presets in ditherStore. */
 
 const SHAPES: DitheringShape[] = ['simplex', 'warp', 'dots', 'wave', 'ripple', 'swirl', 'sphere']
-const SPEEDS = [0, 0.5, 1, 2] as const
-const SPEED_LABELS = ['Still', 'Calm', 'Live', 'Wild']
 const GRAIN_LABELS = { fine: 'Fine', medium: 'Medium', coarse: 'Coarse', chunky: 'Chunky' }
 /** The hero size the Shape previews stand for (CSS px). */
 const HERO = { w: 1440, h: 900 }
@@ -60,8 +61,7 @@ const hint = 'text-lab-xs leading-snug text-lab-fg-subtle'
 const action =
   'min-h-6 shrink-0 px-2 rounded-md border border-lab-border bg-lab-fill text-lab-xs font-medium text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover aria-pressed:bg-lab-fill-selected aria-pressed:text-lab-fg cursor-pointer transition-[color,background-color,border-color,transform] active:scale-[0.96] lab-focus'
 /** A pickable tile: palette, template, shape, type pair, copy. */
-const card =
-  'min-w-0 rounded-md border border-lab-border bg-lab-fill p-1.5 text-left text-lab-fg-muted hover:bg-lab-fill-hover aria-pressed:border-lab-border-strong aria-pressed:bg-lab-fill-selected aria-pressed:text-lab-fg cursor-pointer transition-[color,background-color,border-color,transform] active:scale-[0.96] lab-focus'
+const card = `${pickTile} p-1.5`
 
 /** Text that swaps without changing the button's width: every label sits in
  *  one grid cell, only the shown one is visible. */
@@ -121,7 +121,7 @@ export default function DitherPanel() {
   const pitch = gridPitch(pg)
   const grain = grainIds.find((g) => (pg.enabled ? grainPitch[g] === pitch : grainDot[g] === c.size)) ?? null
   const gap = gapIds.find((g) => gapFor(g, pitch) === pg.gap) ?? null
-  const speed = SPEEDS.find((s) => s === (a.playing ? a.speed : 0)) ?? null
+  const speed = speedStop(a)?.value ?? null
   const feel = warpFeelIds.find((f) => {
     const w = warpFeels[f]
     return w.warpRotate === h.warpRotate && w.warpRound === h.warpRound && w.warpJitter === h.warpJitter
@@ -261,7 +261,7 @@ export default function DitherPanel() {
           )}
         </Group>
 
-        <Group title="Shape & speed" value={speed === 0 ? 'paused' : `${SPEED_LABELS[SPEEDS.indexOf(speed ?? 1)] ?? ''} · ${a.speed}×`} showWhy={showWhy}
+        <Group title="Shape & speed" value={speed === 0 ? 'paused' : `${speedStop(a)?.label ?? 'Custom'} · ${a.speed}×`} showWhy={showWhy}
           why="Previews use the hero's own shape maths, tile size and scale, scaled down to the panel. Layers stack: a layer on top can hide the one below, as in the hero.">
           {gpuPath ? (
             <p className={hint}>
@@ -301,7 +301,7 @@ export default function DitherPanel() {
           )}
           <Segmented size="xs" stretch label="Speed" value={speed}
             onChange={(v) => setAnimationConfig(v === 0 ? { playing: false } : { playing: true, speed: v })}
-            options={SPEEDS.map((s, i) => ({ value: s, label: SPEED_LABELS[i] }))} />
+            options={speedStops.map((s) => ({ value: s.value, label: s.label }))} />
           <p className={hint}>Speed scales every loop in the hero: shape motion, scan and drift. The previews move at the hero's shape pace.</p>
         </Group>
 

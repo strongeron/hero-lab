@@ -26,8 +26,11 @@ import {
   type DitherAnimationConfig,
   type SceneTemplateId,
   snapshotDitherState,
+  speedStops,
+  speedStop,
   restoreDitherState,
 } from '../heroes/dither/ditherStore'
+import { pickTile } from './ui/pickTile'
 import LabToolbarTitle from './LabToolbarTitle'
 import Segmented from './ui/Segmented'
 import SectionLabel from './ui/SectionLabel'
@@ -64,17 +67,11 @@ const verdictStyle: Record<Verdict, string> = {
  *  stableColorField holds the colour still. */
 const LAYER_SCENES: SceneTemplateId[] = ['solid-classic', 'gentle-drift', 'living-texture', 'orbit', 'radar-scan']
 
-/** The Design Panel's Speed stops and labels (DitherPanel.tsx), on the same
- *  field: animation.speed scales every loop of the hero (DitherHero timeScale),
- *  so one value makes the whole scene faster or slower. */
-const SPEEDS = [0, 0.5, 1, 2] as const
-const SPEED_LABELS = ['Still', 'Calm', 'Live', 'Wild']
 /** The Panel's Grain and Gap words, used when a step's value matches a preset. */
 const GRAIN_LABELS = { fine: 'Fine', medium: 'Medium', coarse: 'Coarse', chunky: 'Chunky' }
 const GAP_LABELS = { none: 'No gap', tight: 'Tight gap', open: 'Open gap' }
-/** Pick tile, as the Design Panel's `card`: neutral selected state. */
-const card =
-  'min-w-0 rounded-md border border-lab-border bg-lab-fill p-1 text-left text-lab-fg-muted hover:bg-lab-fill-hover aria-pressed:border-lab-border-strong aria-pressed:bg-lab-fill-selected aria-pressed:text-lab-fg cursor-pointer transition-[color,background-color,border-color,transform] active:scale-[0.96] lab-focus'
+/** Pick tile, shared with the Design Panel. */
+const card = `${pickTile} p-1`
 /** Step thumbnails: a 16:10 mini hero (the artboard is 1440 × 900). */
 const thumb = 'w-20 sm:w-28 aspect-[16/10] rounded-md border border-lab-border'
 const NO_STEPS: ReadonlySet<StepId> = new Set()
@@ -102,7 +99,8 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   // step can restore that template's own value for its setting.
   const target = useRef<DitherState | null>(null)
   const t = target.current ?? s
-  const speed = SPEEDS.find((x) => x === (s.animation.playing ? s.animation.speed : 0)) ?? null
+  // Speed stops shared with the Design Panel; animation.speed scales every loop.
+  const speed = speedStop(s.animation)?.value ?? null
   /** Preview clock rate, as in the Design Panel: the hero's speed, 0 while still. */
   const tempo = s.animation.playing ? s.animation.speed : 0
 
@@ -378,7 +376,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
                       label="Speed"
                       value={speed}
                       onChange={applySpeed}
-                      options={SPEEDS.map((x, i) => ({ value: x, label: SPEED_LABELS[i] }))}
+                      options={speedStops.map((x) => ({ value: x.value, label: x.label }))}
                     />
                   </span>
                 </div>

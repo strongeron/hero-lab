@@ -125,6 +125,12 @@ tile, layers screen-blended. The Grid strip (was "Grain") draws whole tiles only
 at 1:1. Scene scan, drift and colour cycling are not drawn. Each preview caps at
 ~4000 cells.
 
+2026-11-22, shared picks: `pickTile` (`src/lab/ui/pickTile.ts`) is the one class
+string for a pickable preview tile in the Design Panel and Layers (padding at the
+call site). `speedStops` / `speedStop` in `ditherStore.ts` are the one list of
+Speed stops (Still, Calm, Live, Wild). Layers restores the Design Panel look on
+exit with `snapshotDitherState` / `restoreDitherState`.
+
 2026-11-22, Layers previews (`docs/specs/2026-11-22-layers-previews.md`): every
 Layers step row ends in a `LivePreview` thumbnail of the hero after that step,
 drawn by `src/lab/layerSketch.ts` (`stepLook`, `drawStep`) on top of
