@@ -4,6 +4,7 @@ import { useDitherStore, resolveCopy, palettes, warpErrorSnippets, warpFixSnippe
 import { getThemeById } from '../../themes/terminalThemes'
 import { TileFieldRenderer, type TileFieldFrame } from './tileField'
 import { getAccessibleCtaPair } from '../../utils/colorContrast'
+import { useHeadlineFit } from './useHeadlineFit'
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
@@ -738,6 +739,7 @@ export default function DitherHero() {
   const lockSubRef = useRef<HTMLParagraphElement>(null)
   const lockResponseWrapRef = useRef<HTMLDivElement>(null)
   const lockCtaRef = useRef<HTMLAnchorElement>(null)
+  useHeadlineFit(lockHeadlineRef, `${copyVariant}|${typePair}|${copy.headlineSize}`)
   const [baselineNudge, setBaselineNudge] = useState({ response: 0, cta: 0, subGap: 0 })
   useEffect(() => {
     const content = contentRef.current
@@ -1560,7 +1562,7 @@ export default function DitherHero() {
                       color: headlineColor,
                       fontFamily: copy.headlineFont || 'var(--font-display, Satoshi, sans-serif)',
                       fontWeight: copy.headlineWeight ?? 900,
-                      fontSize: `min(${copy.headlineSize || 'clamp(2.5rem, 3.5vw + 1rem, 4rem)'}, 8.5vw)`,
+                      fontSize: `var(--hl-fit-size, min(${copy.headlineSize || 'clamp(2.5rem, 3.5vw + 1rem, 4rem)'}, 8.5vw))`,
                       letterSpacing: copy.headlineTracking ?? '-0.03em',
                       lineHeight: copy.headlineLeading || '0.95',
                       fontStretch: copy.headlineFont ? undefined : 'var(--font-display-stretch, normal)',
@@ -1659,12 +1661,13 @@ export default function DitherHero() {
               >
                 <div className="col-span-4 min-w-0 md:[grid-column:span_var(--hl-cols)_/_span_var(--hl-cols)]">
                   <h1
+                    ref={lockHeadlineRef}
                     className="text-balance break-words [overflow-wrap:anywhere]"
                     style={{
                       color: headlineColor,
                       fontFamily: copy.headlineFont || 'var(--font-display, Satoshi, sans-serif)',
                       fontWeight: copy.headlineWeight ?? 900,
-                      fontSize: `min(${copy.headlineSize || 'clamp(2.5rem, 3.5vw + 1rem, 4rem)'}, 8.5vw)`,
+                      fontSize: `var(--hl-fit-size, min(${copy.headlineSize || 'clamp(2.5rem, 3.5vw + 1rem, 4rem)'}, 8.5vw))`,
                       letterSpacing: copy.headlineTracking ?? '-0.03em',
                       lineHeight: copy.headlineLeading || '0.95',
                       fontStretch: copy.headlineFont ? undefined : 'var(--font-display-stretch, normal)',
