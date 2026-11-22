@@ -114,3 +114,10 @@ and warp feels under a looping pointer. Shape is hidden on the GPU tile field
 says so. Prism and Aurora give each layer its own hue (the old multi-colour mode
 stays removed).
 
+2026-11-22, perf strip ratings: green / amber / red mean good / needs improvement /
+poor. LCP, INP, CLS, FCP and TTFB use the web.dev field thresholds through
+`web-vitals` (`m.rating`); these are not Lighthouse lab scores, which use other
+curves and TBT instead of INP. Frame cells use the 60 Hz budget, so 120 Hz screens
+stay green; blocked time and the WebGL count are lab rules. Each cell's `title`
+names its bands and source.
+
