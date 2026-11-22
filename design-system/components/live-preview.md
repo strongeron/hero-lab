@@ -1,4 +1,5 @@
 ---
+sourcesHash: fabb13983dc705a665fca8ad2b4d4f87b6f949d47346b8d30b738c0411a68cf2
 id: live-preview
 description: >-
   Show what a setting does with a small live canvas next to or inside its
