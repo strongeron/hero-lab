@@ -36,9 +36,21 @@ const colorInput =
 /** Native select for the seven dither shapes (Segmented contract: more than
  *  about six options → select). */
 const select =
-  'min-h-6 min-w-0 flex-1 rounded-md border border-lab-border bg-lab-fill px-1.5 text-lab-xs text-lab-fg-muted hover:bg-lab-fill-hover cursor-pointer lab-focus'
+  'min-h-6 min-w-0 flex-1 rounded-md border border-lab-border bg-lab-fill px-1.5 text-lab-xs text-lab-fg-muted hover:bg-lab-fill-hover cursor-pointer [color-scheme:dark] lab-focus'
 const action =
-  'min-h-6 shrink-0 px-2 rounded-md border border-lab-border bg-lab-fill text-lab-xs font-medium text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover cursor-pointer transition-colors lab-focus'
+  'min-h-6 shrink-0 px-2 rounded-md border border-lab-border bg-lab-fill text-lab-xs font-medium text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover cursor-pointer transition-[color,background-color,border-color,transform] active:scale-[0.96] lab-focus'
+
+/** Text that swaps without changing the button's width: every label sits in
+ *  one grid cell, only the shown one is visible. */
+function Stable({ labels, show }: { labels: string[]; show: number }) {
+  return (
+    <span className="grid">
+      {labels.map((l, i) => (
+        <span key={l} aria-hidden={i !== show} className={`col-start-1 row-start-1 ${i === show ? '' : 'invisible'}`}>{l}</span>
+      ))}
+    </span>
+  )
+}
 
 function Group({ title, action: groupAction, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
@@ -78,13 +90,13 @@ export default function DitherPanel() {
           action={
             <div className="flex items-center gap-1.5">
               <button type="button" onClick={copyConfig} className={action} aria-live="polite">
-                {copied ? 'Copied' : 'Copy config'}
+                <Stable labels={['Copy config', 'Copied']} show={copied ? 1 : 0} />
               </button>
               <button
                 type="button"
                 onClick={() => applyHeroTemplate(state.activeTemplate ?? heroTemplates[0].id)}
                 title="Back to the template as authored"
-                className="min-h-6 px-1.5 rounded-md bg-transparent border-0 text-lab-xs font-medium text-lab-danger hover:text-lab-fg cursor-pointer transition-colors lab-focus"
+                className="min-h-6 px-1.5 rounded-md bg-transparent border-0 text-lab-xs font-medium text-lab-danger hover:text-lab-fg cursor-pointer transition-[color,background-color,border-color,transform] active:scale-[0.96] lab-focus"
               >
                 Reset
               </button>
@@ -159,7 +171,7 @@ export default function DitherPanel() {
           title="Motion"
           action={
             <Toggle inline label="Play animation" on={a.playing} onChange={(on) => setAnimationConfig({ playing: on })}>
-              {a.playing ? 'Playing' : 'Paused'}
+              <Stable labels={['Playing', 'Paused']} show={a.playing ? 0 : 1} />
             </Toggle>
           }
         >

@@ -28,7 +28,7 @@ export default function Segmented<T extends string | number>({
     ? 'rounded-full p-1 gap-1'
     : 'rounded-lg p-0.5 gap-0.5 bg-lab-fill border border-lab-border'
   const item = [
-    'shrink-0 cursor-pointer border-0 font-medium transition-colors lab-focus',
+    'shrink-0 cursor-pointer border-0 font-medium transition-[color,background-color,border-color,transform] active:scale-[0.96] lab-focus',
     'disabled:opacity-40 disabled:cursor-not-allowed',
     shape === 'pill' ? 'rounded-full px-3 py-1.5' : 'rounded-md px-2.5 py-1',
     size === 'xs' ? 'text-lab-xs' : 'text-lab-sm',

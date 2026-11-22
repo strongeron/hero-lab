@@ -177,3 +177,14 @@ Conflicting (break the hover, the initial state or pixel alignment):
 - Fine Grain warp reveals whole dither cells of its own field: no rotation, base type, size and scale.
 - Pixel alignment: integer pieces on whole device pixels, integer grid phase, no gap pulse, integer Paper size, integer Paper render scale.
 - URL params apply after the first template.
+
+## 7. Result (2026-11-22)
+
+Done: section 5 dead 1–6, duplicated 1–4 (the duplicated panel rows left with the
+panel; one per-layer Paper helper), conflicting 1–6 and 8 (the hover effect depends
+on `hover.enabled` only). Kept: conflicting 7 (`problemMotionBoost`), because
+removing it would change how the Problem template moves.
+
+After: 9 sliders, 3 choice groups, 7 colour inputs, 3 shape selects, 18 buttons,
+6 section headings (Live view, Full Bleed). One hover (warp reveal, pixel circle),
+three draw paths by renderer (`hoverPath`: gpu, mask, cells).
