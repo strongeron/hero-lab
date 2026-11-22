@@ -475,18 +475,6 @@ export default function DitherHero() {
 
   // Measured shader-container size (masks and the GPU field work in px).
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
-  // The snapped field centres its lattice on the hero, on a whole pixel.
-  const grid = useMemo(() => tileGrid(
-    pixelGrid,
-    gridSnap ? Math.floor(containerSize.w / 2) % gridPitch : 0,
-    gridSnap ? Math.floor(containerSize.h / 2) % gridPitch : 0,
-  ), [pixelGrid, gridSnap, gridPitch, containerSize.w, containerSize.h])
-  // Points mode shifts rows so the first whole row starts at Top start; the
-  // warp must share that row phase or it would cut dots into slivers.
-  const tileAlignY = pointCanvasMode && edge.topInset > 0
-    ? grid.alignY + positiveModulo(edge.topInset - grid.alignY, gridPitch)
-    : grid.alignY
-
   // ── Paper render scale ──
   // Paper draws dither cells per render pixel, so a cell is a whole number of
   // device pixels only when the render scale is a whole number. Native DPR on
@@ -498,8 +486,33 @@ export default function DitherHero() {
   const paperH = containerSize.h || (typeof window !== 'undefined' ? window.innerHeight : 900)
   const paperScale = paperW < 1280 && paperW * paperH * dpr * dpr <= 4_200_000 ? dpr : 1
   const paperMaxPixelCount = Math.ceil(paperW * paperH * paperScale * paperScale)
+  // The snapped field centres its lattice on the hero, on a whole pixel. The
+  // tile-mask path shares Paper's own lattice (cells start at floor(W / 2)
+  // render px from the left, ceil(H / 2) from the top) and draws one Paper
+  // cell per tile, so every tile is exactly one dither cell: no tile is split
+  // between two cells, whatever the grid and gap.
+  const tileMaskPath = gridOn && !pointCanvasMode
+  const grid = useMemo(() => {
+    if (tileMaskPath) {
+      const rw = Math.round(paperW * paperScale), rh = Math.round(paperH * paperScale)
+      return tileGrid(pixelGrid,
+        positiveModulo(Math.floor(rw / 2) / paperScale, gridPitch),
+        positiveModulo(Math.ceil(rh / 2) / paperScale, gridPitch))
+    }
+    return tileGrid(
+      pixelGrid,
+      gridSnap ? Math.floor(containerSize.w / 2) % gridPitch : 0,
+      gridSnap ? Math.floor(containerSize.h / 2) % gridPitch : 0,
+    )
+  }, [pixelGrid, gridSnap, tileMaskPath, gridPitch, containerSize.w, containerSize.h, paperW, paperH, paperScale])
+  // Points mode shifts rows so the first whole row starts at Top start; the
+  // warp must share that row phase or it would cut dots into slivers.
+  const tileAlignY = pointCanvasMode && edge.topInset > 0
+    ? grid.alignY + positiveModulo(edge.topInset - grid.alignY, gridPitch)
+    : grid.alignY
+
   /** Paper dither cell in CSS px — whole pixels. */
-  const paperCell = Math.max(1, Math.round(c.size))
+  const paperCell = tileMaskPath ? gridPitch : Math.max(1, Math.round(c.size))
 
   // ── Dissolve edge (Paper + CSS tile grid only; the GPU field draws its own) ──
   const dissolveOn = gridOn && !pointCanvasMode && edge.mode === 'dissolve'
