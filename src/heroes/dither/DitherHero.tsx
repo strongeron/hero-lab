@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useState, useLayoutEffect } from 'react'
+import { useMemo, useRef, useEffect, useState } from 'react'
 import { Dithering } from '@paper-design/shaders-react'
 import { useDitherStore, resolveCopy, palettes, warpErrorSnippets, warpFixSnippets, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
 import { getThemeById } from '../../themes/terminalThemes'
@@ -343,63 +343,33 @@ function warpTileSize(piece: number, scale: number, spread: number, col: number,
 
 interface WarpShape { rotate: number; round: number; scale: number; spread: number }
 
-/** Cached pattern of one resting tile at device resolution — the same rect as
- *  buildTileMaskUrl, so swapping the CSS tile mask for a warp mask moves no
- *  pixel outside the cursor. */
-let warpPatternCache: { key: string; canvas: HTMLCanvasElement } | null = null
-function warpRestPattern(ctx: CanvasRenderingContext2D, g: TileGrid, dpr: number): CanvasPattern | null {
-  const size = Math.round(g.pitch * dpr)
-  const key = `${g.pitch}:${g.piece}:${g.inset}:${g.radius}:${dpr}`
-  if (warpPatternCache?.key !== key) {
-    const c = document.createElement('canvas')
-    c.width = c.height = size
-    const ctx2 = c.getContext('2d')
-    if (!ctx2) return null
-    ctx2.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx2.fillStyle = '#000'
-    roundRectPath(ctx2, g.inset, g.inset, g.piece, g.piece, g.radius)
-    ctx2.fill()
-    warpPatternCache = { key, canvas: c }
-  }
-  return ctx.createPattern(warpPatternCache.canvas, 'repeat')
-}
-
-/** Warp mask for the Paper + CSS tile grid path. `insideOnly` = false: every
- *  resting tile, with the tiles in the pixel circle warped (the base mask).
- *  `insideOnly` = true: only the warped tiles (the reveal mask). */
-function buildWarpMask(
-  canvas: HTMLCanvasElement, cw: number, ch: number, px: number, py: number, r: number,
-  g: TileGrid, w: WarpShape, insideOnly: boolean, dpr: number,
-): boolean {
+/** Reveal mask for the Paper + CSS tile grid path: only the warped tiles in
+ *  the pixel circle, drawn into a canvas the size of the circle's tile box
+ *  (not the whole hero), so encoding and decoding it stays cheap. Returns the
+ *  box in CSS px, or null when no tile is drawn. */
+function buildRevealMask(
+  canvas: HTMLCanvasElement, px: number, py: number, r: number,
+  g: TileGrid, w: WarpShape, dpr: number,
+): { x: number; y: number; w: number; h: number } | null {
   const { pitch, alignX, alignY } = g
-  if (pitch <= 1 || cw <= 0 || ch <= 0) return false
-  const canvasW = Math.max(1, Math.round(cw * dpr))
-  const canvasH = Math.max(1, Math.round(ch * dpr))
-  if (canvas.width !== canvasW || canvas.height !== canvasH) {
-    canvas.width = canvasW
-    canvas.height = canvasH
-  }
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return false
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.clearRect(0, 0, cw, ch)
-  // Draw the resting tiles as ONE pattern fill, clear the cursor's box (whole
-  // tiles, one tile of margin for rotated corners), then draw only those tiles.
+  if (pitch <= 1) return null
   const rr = pixelCircleRadius(r, pitch)
   const reach = rr + pitch
   const colLo = Math.floor((px - reach - alignX) / pitch)
   const colHi = Math.ceil((px + reach - alignX) / pitch)
   const rowLo = Math.floor((py - reach - alignY) / pitch)
   const rowHi = Math.ceil((py + reach - alignY) / pitch)
-  if (!insideOnly) {
-    const pat = warpRestPattern(ctx, g, dpr)
-    if (pat) {
-      pat.setTransform(new DOMMatrix().translate(alignX, alignY).scale(1 / dpr))
-      ctx.fillStyle = pat
-      ctx.fillRect(0, 0, cw, ch)
-      ctx.clearRect(alignX + colLo * pitch, alignY + rowLo * pitch, (colHi - colLo + 1) * pitch, (rowHi - rowLo + 1) * pitch)
-    }
+  const box = { x: alignX + colLo * pitch, y: alignY + rowLo * pitch, w: (colHi - colLo + 1) * pitch, h: (rowHi - rowLo + 1) * pitch }
+  const canvasW = Math.max(1, Math.round(box.w * dpr))
+  const canvasH = Math.max(1, Math.round(box.h * dpr))
+  if (canvas.width !== canvasW || canvas.height !== canvasH) {
+    canvas.width = canvasW
+    canvas.height = canvasH
   }
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.setTransform(dpr, 0, 0, dpr, -box.x * dpr, -box.y * dpr)
+  ctx.clearRect(box.x, box.y, box.w, box.h)
   ctx.fillStyle = '#000'
   const maxSz = g.piece * Math.max(0, Math.min(1, w.scale))
   const targetRound = g.radius + Math.max(0, Math.min(1, w.round)) * (g.piece / 2 - g.radius)
@@ -409,13 +379,7 @@ function buildWarpMask(
     const tcy = alignY + (row + 0.5) * pitch
     for (let col = colLo; col <= colHi; col++) {
       const tcx = alignX + (col + 0.5) * pitch
-      const inside = Math.hypot(tcx - px, tcy - py) <= rr
-      if (!inside) {
-        if (insideOnly) continue
-        roundRectPath(ctx, alignX + col * pitch + g.inset, alignY + row * pitch + g.inset, g.piece, g.piece, g.radius)
-        ctx.fill()
-        continue
-      }
+      if (Math.hypot(tcx - px, tcy - py) > rr) continue
       const sz = snapPiece(warpTileSize(g.piece, w.scale, w.spread, col, row), pitch, dpr)
       if (sz <= 0) continue
       const rad = clampTileRadius(maxSz > 0 ? g.radius + (targetRound - g.radius) * (sz / maxSz) : g.radius, sz)
@@ -428,7 +392,7 @@ function buildWarpMask(
       drew = true
     }
   }
-  return drew || !insideOnly
+  return drew ? box : null
 }
 
 
@@ -439,9 +403,6 @@ function buildWarpMask(
  *  paints blank until it lands — every swap blinked the whole grid. */
 /** Min ms between warp-mask encodes (CPU warp path, Paper tile displays). */
 const WARP_MASK_INTERVAL = 1000 / 60
-/** A 2× DPR mask costs ~4× the pixels to encode and decode; 60/s of those
- *  held the Problem template at ~46fps. */
-const WARP_MASK_INTERVAL_HIDPI = 1000 / 30
 
 function canvasToDataUrl(canvas: HTMLCanvasElement): Promise<string | null> {
   return new Promise((resolve) => {
@@ -1032,7 +993,7 @@ export default function DitherHero() {
   // One rAF loop while the pointer is over the hero or the radius settles. Three
   // ways to draw it, by renderer (hoverPath):
   //   'gpu'   — the tile field draws the warp from hoverAnim; only the tip commits
-  //   'mask'  — Paper + CSS tile grid: PNG warp masks for the base and the reveal
+  //   'mask'  — Paper + CSS tile grid: a clip-path cover plus a small PNG reveal mask
   //   'cells' — Paper without a grid: the reveal layer is clipped to whole dither
   //             cells (no rotation; the field's own dots, no tile shapes)
   const shaderContainerRef = useRef<HTMLDivElement>(null)
@@ -1115,21 +1076,17 @@ export default function DitherHero() {
       alignY: positiveModulo(Math.ceil(rh / 2) / paperScale, paperCell),
     }
   }
-  const warpCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  const warpSceneCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  // 'mask' path: the resting tile mask never changes during a hover (swapping
+  // a full-hero mask under three Paper layers cost 20–90 ms frames). Instead a
+  // background-coloured cover hides the resting tiles in the circle (a cheap
+  // clip-path) and the reveal layer gets a small mask of the warped tiles only,
+  // both written straight to the DOM with no React commit.
+  const coverRef = useRef<HTMLDivElement>(null)
+  const revealCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const warpGenRef = useRef({ px: -1, py: -1, r: -1, key: '' })
-  const [warp, setWarp] = useState<{ url: string; sceneUrl: string | null } | null>(null)
   const warpEncodingRef = useRef(false)
   const warpLastStartRef = useRef(0)
   const warpTokenRef = useRef(0)
-  // The loop shows the reveal layer imperatively, but its mask lands with the
-  // next commit; showing it earlier painted the layer unmasked for 1–2 frames
-  // on every hover entry. Gate visibility on a committed mask.
-  const warpCommittedRef = useRef(false)
-  useLayoutEffect(() => {
-    warpCommittedRef.current = warp != null
-    if (warp && fixLayerRef.current) fixLayerRef.current.style.visibility = 'visible'
-  }, [warp])
   const hoverReleaseTimer = useRef(0)
   const tileDirtyRef = useRef(true)
 
@@ -1204,49 +1161,58 @@ export default function DitherHero() {
         const g = maskGridRef.current
         const gen = warpGenRef.current
         if (a.radius > 0 && a.cw > 0) {
-          if (fixEl) fixEl.style.visibility = warpCommittedRef.current ? 'visible' : 'hidden'
           const w = warpShapeRef.current
           const dprM = maskDprRef.current
           const key = [g.pitch, g.alignX, g.alignY, g.piece, g.inset, g.radius, w.rotate, w.round, w.scale, w.spread, dprM].join(':')
           const moved = Math.abs(a.px - gen.px) >= 2 || Math.abs(a.py - gen.py) >= 2 || Math.abs(a.radius - gen.r) >= 2
           // One encode in flight at a time; the next build picks up the latest cursor.
-          if (!warpEncodingRef.current && now - warpLastStartRef.current >= (dprM > 1 ? WARP_MASK_INTERVAL_HIDPI : WARP_MASK_INTERVAL) && (moved || gen.key !== key)) {
-            warpCanvasRef.current ??= document.createElement('canvas')
-            warpSceneCanvasRef.current ??= document.createElement('canvas')
-            const drewBase = buildWarpMask(warpCanvasRef.current, a.cw, a.ch, a.px, a.py, a.radius, g, w, false, dprM)
-            const drewScene = drewBase && buildWarpMask(warpSceneCanvasRef.current, a.cw, a.ch, a.px, a.py, a.radius, g, w, true, dprM)
-            if (drewBase) {
-              gen.px = a.px; gen.py = a.py; gen.r = a.radius; gen.key = key
-              // toBlob snapshots the bitmap at call time, so reusing the
-              // canvases on the next build is safe.
-              const token = ++warpTokenRef.current
-              warpEncodingRef.current = true
-              warpLastStartRef.current = now
-              Promise.all([
-                canvasToDataUrl(warpCanvasRef.current),
-                drewScene ? canvasToDataUrl(warpSceneCanvasRef.current) : null,
-              ]).then(([url, sceneUrl]) => {
-                warpEncodingRef.current = false
-                // Dropped if the warp was cleared or the effect re-ran meanwhile.
-                if (!running || token !== warpTokenRef.current || !url) return
-                setWarp({ url, sceneUrl })
-                startLoop()
-              })
-            }
+          if (!warpEncodingRef.current && now - warpLastStartRef.current >= WARP_MASK_INTERVAL && (moved || gen.key !== key)) {
+            revealCanvasRef.current ??= document.createElement('canvas')
+            const px = a.px, py = a.py, r = a.radius
+            const box = buildRevealMask(revealCanvasRef.current, px, py, r, g, w, dprM)
+            gen.px = px; gen.py = py; gen.r = r; gen.key = key
+            const token = ++warpTokenRef.current
+            warpEncodingRef.current = true
+            warpLastStartRef.current = now
+            ;(box ? canvasToDataUrl(revealCanvasRef.current) : Promise.resolve(null)).then((url) => {
+              warpEncodingRef.current = false
+              // Dropped if the warp was cleared or the effect re-ran meanwhile.
+              if (!running || token !== warpTokenRef.current) return
+              const fix = fixLayerRef.current
+              const cover = coverRef.current
+              // Cover and reveal move together, on the cursor the mask was built for.
+              if (cover) {
+                cover.style.clipPath = buildWholeTileCircleClip(px, py, pixelCircleRadius(r, g.pitch), g.pitch, g.alignX, g.alignY, a.cw, a.ch)
+                cover.style.visibility = 'visible'
+              }
+              if (fix) {
+                if (url && box) {
+                  const m = { image: `url(${url})`, pos: `${box.x}px ${box.y}px`, size: `${box.w}px ${box.h}px` }
+                  fix.style.maskImage = m.image; fix.style.webkitMaskImage = m.image
+                  fix.style.maskPosition = m.pos; fix.style.webkitMaskPosition = m.pos
+                  fix.style.maskSize = m.size; fix.style.webkitMaskSize = m.size
+                  fix.style.visibility = 'visible'
+                } else fix.style.visibility = 'hidden'
+              }
+              startLoop()
+            })
           }
         } else if (gen.r !== -1) {
           warpGenRef.current = { px: -1, py: -1, r: -1, key: '' }
           warpTokenRef.current++
-          setWarp(null)
           if (fixEl) fixEl.style.visibility = 'hidden'
+          if (coverRef.current) coverRef.current.style.visibility = 'hidden'
         }
       }
 
       if (a.radius > 0.5 || a.hovering) a.rafId = requestAnimationFrame(animate)
     }
 
-    el.addEventListener('mousemove', handleMove)
-    el.addEventListener('mouseleave', handleLeave)
+    // Listen on the section: the copy sits above the field and would
+    // otherwise swallow every move over the headline.
+    const target = el.closest('section') ?? el
+    target.addEventListener('mousemove', handleMove)
+    target.addEventListener('mouseleave', handleLeave)
     return () => {
       running = false
       if (hoverAnim.current.rafId) cancelAnimationFrame(hoverAnim.current.rafId)
@@ -1255,18 +1221,18 @@ export default function DitherHero() {
         clearTimeout(hoverReleaseTimer.current)
         hoverReleaseTimer.current = 0
       }
-      el.removeEventListener('mousemove', handleMove)
-      el.removeEventListener('mouseleave', handleLeave)
+      target.removeEventListener('mousemove', handleMove)
+      target.removeEventListener('mouseleave', handleLeave)
     }
   }, [hover.enabled])
 
-  // Leaving the 'mask' path (template or renderer change) drops a stale mask.
+  // Leaving the 'mask' path (template or renderer change) drops a stale cover.
   useEffect(() => {
-    if (hoverPath === 'mask' || !warp) return
+    if (hoverPath === 'mask') return
     warpGenRef.current = { px: -1, py: -1, r: -1, key: '' }
     warpTokenRef.current++
-    setWarp(null)
-  }, [hoverPath, warp])
+    if (coverRef.current) coverRef.current.style.visibility = 'hidden'
+  }, [hoverPath])
 
   // ── GPU tile field (Point sizes, snapped colour, and the warp on top) ──
   // One WebGL2 canvas drawn from a rAF loop that reads refs: drift, field time,
@@ -1421,19 +1387,10 @@ export default function DitherHero() {
       )
     })
 
-  const fullSizeMask = (url: string): React.CSSProperties => ({
-    maskImage: `url(${url})`, WebkitMaskImage: `url(${url})`,
-    maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
-    maskSize: '100% 100%', WebkitMaskSize: '100% 100%',
-    maskPosition: '0 0', WebkitMaskPosition: '0 0',
-  })
-  // While warping, the base mask replaces the CSS tile mask; the dissolve edge
-  // still applies (before, the warp dropped it and the band filled in on hover).
-  const warpActive = hoverPath === 'mask' && warp != null
-  const containerStyle = warpActive && warp
-    ? (dissolveUrl ? intersectMask(fullSizeMask(warp.url), dissolveUrl) : fullSizeMask(warp.url))
-    : restMaskStyle
-  const revealMaskStyle = warpActive && warp?.sceneUrl ? fullSizeMask(warp.sceneUrl) : undefined
+  const containerStyle = restMaskStyle
+  // The cover only ever shows on the 'mask' path; the reveal escapes the
+  // dissolve band, so the hover works over the whole hero, text included.
+  const maskBase: React.CSSProperties = { maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat' }
   // A terminal theme reveals one themed colour instead of the other state's layers.
   const revealColor = (color: string) => (activeTheme ? responseColor : color)
   const textUnderScene = edge.mode === 'full'
@@ -1460,19 +1417,26 @@ export default function DitherHero() {
           </div>
         )}
 
-        {/* Reveal — the other state's layers, mounted on first hover */}
-        {hover.enabled && hoverActive && !pointCanvasMode && (
-          <div key={`hover-gl${glEpoch}`} className="absolute inset-0 pointer-events-none">
-            <div
-              ref={fixLayerRef}
-              className="absolute inset-0"
-              style={{ visibility: 'hidden', backgroundColor: c.colorBack, ...(revealMaskStyle ?? {}) }}
-            >
-              {paperLayers(hover.hoverLayers, revealColor, false)}
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Hover cover — hides the resting tiles under the cursor ('mask' path) */}
+      {hover.enabled && hoverPath === 'mask' && (
+        <div ref={coverRef} className="absolute inset-0 pointer-events-none" style={{ visibility: 'hidden', backgroundColor: c.colorBack }} aria-hidden="true" />
+      )}
+
+      {/* Reveal — the other state's layers, mounted on first hover. Outside the
+          resting mask, so it is not cut by the dissolve band. */}
+      {hover.enabled && hoverActive && !pointCanvasMode && (
+        <div key={`hover-gl${glEpoch}`} className="absolute inset-0 pointer-events-none" aria-hidden="true">
+          <div
+            ref={fixLayerRef}
+            className="absolute inset-0"
+            style={{ visibility: 'hidden', backgroundColor: c.colorBack, ...(hoverPath === 'mask' ? maskBase : {}) }}
+          >
+            {paperLayers(hover.hoverLayers, revealColor, false)}
+          </div>
+        </div>
+      )}
 
 
       {/* Warp-reveal tooltip — short log fragments below the cursor. The pool
