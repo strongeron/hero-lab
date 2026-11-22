@@ -11,7 +11,8 @@ UI. The hero keeps its own palette tokens (`--color-t-*`, `[data-palette]` in
 
 The lab UI is a dark, quiet instrument panel. It must never compete with the hero
 for attention: low-contrast surfaces, one neutral selected state, colour only for
-meaning (the emerald accent marks "editing" and "on").
+meaning (the emerald accent marks "editing" and "on"; `lab-danger` marks a
+destructive action).
 
 Required:
 
@@ -24,8 +25,9 @@ Required:
 - **Type floor.** `text-lab-2xs` (10px) only for uppercase section labels and
   badges. Labels, values and body text use `text-lab-xs` (11px) or larger.
 - **One control per job.** A choice among a few options is `Segmented`. A numeric
-  setting is `SliderRow`. A settings group opens with `SectionLabel`. Do not
-  re-create these with local class strings.
+  setting is `SliderRow`. An independent on/off setting is `Toggle`. A settings
+  group opens with `SectionLabel`. More than about six options is a native
+  `<select>`. Do not re-create these with local class strings.
 - **Keyboard.** Every interactive element shows the `lab-focus` ring on
   `:focus-visible`, has an accessible name, and toggles expose `aria-pressed`.
 - **Hit area.** Controls are at least 24×24 CSS px (WCAG 2.5.8).
@@ -54,6 +56,7 @@ used settings behind a disclosure over adding more rows.
 | `lab-border` / `lab-border-strong` | Hairlines; emphasised edge |
 | `lab-focus` | Focus ring colour |
 | `lab-accent` | "Editing" / "on" meaning only |
+| `lab-danger` | Destructive actions only (Reset, Clear, Remove) |
 | `text-lab-2xs` … `text-lab-md` | 10 / 11 / 12 / 13 px |
 | `shadow-lab-float` | Floating chrome and chips: bottom view bar, toolbar pill, hover chip |
 | `shadow-lab-raised` | Artboards on the canvas (Templates, Breakpoints, Layers) |
@@ -67,7 +70,7 @@ Component contracts live in `design-system/components/`, layouts in
 uppercase index. Contract frontmatter owns id, description, status and paths.
 
 Public imports: `src/lab/ui/Segmented.tsx`, `src/lab/ui/SliderRow.tsx`,
-`src/lab/ui/SectionLabel.tsx` (default exports) and
+`src/lab/ui/SectionLabel.tsx`, `src/lab/ui/Toggle.tsx` (default exports) and
 `src/lab/LabToolbarTitle.tsx`. Consumers: `src/lab/*` views and the Design Panel
 (`src/components/playground/*`, `src/heroes/dither/DitherPanel.tsx`).
 Component internals and business logic (store, handlers, effects) stay project-owned.
@@ -86,3 +89,9 @@ Component internals and business logic (store, handlers, effects) stay project-o
 
 No open gaps. Decisions taken 2026-11-21 with the user: connect the design system,
 then align the lab chrome and the Design Panel on it. No Storybook in this repo.
+
+2026-11-21, panel cleanup: the Design Panel keeps only colour, size, speed, shape
+and warp settings (the state map is in
+`docs/architecture/2026-11-21-state-machines.md`). Added `Toggle` and
+`lab-danger`. Scoped exceptions kept: the Layers verdict badges and the perf strip
+ratings use Tailwind palette colours because each colour carries one fixed meaning.
