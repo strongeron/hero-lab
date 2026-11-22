@@ -73,10 +73,10 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
 
   return (
     <header
-      className={`fixed top-0 left-0 z-40 transition-colors duration-300 ${bgClass}`}
+      className={`fixed top-0 left-0 z-40 h-lab-bar transition-colors duration-300 ${bgClass}`}
       style={{ right: rightOffset }}
     >
-      <div className="max-w-[1440px] mx-auto px-5 sm:px-8 xl:px-16 py-4 flex items-center justify-between">
+      <div className="max-w-[1440px] h-full mx-auto px-5 sm:px-8 xl:px-16 flex items-center justify-between">
         <a href="#" className="flex items-center gap-3 shrink-0 no-underline text-t-headline">
           {/* Fixed, not the generative BrandMark. ACME is a demo *brand*: a
               mark that redraws itself per visit isn't one, and it left the
@@ -229,6 +229,11 @@ const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
 export default function HeroLab() {
   const fontPair = fontPairs['jakarta-dm']
   const heroState = useDitherStore()
+  // Lab chrome wears the site's background (see --color-lab-site in index.css).
+  const siteBg = heroState.shader.colorBack
+  useEffect(() => {
+    document.documentElement.style.setProperty('--color-lab-site', siteBg)
+  }, [siteBg])
   // Open by default; the choice persists per browser.
   const [panelOpen, setPanelOpen] = useState(() => {
     try { return localStorage.getItem(PANEL_OPEN_KEY) !== '0' } catch { return true }

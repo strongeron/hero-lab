@@ -51,6 +51,11 @@ export interface DitherCopy {
   headlineTracking?: string;
   /** CSS line-height override for headline */
   headlineLeading?: string;
+  /** Sub font-size override (default 17px, 20px from md). Monospace sets it
+   *  smaller: its wide advance makes the same px read ~15% larger. */
+  subSize?: string;
+  /** CTA font-size override (default 16px, 18px from xl). */
+  ctaSize?: string;
   /** Headline text color mode */
   headlineColorMode?: DitherCopyColorMode;
   /** CSS font-family override for response text (omit = use DesignPanel font pair) */
@@ -250,9 +255,15 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
       // -0.05em (from the -0.03em default) tightens the words into solid blocks
       // without breaking the even monospace rhythm or colliding glyphs.
       headlineTracking: "-0.05em",
-      headlineSize: "clamp(3rem, 5vw + 1rem, 5.5rem)",
+      // Mono scale, ~0.85× the sans copies: a fixed advance makes JetBrains
+      // Mono read about 15% larger than a proportional face at the same px,
+      // and its sub ran 20px, louder than a sans sub. Sub, response and CTA
+      // follow the same step so the whole block keeps its proportions.
+      headlineSize: "clamp(2.5rem, 4vw + 1rem, 4.5rem)",
+      subSize: "clamp(15px, 0.4vw + 13px, 17px)",
+      ctaSize: "clamp(14px, 0.3vw + 12.5px, 16px)",
       responseFontMode: "headline",
-      responseSize: "36px",
+      responseSize: "28px",
       responseFontStyle: "normal",
       responseWeight: 400,
       // Group the tagline tight above the CTA so "We speak AI too." reads as a
@@ -290,9 +301,12 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
       // round dots that echo the point-field geometry instead of fighting it.
       headlineFont: "'Geist Mono', monospace",
       headlineWeight: 500,
-      headlineSize: "clamp(2.8rem, 4vw + 1rem, 4.5rem)",
+      // Mono scale (see "ai"): ~0.85× the sans size, same tight tracking.
+      headlineSize: "clamp(2.375rem, 3.4vw + 1rem, 3.875rem)",
+      headlineLeading: "1.08",
+      headlineTracking: "-0.04em",
       responseFontMode: "headline",
-      responseSize: "36px",
+      responseSize: "30px",
       responseFontStyle: "normal",
       responseWeight: 400,
     },
@@ -863,22 +877,27 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
   "error-sweep": {
     label: "Error Sweep",
     desc: "Diagonal scan with a vertical wave",
+    // 2026-11-22: was 3× the other scenes (speed 0.36, rotation 1.2, scan
+    // 0.85 @ 0.2 Hz, wave 0.42 @ 0.24 Hz). Under Problem's large square tiles
+    // (and its 1.8× rest boost) nearly every tile flipped within 0.3s, which
+    // read as flicker, not a sweep. These values keep the diagonal sweep and
+    // the wave but let shapes flow tile to tile.
     shader: {
-      speed: 0.36,
-      colorCycleSpeed: 0.4,
+      speed: 0.12,
+      colorCycleSpeed: 0.15,
     },
     animation: {
       driftY: 0,
       driftX: 0,
-      rotationDrift: 1.2,
+      rotationDrift: 0.3,
       pulseAmount: 0.035,
       pulseSpeed: 0.18,
       scanMode: "oscillate" as const,
-      scanAmplitude: 0.85,
-      scanSpeed: 0.2,
+      scanAmplitude: 0.35,
+      scanSpeed: 0.08,
       scanAngle: 30,
-      waveAmplitude: 0.42,
-      waveSpeed: 0.24,
+      waveAmplitude: 0.18,
+      waveSpeed: 0.1,
       waveAngle: 90,
       tileSizeSpread: 0.6,
       tileSizeSpeed: 0.13,
@@ -1132,7 +1151,11 @@ const SCENE_LOOP_BREAK: Record<SceneTemplateId, LoopBreakMode> = {
   "falling-errors": "drift",
   "signal-sweep": "drift",
   "radar-scan": "wander",
-  "error-sweep": "orbit",
+  // Not "orbit": its pan wrapped ±2 units (×1.8 on Problem), pushing centred
+  // shapes off canvas and jumping the whole field on each wrap, and its
+  // 4°/s spin was ~13× the scene's own rotation. Scan 0.08 Hz, wave 0.1 Hz and
+  // pulse 0.18 Hz already never line up, so the scene does not visibly loop.
+  "error-sweep": "none",
   "deep-breath": "rotate",
   "solid-classic": "none",
 };
@@ -1374,7 +1397,7 @@ export const typePairs: Record<TypePairId, TypePair> = {
   grotesk: { label: "Grotesk", hint: "Space Grotesk + Inter", headlineFont: "'Space Grotesk', Inter, sans-serif", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.0", headlineTracking: "-0.03em" },
   quirky: { label: "Quirky", hint: "Bricolage + Inter", headlineFont: "'Bricolage Grotesque', Inter, sans-serif", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.0", headlineTracking: "-0.03em" },
   soft: { label: "Soft serif", hint: "Fraunces + DM Sans", headlineFont: "'Fraunces', Georgia, serif", bodyFont: "'DM Sans', Inter, sans-serif", headlineWeight: 500, headlineLeading: "1.04", headlineTracking: "-0.02em" },
-  terminal: { label: "Terminal", hint: "Geist Mono + Inter", headlineFont: "'Geist Mono', ui-monospace, monospace", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.08", headlineTracking: "-0.05em", headlineSize: "clamp(2.25rem, 3.4vw + 1rem, 4rem)" },
+  terminal: { label: "Terminal", hint: "Geist Mono + Inter", headlineFont: "'Geist Mono', ui-monospace, monospace", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.08", headlineTracking: "-0.04em", headlineSize: "clamp(2.25rem, 3.4vw + 1rem, 3.875rem)" },
 };
 export const typePairIds = Object.keys(typePairs) as TypePairId[];
 
@@ -1393,6 +1416,9 @@ export function resolveCopy(id: CopyVariantId, pair: TypePairId | null): DitherC
     headlineSize: p.headlineSize ?? copy.headlineSize,
     subFont: p.bodyFont,
     ctaFont: p.bodyFont,
+    // A pair's body face is proportional: drop a mono copy's smaller sizes.
+    subSize: undefined,
+    ctaSize: undefined,
     responseFontMode: "headline",
     responseFontStyle: "normal",
     tabletLayout: pair === "terminal" ? "stack" : copy.tabletLayout,
@@ -1505,7 +1531,7 @@ export const heroTemplates: HeroTemplate[] = [
   {
     id: "problem",
     name: "Problem",
-    desc: "Square error tiles on a 96px grid with wide gaps, pink problem state at rest; hover reveals the green fix. AI-native copy in JetBrains Mono.",
+    desc: "Square 24px error tiles with open gaps, pink problem state at rest; hover reveals the green fix. AI-native copy in JetBrains Mono.",
     swatch: ["#E6307A", "#FF6B2B", "#FF3366"],
     initialState: "problem",
     // AI-native headline baked in: "Your AI built the app. Who's watching it run?"
@@ -1518,9 +1544,12 @@ export const heroTemplates: HeroTemplate[] = [
     // dither axis-aligns, so scene drift/scan/rotation can only flip tiles
     // on/off at the threshold — every scene looks the same. Snap off lets the
     // dither flow freely under the square tile mask, so scene motion reads.
-    pixelGrid: { cell: 96, divisions: 3, gap: 13, radius: 0, snap: false },
+    // 24px tiles (Coarse, 10px Open gap). 32px (Chunky) read as a zoomed-in
+    // crop: too few tiles across the hero to show a shape.
+    pixelGrid: { cell: 72, divisions: 3, gap: 10, radius: 0, snap: false },
     // The most expressive color/alpha scene: diagonal scan + vertical wave,
-    // slow rotation, color cycling, and an orbiting non-looping drift.
+    // slow rotation and color cycling. No loop-break pan, so the panel's
+    // shape picks stay on canvas.
     scene: "error-sweep",
     animation: { tileDisplay: "color" },
     // Square, uppercase CTA to echo the sharp pixel tiles.

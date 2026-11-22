@@ -59,7 +59,7 @@ export default function PreviewCanvas({ onHome, actions }: { onHome?: () => void
     // pinned no matter how far the canvas is panned or zoomed.
     <div className="h-dvh flex flex-col bg-lab-canvas">
       {/* Pinned canvas toolbar */}
-      <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-lab-border bg-lab-toolbar backdrop-blur-xl">
+      <div className="shrink-0 z-10 h-lab-bar flex items-center justify-between px-6 border-b border-lab-border bg-lab-toolbar">
         <LabToolbarTitle
           onHome={onHome}
           view="Breakpoints"

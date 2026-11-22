@@ -41,13 +41,21 @@
 
   /* ── Lab UI (chrome, toolbars, Design Panel) — see DESIGN.md ──
      Text never goes below --color-lab-fg-subtle: 0.5 white is 5.4:1 on the
-     lab canvas (AA); 0.4 was 3.8:1 and 0.25 was 2.2:1. */
-  --color-lab-canvas: #0B0C14;
+     lab canvas (AA); 0.4 was 3.8:1 and 0.25 was 2.2:1.
+     --color-lab-site is the website's own background (the hero colorBack,
+     #0A1714 by default). HeroLab overwrites it on <html> whenever colorBack
+     changes, so toolbars and the Design Panel always wear the site's colour
+     and the canvas sits one step darker behind the artboards. */
+  --color-lab-site: #0A1714;
+  --color-lab-canvas: oklch(from var(--color-lab-site) calc(l - 0.035) c h);
   /* Black behind each artboard: the hero's own dark base shows before it paints. */
   --color-lab-artboard: #000;
-  --color-lab-toolbar: rgb(11 12 20 / 0.9);
-  --color-lab-surface: rgb(20 21 35 / 0.92);
-  --color-lab-panel: rgb(20 21 35 / 0.97);
+  --color-lab-toolbar: var(--color-lab-site);
+  --color-lab-surface: oklch(from var(--color-lab-site) calc(l + 0.035) c h / 0.95);
+  --color-lab-panel: var(--color-lab-site);
+  /* One height for every top bar: the demo site header, lab view toolbars and
+     the Design Panel header, so their bottom lines meet across the page. */
+  --spacing-lab-bar: 68px;
   --color-lab-fg: rgb(255 255 255 / 0.9);
   --color-lab-fg-muted: rgb(255 255 255 / 0.65);
   --color-lab-fg-subtle: rgb(255 255 255 / 0.5);
@@ -104,6 +112,9 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* A weight or italic that was never loaded shows as a plain regression,
+       not a browser-faked bold or slant. */
+    font-synthesis: none;
   }
 
   html.lenis-active {

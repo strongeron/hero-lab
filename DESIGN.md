@@ -113,9 +113,14 @@ only.)
 free values. Palette pairs (`palettes`), whole-pixel grain and gap stops
 (`grainPitch`, `gapFor`), warp feels (`warpFeels`) and tested type pairs
 (`typePairs`, laid over the copy by `resolveCopy`) live in `ditherStore.ts`. Picks
-are tiles built from lab tokens (`aria-pressed` for the selected state); a "Why"
-switch shows one reason per section. Shape thumbnails are canvas sketches, not
-the shader.
+are tiles built from lab tokens (`aria-pressed` for the selected state). Shape
+thumbnails are canvas sketches, not the shader.
+
+2026-11-22, panel header: the "Why" switch and its per-section reasons are gone;
+the previews show what a pick does. Shuffle, Copy and Reset sit in one track with
+the `box` Segmented's track and item styles (`actionTrack`, `action` in
+`DitherPanel.tsx`), without `aria-pressed`, because they are commands, not a
+choice. Reset keeps `text-lab-danger`.
 
 2026-11-22, panel previews: every Design Panel pick shows its result in a
 `LivePreview` (new part, contract in `design-system/components/live-preview.md`)
@@ -174,3 +179,19 @@ Chromium only, hidden elsewhere); green ≤ half the 60 Hz budget, amber ≤ the
 budget. "rAF capped" shows when frames are even at about 30 fps: the browser caps
 rAF (Low Power Mode, battery saver), and the page is not the cause.
 
+
+2026-11-22, lab chrome colour and bar height: toolbars and the Design Panel use
+`--color-lab-site`, the website's own background (the hero `colorBack`, `#0A1714`
+by default). HeroLab writes it on `<html>` when `colorBack` changes, so the
+chrome follows a theme or palette. `--color-lab-canvas` is one OKLCH step darker
+and `--color-lab-surface` one step lighter, both derived from it. The demo site
+header, the lab view toolbars and the Design Panel header share one height,
+`h-lab-bar` (68px), so their bottom lines meet across the page.
+
+2026-11-22, monospace scale: a mono face reads ~15% larger than a proportional
+one at the same px (fixed advance), so mono copy runs ~0.85× the sans sizes.
+`ai` (Problem): headline `clamp(2.5rem, 4vw + 1rem, 4.5rem)`, response 28px, and
+the new `subSize` / `ctaSize` copy fields at 15–17px and 14–16px (sans copies keep
+17/20px and 16/18px). `broke-fixed` and the Terminal pair cap at 3.875rem with
+-0.04em tracking. A type pair drops `subSize`/`ctaSize`, since its body face is
+proportional. `html` sets `font-synthesis: none`.

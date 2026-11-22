@@ -1628,7 +1628,7 @@ export default function DitherHero() {
                     {copy.headline}
                   </h1>
                   {copy.sub && (
-                    <p ref={lockSubRef} className="mt-3 md:mt-6 text-[17px] md:text-[20px] max-w-[65ch] text-pretty leading-[1.55] break-words [overflow-wrap:anywhere]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(baselineNudge.subGap > 0 ? { marginTop: 24 + baselineNudge.subGap } : {}), ...textReadabilityStyle }}>
+                    <p ref={lockSubRef} className="mt-3 md:mt-6 text-[17px] md:text-[20px] max-w-[65ch] text-pretty leading-[1.55] break-words [overflow-wrap:anywhere]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(copy.subSize ? { fontSize: copy.subSize } : {}), ...(baselineNudge.subGap > 0 ? { marginTop: 24 + baselineNudge.subGap } : {}), ...textReadabilityStyle }}>
                       {copy.sub}
                     </p>
                   )}
@@ -1699,6 +1699,7 @@ export default function DitherHero() {
                       // template's display face like the header CTAs do, unless
                       // that face goes weak at button size (see copy.ctaFont).
                       fontFamily: copy.ctaFont || copy.headlineFont || 'var(--font-display, Satoshi, sans-serif)',
+                      ...(copy.ctaSize ? { fontSize: copy.ctaSize } : {}),
                       ...ctaStyle,
                       textTransform: ctaTextTransform,
                       ...(copy.responsePin !== 'cta' && baselineNudge.cta !== 0 ? { transform: `translateY(${baselineNudge.cta}px)` } : {}),
@@ -1735,14 +1736,14 @@ export default function DitherHero() {
                 </div>
                 <div className="col-span-4 min-w-0 flex flex-col items-start justify-end gap-5 md:gap-8 pb-[2px] mt-6 md:mt-0 md:[grid-column:span_var(--rsp-cols)_/_span_var(--rsp-cols)] [container-type:inline-size] [--rsp-cap:6vw] md:[--rsp-cap:9.7cqw] xl:[--rsp-cap:999px]">
                   {copy.sub && (
-                    <p className="text-[17px] md:text-[20px] max-w-[65ch] text-pretty leading-[1.55] break-words [overflow-wrap:anywhere]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}) }}>
+                    <p className="text-[17px] md:text-[20px] max-w-[65ch] text-pretty leading-[1.55] break-words [overflow-wrap:anywhere]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(copy.subSize ? { fontSize: copy.subSize } : {}) }}>
                       {copy.sub}
                     </p>
                   )}
                   <a
                     href="#"
                     className="inline-flex items-center justify-center whitespace-nowrap px-7 py-3 text-[16px] xl:px-10 xl:py-4 xl:text-[18px] font-semibold tracking-wide transition-colors"
-                    style={{ backgroundColor: CTA_BG, color: ctaTextColor, ...ctaStyle, textTransform: ctaTextTransform }}
+                    style={{ backgroundColor: CTA_BG, color: ctaTextColor, ...(copy.ctaSize ? { fontSize: copy.ctaSize } : {}), ...ctaStyle, textTransform: ctaTextTransform }}
                     onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.style.backgroundColor = CTA_BG_HOVER }}
                     onPointerLeave={(e) => { e.currentTarget.style.backgroundColor = CTA_BG }}
                   >

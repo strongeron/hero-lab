@@ -58,8 +58,12 @@ const HERO = { w: 1440, h: 900 }
 const GAP_LABELS = { none: 'No gap', tight: 'Tight', open: 'Open' }
 
 const hint = 'text-lab-xs leading-snug text-lab-fg-subtle'
+/** Header actions sit in the same track as a `box` Segmented, so they read as
+ *  one control group, not three loose pills. Not Segmented itself: these are
+ *  commands, not a choice, so they carry no aria-pressed. */
+const actionTrack = 'flex items-center rounded-lg p-0.5 gap-0.5 bg-lab-fill border border-lab-border'
 const action =
-  'min-h-6 shrink-0 px-2 rounded-md border border-lab-border bg-lab-fill text-lab-xs font-medium text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover aria-pressed:bg-lab-fill-selected aria-pressed:text-lab-fg cursor-pointer transition-[color,background-color,border-color,scale] motion-safe:active:scale-[0.96] lab-focus'
+  'min-h-6 shrink-0 px-2.5 rounded-md border-0 bg-transparent text-lab-xs font-medium cursor-pointer transition-[color,background-color,scale] motion-safe:active:scale-[0.96] lab-focus'
 /** A pickable tile: palette, template, shape, type pair, copy. */
 const card = `${pickTile} p-1.5`
 
@@ -75,13 +79,10 @@ function Stable({ labels, show }: { labels: string[]; show: number }) {
   )
 }
 
-function Group({ title, value, why, showWhy, children }: { title: string; value?: ReactNode; why?: ReactNode; showWhy: boolean; children: ReactNode }) {
+function Group({ title, value, children }: { title: string; value?: ReactNode; children: ReactNode }) {
   return (
     <section className="space-y-2 pt-3 first:pt-0">
       <SectionLabel level={4} action={value ? <span className="text-lab-xs text-lab-fg-subtle tabular-nums">{value}</span> : undefined}>{title}</SectionLabel>
-      {showWhy && why && (
-        <p className="rounded-md border border-lab-accent/20 bg-lab-accent/5 px-2 py-1.5 text-lab-xs leading-snug text-lab-fg-muted">{why}</p>
-      )}
       {children}
     </section>
   )
@@ -115,7 +116,6 @@ export default function DitherPanel() {
   const h = state.hover
   const [copied, setCopied] = useState(false)
   const [copyFailed, setCopyFailed] = useState(false)
-  const [showWhy, setShowWhy] = useState(false)
   const [layer, setLayer] = useState(0)
 
   const otherState = state.initialState === 'fix' ? 'problem' : 'fix'
@@ -181,17 +181,16 @@ export default function DitherPanel() {
         <SectionLabel
           level={3}
           action={
-            <div className="flex items-center gap-1.5">
-              <button type="button" onClick={() => setShowWhy(!showWhy)} aria-pressed={showWhy} title="Show why each section is safe" className={action}>Why</button>
-              <button type="button" onClick={shuffle} title="A random mix of the presets" className={action}>Shuffle</button>
-              <button type="button" onClick={copyConfig} className={action} aria-live="polite">
+            <div role="group" aria-label="Panel actions" className={actionTrack}>
+              <button type="button" onClick={shuffle} title="A random mix of the presets" className={`${action} text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover`}>Shuffle</button>
+              <button type="button" onClick={copyConfig} title="Copy the settings as JSON" className={`${action} text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover`} aria-live="polite">
                 <Stable labels={['Copy', 'Copied', 'Failed']} show={copied ? 1 : copyFailed ? 2 : 0} />
               </button>
               <button
                 type="button"
                 onClick={() => applyHeroTemplate(state.activeTemplate ?? heroTemplates[0].id)}
                 title="Back to the template as authored"
-                className="min-h-6 px-1.5 rounded-md bg-transparent border-0 text-lab-xs font-medium text-lab-danger hover:text-lab-fg cursor-pointer transition-[color,background-color,border-color,scale] motion-safe:active:scale-[0.96] lab-focus"
+                className={`${action} text-lab-danger hover:bg-lab-fill-hover`}
               >
                 Reset
               </button>
@@ -203,8 +202,7 @@ export default function DitherPanel() {
       </div>
 
       <div className="px-3 py-3 space-y-1">
-        <Group title="Start from" showWhy={showWhy}
-          why="A template sets renderer, edge and scene together. None of those sit in this panel, so nothing below can break the resting state.">
+        <Group title="Start from">
           <div className="grid grid-cols-3 gap-1.5">
             {heroTemplates.map((t) => {
               const look = TEMPLATE_LOOK[t.id] ?? TEMPLATE_LOOK['full-bleed']
@@ -222,14 +220,12 @@ export default function DitherPanel() {
           </div>
         </Group>
 
-        <Group title="At rest" value={`hover reveals ${otherState}`} showWhy={showWhy}
-          why="The resting palette shows first; the hover reveals the other one. Both are authored, so the hover always shows a real state.">
+        <Group title="At rest" value={`hover reveals ${otherState}`}>
           <Segmented size="xs" stretch label="State at rest" value={state.initialState} onChange={setInitialState}
             options={[{ value: 'problem', label: 'Problem' }, { value: 'fix', label: 'Fix' }]} />
         </Group>
 
-        <Group title="Palette" value="rest, hover reveals" showWhy={showWhy}
-          why="Pairs, not pickers. Each of the three resting layers takes one colour of the pair; Prism and Aurora give every layer its own hue. Each pair is checked for contrast with the reveal and readable white text.">
+        <Group title="Palette" value="rest, hover reveals">
           <div className="grid grid-cols-2 gap-1.5">
             {paletteIds.map((id) => {
               const p = palettes[id]
@@ -254,9 +250,8 @@ export default function DitherPanel() {
           </div>
         </Group>
 
-        <Group title="Grid" showWhy={showWhy}
-          value={pg.enabled ? `${pitch}px tiles · ${pg.gap}px gap` : `${c.size}px dots`}
-          why="Whole pixels only. Every size and gap is an integer, so tiles stay sharp at 1× and 2×. The strip shows whole tiles at their real size.">
+        <Group title="Grid"
+          value={pg.enabled ? `${pitch}px tiles · ${pg.gap}px gap` : `${c.size}px dots`}>
           <LivePreview className="w-full h-20 rounded-md border border-lab-border" rate={shapeRate} draw={(ctx, time, W, H, dpr) => {
             // 1:1 crop of the hero's top band, whole tiles only, centred.
             drawHero(ctx, W, H, dpr, { ...heroSketch, layers: c.alphaLayers, t: time, zoom: 1, cy: HERO.h / 2 - 80, whole: true })
@@ -272,8 +267,7 @@ export default function DitherPanel() {
         {/* Shapes change nothing on a template that draws its own point sizes
             (gpuPath), so the group only shows where a shape pick is visible. */}
         {!gpuPath && (
-          <Group title="Shape" showWhy={showWhy}
-            why="Previews use the hero's own shape maths, tile size and scale, scaled down to the panel. Layers stack: a layer on top can hide the one below, as in the hero.">
+          <Group title="Shape">
             <div className="space-y-1">
               <LivePreview className="w-full h-20 rounded-md border border-lab-border" rate={shapeRate} draw={(ctx, time, W, H, dpr) => {
                 // The whole hero width, top first: what the hero shows, all layers.
@@ -305,15 +299,13 @@ export default function DitherPanel() {
           </Group>
         )}
 
-        <Group title="Speed" value={speed === 0 ? 'paused' : `${a.speed}×`} showWhy={showWhy}
-          why="Speed scales every loop in the hero: shape motion, scan and drift. The previews move at the same pace.">
+        <Group title="Speed" value={speed === 0 ? 'paused' : `${a.speed}×`}>
           <Segmented size="xs" stretch label="Speed" value={speed}
             onChange={(v) => setAnimationConfig(v === 0 ? { playing: false } : { playing: true, speed: v })}
             options={speedStops.map((s) => ({ value: s.value, label: s.label }))} />
         </Group>
 
-        <Group title="Hover · warp" showWhy={showWhy}
-          why="The warp is the only hover. Size and feel change how it looks, never what it reveals. Each preview runs the warp under a moving pointer.">
+        <Group title="Hover · warp">
           <SliderRow label="Size" value={h.radius} min={40} max={400} step={10} suffix="px" onChange={(v) => setHoverConfig({ radius: v })} />
           {pg.enabled ? (
             <div role="group" aria-label="Warp feel" className="grid grid-cols-4 gap-1.5">
@@ -345,8 +337,7 @@ export default function DitherPanel() {
           )}
         </Group>
 
-        <Group title="Copy" showWhy={showWhy}
-          why="Each copy set brings its own headline, response and sub, sized for the grid.">
+        <Group title="Copy">
           <div role="group" aria-label="Copy" className="grid grid-cols-2 gap-1.5">
             {copyVariantIds.map((id) => {
               const v = copyVariants[id]
@@ -362,8 +353,7 @@ export default function DitherPanel() {
           </div>
         </Group>
 
-        <Group title="Type pair" value={state.typePair ? pairShown.hint : 'the copy’s own'} showWhy={showWhy}
-          why="Tested pairs only. A pair sets display face, body face, weight, leading and tracking together, so the headline keeps its rhythm and the CTA its baseline.">
+        <Group title="Type pair" value={state.typePair ? pairShown.hint : 'the copy’s own'}>
           <div className="grid grid-cols-3 gap-1.5">
             {([null, ...typePairIds] as (TypePairId | null)[]).map((id) => {
               const p = id ? typePairs[id] : null
@@ -379,14 +369,14 @@ export default function DitherPanel() {
           </div>
         </Group>
 
-        <Group title="Button" showWhy={false}>
+        <Group title="Button">
           <Segmented size="xs" stretch label="Button shape"
             value={state.button.radius === 0 || state.button.radius === 12 || state.button.radius === 999 ? state.button.radius : null}
             onChange={(r) => setButtonConfig({ radius: r })}
             options={[{ value: 0, label: 'Square' }, { value: 12, label: 'Rounded' }, { value: 999, label: 'Pill' }]} />
         </Group>
 
-        <Group title="Guides" showWhy={false}>
+        <Group title="Guides">
           <div className="flex gap-3">
             <Toggle inline label="Layout guides" on={state.layout.showGuides} onChange={(on) => setLayoutConfig({ showGuides: on })}>Layout</Toggle>
             <Toggle inline label="Baseline guides" on={state.layout.showBaselines} onChange={(on) => setLayoutConfig({ showBaselines: on })}>Baselines</Toggle>

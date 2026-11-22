@@ -40,19 +40,23 @@ export default function DesignToggle({ open, onToggle, variant = 'toolbar' }: {
       </button>
     )
   }
+  // Same track and item as the `box` Segmented (xs) it sits next to, so the
+  // toolbar's controls share one height, radius and selected fill.
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={open}
-      aria-keyshortcuts="Meta+Shift+E Control+Shift+E"
-      title={label}
-      className={`min-h-6 shrink-0 inline-flex items-center gap-1.5 px-2 rounded-md border text-lab-xs font-medium cursor-pointer transition-[color,background-color,border-color,scale] motion-safe:active:scale-[0.96] lab-focus ${
-        open ? 'bg-lab-fill-selected border-lab-border-strong text-lab-fg' : 'bg-lab-fill border-lab-border text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover'
-      }`}
-    >
-      <SlidersIcon />
-      Design
-    </button>
+    <div className="flex items-center rounded-lg p-0.5 bg-lab-fill border border-lab-border">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={open}
+        aria-keyshortcuts="Meta+Shift+E Control+Shift+E"
+        title={label}
+        className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border-0 text-lab-xs font-medium cursor-pointer transition-[color,background-color,scale] motion-safe:active:scale-[0.96] lab-focus ${
+          open ? 'bg-lab-fill-selected text-lab-fg' : 'bg-transparent text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover'
+        }`}
+      >
+        <SlidersIcon />
+        Design
+      </button>
+    </div>
   )
 }

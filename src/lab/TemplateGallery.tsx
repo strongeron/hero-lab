@@ -74,7 +74,7 @@ export default function TemplateGallery({ actions }: { actions?: ReactNode }) {
   return (
     <div className="h-dvh flex flex-col bg-lab-canvas">
       {/* Pinned toolbar */}
-      <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-lab-border bg-lab-toolbar backdrop-blur-xl">
+      <div className="shrink-0 z-10 h-lab-bar flex items-center justify-between px-6 border-b border-lab-border bg-lab-toolbar">
         <LabToolbarTitle
           view="Canvas"
           strap="baked snapshots — select an artboard to load the live animation & edit in the Design Panel"

@@ -12,7 +12,7 @@ export default function DesignPanel({ onClose }: { onClose: () => void }) {
       data-design-panel
       className="fixed top-0 right-0 bottom-0 z-[1000] w-full sm:w-80 border-l bg-lab-panel border-lab-border flex flex-col overflow-hidden"
     >
-      <div className="flex items-center justify-between px-4 py-3 border-b border-lab-border shrink-0">
+      <div className="h-lab-bar flex items-center justify-between px-4 border-b border-lab-border shrink-0">
         <h2 className="m-0 text-lab-sm font-semibold text-lab-fg flex items-center gap-2">
           <SlidersIcon />
           Design Panel
