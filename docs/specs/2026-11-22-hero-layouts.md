@@ -1,7 +1,7 @@
 # Hero layouts: Centered and Wild type
 
 **Date:** 2026-11-22
-**Status:** draft, waiting for approval. No code until approved.
+**Status:** approved 2026-11-22 (all recommended answers taken), implemented on `claude/interesting-feistel-363566`.
 **Measured at:** `34062d4` (branch `claude/interesting-feistel-363566`, from `perf/single-pass-shader`).
 **Scope:** `src/heroes/dither/` (store, hero, tile field, panel), `src/lab/TemplateGallery.tsx`
 posters, DESIGN.md, GLOSSARY.md.
@@ -202,6 +202,58 @@ not cover it: the warp tooltip is `z-40`, so it needs a check near the CTA.
 canvases. Chromium composites this; Safari may not. Measure before committing
 to C on the Paper path.
 
-## Open questions
+## Decisions (2026-11-22, grilling round)
 
-See the hand-off message; the answers update this section before `ce-plan`.
+The user accepted every recommended answer:
+
+1. Rebased onto `perf/single-pass-shader` (`bd7d9c7`) before building.
+2. Layout is a store axis, `composition: { mode, halo, letterEdge }`, and
+   templates can set it. Glossary: **Composition**, **Halo**, **Letter fill**.
+3. Wild type works on all three renderers from one text-alpha canvas.
+4. Centered shows headline, sub and one CTA. No response line, no baseline lock.
+5. Copy variants get an optional `shortHeadline`; Wild type falls back to `headline`.
+6. Outside the letters: plain `colorBack`.
+7. Letter edge on the GPU field: Crisp (default) or Whole tiles. Paper is Crisp.
+8. The warp works inside the letters. Reduced motion pauses the Wild type field.
+9. Panel names: Layout → Split / Centered / Wild type. The unused `solution`
+   copy layout is removed (`CopyLayout` and `DitherCopy.layout` are gone).
+10. Two templates, **Center Stage** and **Wild Type**, with baked posters.
+
+## As built
+
+- Halo shape is not a knob. The GPU field and the Paper tile-grid path clear a
+  box (whole tiles); the Paper no-grid path (Fine Grain) clears a soft ellipse.
+  The only knob is Halo size: Tight (24 px) or Wide (72 px), `haloPad`.
+- Letter mask: `buildLetterMask` draws each glyph at the position the DOM
+  measured for it, so tracking and kerning cannot drift. GPU: R8 texture,
+  premultiplied on upload so the red channel is coverage. Paper: a data: URL
+  mask on the shader container and on the hover stack (a static wrapper,
+  because the reveal layer rewrites its own mask on every hover step).
+- Two heavy type pairs, **Heavy** (Anybody 900) and **Poster** (Dela Gothic
+  One). Wild Type uses Heavy.
+- `useDisplayFit`: largest size where no word breaks, ≤ 3 lines and ≤ 60 % of
+  the hero height.
+- Letter tint floor: the DOM `h1` at 22 % of the first layer colour, drawn over
+  the field. Solid colour when the GPU field fails. `forced-colors` overrides it.
+
+## Measured
+
+Headless Chrome 157, ANGLE Metal (Apple M4 Pro), 1440 × 900 at DPR 2, Live
+view, 3 s idle and 3 s with a hover sweep (script in the session scratchpad):
+
+| Template | Layout | Idle fps / worst frame | Hover fps / worst frame |
+| --- | --- | --- | --- |
+| Full Bleed | Split | 60 / 16.8 ms | 60 / 16.8 ms |
+| Center Stage | Centered | 60 / 16.8 ms | 60 / 16.8 ms |
+| Wild Type | Wild type | 60 / 16.8 ms | 60 / 16.8 ms |
+| Fine Grain | Split, Centered, Wild type | 60 / 16.8 ms each | 60 / 16.8 ms each |
+| Problem | Split, Centered, Wild type | 60 / 16.8 ms each | 60 / 16.8 ms each |
+
+No new WebGL context: the letter mask is one more texture on the existing GPU
+field, and a CSS mask layer on the Paper paths. Not measured: Safari, Firefox,
+a phone, or a low-end GPU.
+
+Contrast of the tint floor alone against `#0A1714` (sRGB mix): 1.6:1 on the fix
+green, 1.2:1 on the problem pink. It fails the 3:1 target; the full dots pass
+(9.7:1 green, 4.4:1 pink). Letter legibility rests on the dots, not the tint.
+Open: raise the tint (it washes out the field) or accept it for display text.

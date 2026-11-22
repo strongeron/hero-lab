@@ -233,3 +233,11 @@ tint. The response line and the CTA share one accent, `CTA_BG` from
 `heroCtaColors`, so the line reads as the button's lead-in. Every palette's
 `CTA_BG` is ≥ 4.29:1 on its background; the response is large text (≥ 28px, needs
 3:1). Only `responseColorMode: 'white'` (no template uses it) opts out.
+
+2026-11-22, compositions (`docs/specs/2026-11-22-hero-layouts.md`): a **Layout**
+group under "Start from" picks the composition: Split, Centered or Wild type, as
+pick tiles with a `LivePreview` sketch (`drawComposition` in `DitherPanel.tsx`).
+Centered adds a Halo `Segmented` (Tight / Wide). Wild type adds a Letter edge
+`Segmented` (Crisp / Whole tiles) on the GPU tile field only, and a hint that
+points to the heavy type pairs (Heavy, Poster). New templates: Center Stage and
+Wild Type.
