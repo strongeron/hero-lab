@@ -131,6 +131,12 @@ call site). `speedStops` / `speedStop` in `ditherStore.ts` are the one list of
 Speed stops (Still, Calm, Live, Wild). Layers restores the Design Panel look on
 exit with `snapshotDitherState` / `restoreDitherState`.
 
+2026-11-22, text inspector removed: click-to-inspect typography overrides are
+gone (they drew under the Design Panel, out of view, and their `!important`
+styles fought the hero's own type and the headline fit). Type is chosen with the
+Design Panel's Type pair. `src/lab/DesignPanel.tsx` is the docked shell (header,
+close, `DitherPanel` body); HeroLab owns its open state (`design-panel:open`).
+
 2026-11-22, Layers previews (`docs/specs/2026-11-22-layers-previews.md`): every
 Layers step row ends in a `LivePreview` thumbnail of the hero after that step,
 drawn by `src/lab/layerSketch.ts` (`stepLook`, `drawStep`) on top of

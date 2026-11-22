@@ -13,7 +13,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const click = (label) => page.evaluate((l) => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === l).click(), label);
 const state = () => page.evaluate(() => {
   const d = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Design');
-  return { panel: !!document.querySelector('[data-inspector-panel]'), pressed: d.getAttribute('aria-pressed'), disabled: d.disabled };
+  return { panel: !!document.querySelector('[data-design-panel]'), pressed: d.getAttribute('aria-pressed'), disabled: d.disabled };
 });
 const stripText = () => page.evaluate(() => document.querySelector('section[aria-label^="Performance"]')?.innerText.replace(/\s+/g, ' ') ?? null);
 const log = [];

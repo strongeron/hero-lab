@@ -1,7 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { TextInspectorProvider, useTextInspector, PANEL_WIDTH } from '../components/playground/TextInspectorContext'
-import { useTextSelection } from '../components/playground/useTextSelection'
-import { useApplyOverrides } from '../components/playground/useApplyOverrides'
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react'
 import { fontPairs } from '../themes/fonts'
 import { useDitherStore, setEdgeConfig, initDitherSync, applySceneTemplate, setPixelGridConfig, setAnimationConfig, setInitialState, applyHeroTemplate, heroTemplates } from '../heroes/dither/ditherStore'
 import { heroes, getHero } from './registry'
@@ -17,7 +14,7 @@ import Segmented from './ui/Segmented'
 // (with DitherPanel, about 90 KB raw) and the Layers view are not needed to
 // paint the hero. Templates and Breakpoints stay in the main chunk: Templates is
 // the first-visit view, and a lazy chunk there would add a round trip.
-const TextInspectorPanel = lazy(() => import('../components/playground/TextInspectorPanel'))
+const DesignPanel = lazy(() => import('./DesignPanel'))
 const LayerExplorer = lazy(() => import('./LayerExplorer'))
 
 const params = new URLSearchParams(window.location.search)
@@ -44,14 +41,15 @@ const previewSourceId = params.get('sid')
 // Mutate the active hero's store from the URL before React mounts.
 activeHero.applyUrlParams?.(params)
 
-function ActiveHero() {
-  const heroRef = useRef<HTMLDivElement>(null)
-  useTextSelection(heroRef)
-  useApplyOverrides(heroRef)
-  const Hero = activeHero.component
+/** Docked Design Panel width (DesignPanel is `sm:w-80`): the layout offsets
+ *  the hero by this much so the panel pushes content instead of covering it. */
+const PANEL_WIDTH = 320
+const PANEL_OPEN_KEY = 'design-panel:open'
 
+function ActiveHero() {
+  const Hero = activeHero.component
   return (
-    <div ref={heroRef} className="min-h-screen">
+    <div className="min-h-screen">
       <Hero />
     </div>
   )
@@ -230,12 +228,16 @@ const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
  *  separate on/off toggle, not one more view, so it is not in that group. */
 const designBtn = 'shrink-0 cursor-pointer border-0 font-medium transition-colors lab-focus rounded-full px-3 py-1.5 text-lab-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-lab-fg-muted'
 
-function LabLayout() {
+export default function HeroLab() {
   const fontPair = fontPairs['jakarta-dm']
   const heroState = useDitherStore()
-  const { enabled: panelOpen, setEnabled } = useTextInspector()
-  const themedRef = useRef<HTMLDivElement>(null)
-  const [themedNode, setThemedNode] = useState<HTMLDivElement | null>(null)
+  // Open by default; the choice persists per browser.
+  const [panelOpen, setPanelOpen] = useState(() => {
+    try { return localStorage.getItem(PANEL_OPEN_KEY) !== '0' } catch { return true }
+  })
+  useEffect(() => {
+    try { localStorage.setItem(PANEL_OPEN_KEY, panelOpen ? '1' : '0') } catch { /* private mode */ }
+  }, [panelOpen])
   // Read on first render, not in the effect: initialising to false gives a
   // phone one frame with the 320px desktop offset applied.
   const [isNarrow, setIsNarrow] = useState(() => window.matchMedia('(max-width: 639px)').matches)
@@ -271,7 +273,6 @@ function LabLayout() {
     mq.addEventListener('change', sync)
     return () => mq.removeEventListener('change', sync)
   }, [])
-  useEffect(() => { setThemedNode(themedRef.current) }, [])
   // A layout effect so the store is set up before any child view's effects
   // run. As a plain effect it ran after them (parent effects run last), so a
   // page that loaded straight into Layers reset to the bare scene and then
@@ -319,12 +320,12 @@ function LabLayout() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'E' || e.key === 'e')) {
         e.preventDefault()
-        setEnabled(!panelOpen)
+        setPanelOpen((open) => !open)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [panelOpen, setEnabled])
+  }, [])
 
   const themedVars = {
     '--font-display': fontPair.headline,
@@ -339,7 +340,7 @@ function LabLayout() {
   // toggles. The store mirrors the main window via initDitherSync above.
   if (isPreviewFrame) {
     return (
-      <div ref={themedRef} data-palette="glass" className="min-h-screen" style={themedVars}>
+      <div data-palette="glass" className="min-h-screen" style={themedVars}>
         <LabHeader headerBg={heroState.headerBg} rightOffset={0} button={heroState.button} />
         <ActiveHero />
       </div>
@@ -362,7 +363,6 @@ function LabLayout() {
         </div>
       ) : (
         <div
-          ref={themedRef}
           data-palette="glass"
           className="min-h-screen"
           style={{ ...themedVars, marginRight: panelOffset }}
@@ -375,7 +375,7 @@ function LabLayout() {
         </div>
       )}
 
-      {showPanel && <Suspense fallback={null}><TextInspectorPanel themedRoot={themedNode} paletteName="glass" /></Suspense>}
+      {showPanel && <Suspense fallback={null}><DesignPanel onClose={() => setPanelOpen(false)} /></Suspense>}
 
       <HeroSwitcher bottom={chromeBottom} />
 
@@ -402,7 +402,7 @@ function LabLayout() {
               surface there), so the toggle is shown but disabled with the
               reason, rather than vanishing from one view. */}
           <button
-            onClick={() => setEnabled(!panelOpen)}
+            onClick={() => setPanelOpen(!panelOpen)}
             disabled={viewMode === 'layers'}
             aria-pressed={viewMode === 'layers' ? undefined : panelOpen}
             aria-keyshortcuts="Meta+Shift+E Control+Shift+E"
@@ -416,13 +416,5 @@ function LabLayout() {
         </div>
       </div>
     </>
-  )
-}
-
-export default function HeroLab() {
-  return (
-    <TextInspectorProvider activeVariant={activeHero.id}>
-      <LabLayout />
-    </TextInspectorProvider>
   )
 }

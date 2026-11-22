@@ -168,7 +168,7 @@ export default function DitherPanel() {
   }
 
   return (
-    <div className="border-b border-lab-border">
+    <div>
       <div className="px-3 py-2 border-b border-lab-border">
         <SectionLabel
           level={3}

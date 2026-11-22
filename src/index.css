@@ -279,7 +279,7 @@
 }
 
 /* ── Lab range input (SliderRow, Design Panel) ── */
-:is([data-inspector-panel] input[type="range"], input.lab-range) {
+input.lab-range {
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
@@ -287,13 +287,13 @@
   cursor: pointer;
 }
 
-:is([data-inspector-panel] input[type="range"], input.lab-range)::-webkit-slider-runnable-track {
+input.lab-range::-webkit-slider-runnable-track {
   height: 3px;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.08);
 }
 
-:is([data-inspector-panel] input[type="range"], input.lab-range)::-webkit-slider-thumb {
+input.lab-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
@@ -305,19 +305,19 @@
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
-:is([data-inspector-panel] input[type="range"], input.lab-range)::-webkit-slider-thumb:hover {
+input.lab-range::-webkit-slider-thumb:hover {
   transform: scale(1.15);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
 }
 
-:is([data-inspector-panel] input[type="range"], input.lab-range)::-moz-range-track {
+input.lab-range::-moz-range-track {
   height: 3px;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.08);
   border: none;
 }
 
-:is([data-inspector-panel] input[type="range"], input.lab-range)::-moz-range-thumb {
+input.lab-range::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
