@@ -29,11 +29,12 @@ const isPreviewFrame = params.get('preview') === '1'
 /** Template a preview frame is pinned to (Templates gallery artboards). */
 const previewTemplate = params.get('template')
 /** Independent config pins for a preview frame (docs real-preview gallery):
- *  ?preview=1&scene=<id>&grid=0|1&tile=color|size|points&state=problem|fix.
+ *  ?preview=1&scene=<id>&grid=0|1&tile=color|points&state=problem|fix.
  *  When any is present the frame applies them locally and does NOT sync. */
 const pinScene = params.get('scene')
 const pinGrid = params.get('grid')
-const pinTile = params.get('tile') as 'color' | 'size' | 'points' | null
+const pinTileParam = params.get('tile')
+const pinTile = pinTileParam === 'color' || pinTileParam === 'points' ? pinTileParam : null
 const pinState = params.get('state') as 'problem' | 'fix' | null
 const isPinnedPreview = isPreviewFrame && !!(pinScene || pinGrid || pinTile || pinState)
 /** Source tab this preview binds to. Set by same-tab previews (Layers) so the
