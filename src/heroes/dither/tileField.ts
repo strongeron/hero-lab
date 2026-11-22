@@ -378,6 +378,18 @@ function locations(gl: WebGL2RenderingContext, p: WebGLProgram): Uniforms {
 
 /** One canvas, one WebGL2 context, two draws per frame. Throws if WebGL2 is
  *  unavailable; the caller shows the plain hero background instead. */
+/** GPU time of one frame (both passes), read by the PerfStrip. The strip sets
+ *  `enabled` while it is shown, so a closed strip issues no queries. Needs
+ *  EXT_disjoint_timer_query_webgl2 (desktop Chromium; Safari and most phones
+ *  do not have it). One query is in flight at a time; results arrive a frame
+ *  or two late. With several renderers in one document, the last one wins. */
+export const gpuTimer: { enabled: boolean; supported: boolean | undefined; ms: number | undefined } = {
+  enabled: false,
+  supported: undefined,
+  ms: undefined,
+}
+type TimerExt = { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number }
+
 export class TileFieldRenderer {
   readonly canvas: HTMLCanvasElement
   private gl: WebGL2RenderingContext
@@ -394,6 +406,8 @@ export class TileFieldRenderer {
   private lo = new Float32Array(MAX_LAYERS * 2)
   private rects = new Float32Array(MAX_RECTS * 4)
   private colorCache = new Map<string, [number, number, number]>()
+  private timerExt: TimerExt | null | undefined
+  private query: WebGLQuery | null = null
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -464,6 +478,7 @@ export class TileFieldRenderer {
     const rows = rowHi - rowLo + 1
     this.ensureTiles(cols, rows)
     gl.bindVertexArray(this.vao)
+    const timing = this.beginTiming()
 
     // ── Pass 1: tiles ──
     const u = this.tu
@@ -569,11 +584,35 @@ export class TileFieldRenderer {
       gl.uniform1f(p.u_hr, w.r)
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+    if (timing) gl.endQuery(timing.TIME_ELAPSED_EXT)
+  }
+
+  /** Reads the finished query, if any, and starts a new one when none is in
+   *  flight. Returns the extension only when a query was started. */
+  private beginTiming(): TimerExt | null {
+    if (!gpuTimer.enabled) return null
+    const gl = this.gl
+    if (this.timerExt === undefined) {
+      this.timerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2') as TimerExt | null
+      gpuTimer.supported = !!this.timerExt
+    }
+    const ext = this.timerExt
+    if (!ext) return null
+    if (this.query) {
+      if (!gl.getQueryParameter(this.query, gl.QUERY_RESULT_AVAILABLE)) return null
+      // A disjoint event (GPU clock change, context switch) spoils the result.
+      if (!gl.getParameter(ext.GPU_DISJOINT_EXT)) gpuTimer.ms = gl.getQueryParameter(this.query, gl.QUERY_RESULT) / 1e6
+      gl.deleteQuery(this.query)
+    }
+    this.query = gl.createQuery()
+    gl.beginQuery(ext.TIME_ELAPSED_EXT, this.query!)
+    return ext
   }
 
   dispose(): void {
     const gl = this.gl
     gl.deleteBuffer(this.vbo)
+    if (this.query) gl.deleteQuery(this.query)
     this.tex.forEach((t) => gl.deleteTexture(t))
     gl.deleteFramebuffer(this.fbo)
     gl.deleteProgram(this.tileProg)

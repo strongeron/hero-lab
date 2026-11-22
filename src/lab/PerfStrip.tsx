@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { CLSThresholds, FCPThresholds, INPThresholds, LCPThresholds, TTFBThresholds } from 'web-vitals'
 import { useDitherStore, heroTemplates } from '../heroes/dither/ditherStore'
+import { gpuTimer } from '../heroes/dither/tileField'
 import { vitals, subscribeVitals, countCanvases, longTasksLastSecond, longTaskSupported, heapUsedMB, connection, type VitalName } from './perfMonitor'
 
 export const PERF_STRIP_HEIGHT = 32
@@ -63,11 +64,12 @@ function useFrameStats() {
 
 /** Everything not frame-driven, polled at 2Hz. */
 function useSampled() {
-  const sample = () => ({ ...countCanvases(), tasks: longTasksLastSecond(), heap: heapUsedMB(), net: connection() })
+  const sample = () => ({ ...countCanvases(), tasks: longTasksLastSecond(), heap: heapUsedMB(), net: connection(), gpu: gpuTimer.ms, gpuSupported: gpuTimer.supported })
   const [s, setS] = useState(sample)
   useEffect(() => {
+    gpuTimer.enabled = true
     const id = setInterval(() => setS(sample()), 500)
-    return () => clearInterval(id)
+    return () => { clearInterval(id); gpuTimer.enabled = false; gpuTimer.ms = undefined }
   }, [])
   return s
 }
@@ -100,6 +102,8 @@ const VITALS: { name: VitalName; fmt: (v: number) => string; thresholds: readonl
   { name: 'FCP', fmt: sec, thresholds: FCPThresholds, note: `Diagnostic, not a Core Web Vital. ${LOAD_ONLY}` },
   { name: 'TTFB', fmt: ms, thresholds: TTFBThresholds, note: `Diagnostic, not a Core Web Vital. ${LOAD_ONLY} A local dev server reads faster than production.` },
 ]
+/** Shown as cells: the two vitals that react to what you do in the lab. */
+const LIVE_VITALS = new Set<VitalName>(['INP', 'CLS'])
 const vitalTitle = ({ name, fmt, thresholds: [good, poor], note }: (typeof VITALS)[number]) =>
   `${name}: green ≤ ${fmt(good)}, amber ≤ ${fmt(poor)}, red > ${fmt(poor)}. ${note} Source: web.dev field thresholds (good / needs improvement / poor). Lighthouse lab scores use other curves and TBT instead of INP.`
 
@@ -111,10 +115,22 @@ export default function PerfStrip({ rightOffset, inIframeView }: { rightOffset: 
   const s = useSampled()
   // Re-render whenever a vital reports a new value.
   useSyncExternalStore(subscribeVitals, () => VITALS.map((v) => vitals[v.name]?.value ?? '').join('|'))
+  // Load-only numbers and the environment, kept in the heading's tooltip: they
+  // do not change while you tune a hero, so they do not earn a cell.
+  const loadLine = VITALS.filter((v) => !LIVE_VITALS.has(v.name))
+    .map(({ name, fmt }) => `${name} ${vitals[name] ? fmt(vitals[name]!.value) : '–'}`).join(' · ')
+  const envLine = [
+    `${s.canvases} canvas${s.canvases === 1 ? '' : 'es'}`,
+    s.heap !== undefined && `heap ${s.heap.toFixed(0)}MB`,
+    s.net && `net ${s.net.effectiveType ?? '?'}${s.net.saveData ? ' save-data' : ''}`,
+  ].filter(Boolean).join(' · ')
   const { activeTemplate } = useDitherStore()
   const templateName = heroTemplates.find((t) => t.id === activeTemplate)?.name
 
   const fpsRating: Rating = frame.fps >= FPS_GOOD ? 'good' : frame.fps >= FPS_POOR ? 'needs-improvement' : 'poor'
+  // Steady ~30 fps with even frames means the browser caps rAF (Low Power
+  // Mode, battery saver, a throttled tab), not that the page is slow.
+  const capped30 = frame.fps > 27 && frame.fps < 33 && frame.worst < 40
 
   return (
     <section
@@ -125,7 +141,7 @@ export default function PerfStrip({ rightOffset, inIframeView }: { rightOffset: 
       <div className="h-full flex items-center gap-3 px-3 overflow-x-auto whitespace-nowrap">
         <span
           className="font-semibold text-lab-fg shrink-0"
-          title={inIframeView ? 'Measures this tab’s top document. The previews here run in iframes and are not counted.' : 'Measures this tab’s top document.'}
+          title={`${inIframeView ? 'Measures this tab’s top document. The previews here run in iframes and are not counted.' : 'Measures this tab’s top document.'}\nLoad (once per page load): ${loadLine}\n${envLine}`}
         >
           Perf <span className="font-normal text-lab-fg-subtle">this tab{inIframeView ? ', excl. iframes' : ''}</span>
         </span>
@@ -136,14 +152,16 @@ export default function PerfStrip({ rightOffset, inIframeView }: { rightOffset: 
             label="FPS"
             value={frame.fps.toFixed(0)}
             rating={fpsRating}
-            title={`Frames per second over the last 2s. Green ≥ ${FPS_GOOD}, amber ≥ ${FPS_POOR}, red < ${FPS_POOR}. ${FRAME_SOURCE}`}
+            title={`Frames per second over the last 2s; median frame ${frame.p50.toFixed(1)}ms. Green ≥ ${FPS_GOOD}, amber ≥ ${FPS_POOR}, red < ${FPS_POOR}. ${FRAME_SOURCE}`}
           />
-          <Cell
-            label="frame p50"
-            value={`${frame.p50.toFixed(1)}ms`}
-            rating={rate(frame.p50, 1000 / FPS_GOOD, 1000 / FPS_POOR)}
-            title={`Median frame time over the last 2s. Green ≤ ${(1000 / FPS_GOOD).toFixed(1)}ms, amber ≤ ${(1000 / FPS_POOR).toFixed(1)}ms, red above. ${FRAME_SOURCE}`}
-          />
+          {capped30 && (
+            <span
+              className="text-lab-fg-subtle shrink-0"
+              title="Frames are even but arrive at 30 Hz: the browser caps requestAnimationFrame (macOS Low Power Mode, a battery saver, or a background tab). A blank page reads the same. Plug in or turn the mode off to measure."
+            >
+              rAF capped
+            </span>
+          )}
           <Cell
             label="worst"
             value={`${frame.worst.toFixed(0)}ms`}
@@ -158,10 +176,18 @@ export default function PerfStrip({ rightOffset, inIframeView }: { rightOffset: 
               title={`${s.tasks.count} long task(s) in the last second. Blocked = each task's time past its first 50ms, the rule Lighthouse TBT uses. Green ≤ 50ms/s, amber ≤ 250ms/s, red above: a lab rule; TBT itself is summed over page load and Lighthouse calls ≤ 200ms good. Chromium only.`}
             />
           )}
+          {s.gpuSupported && (
+            <Cell
+              label="GPU"
+              value={s.gpu === undefined ? '–' : `${s.gpu.toFixed(1)}ms`}
+              rating={s.gpu === undefined ? undefined : rate(s.gpu, BUDGET_MS / 2, BUDGET_MS)}
+              title={`GPU time of one hero frame (tile and pixel passes), from a WebGL timer query. Green ≤ ${(BUDGET_MS / 2).toFixed(1)}ms (half the 60 Hz budget), amber ≤ ${BUDGET_MS.toFixed(1)}ms, red above. A lab rule. Only the hero in this document; iframe previews are not counted. Desktop Chromium only.`}
+            />
+          )}
         </dl>
         <Sep />
         <dl className="m-0 flex items-center gap-3">
-          {VITALS.map((v) => {
+          {VITALS.filter((v) => LIVE_VITALS.has(v.name)).map((v) => {
             const { name, fmt } = v
             const m = vitals[name]
             return <Cell key={name} label={name} value={m ? fmt(m.value) : '–'} rating={m?.rating} title={vitalTitle(v)} />
@@ -170,11 +196,6 @@ export default function PerfStrip({ rightOffset, inIframeView }: { rightOffset: 
         <Sep />
         <dl className="m-0 flex items-center gap-3">
           <Cell label="WebGL" value={String(s.webgl)} rating={rate(s.webgl, 8, 15)} title="Live WebGL contexts in this tab, also on detached canvases. Green ≤ 8, amber ≤ 15, red ≥ 16: Chromium keeps about 16 per page (may be fewer on mobile) and loses the oldest past that." />
-          <Cell label="canvases" value={String(s.canvases)} title="<canvas> elements in this document. No rating." />
-          {s.heap !== undefined && <Cell label="heap" value={`${s.heap.toFixed(0)}MB`} title="JS heap used (Chromium only; may be rounded and cached). No rating." />}
-          {s.net && (
-            <Cell label="net" value={`${s.net.effectiveType ?? '?'}${s.net.saveData ? ' · save-data' : ''}`} title="Network Information API effective type (Chromium only). No rating." />
-          )}
         </dl>
       </div>
     </section>

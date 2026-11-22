@@ -164,3 +164,13 @@ curves and TBT instead of INP. Frame cells use the 60 Hz budget, so 120 Hz scree
 stay green; blocked time and the WebGL count are lab rules. Each cell's `title`
 names its bands and source.
 
+2026-11-22, perf strip cells: the strip shows only what moves while you tune a
+hero — FPS, worst frame, blocked, GPU, INP, CLS and WebGL. Median frame time sits
+in the FPS tooltip. LCP, FCP and TTFB are measured once per load, and canvases,
+heap and network do not change while tuning, so they sit in the "Perf" heading's
+tooltip. GPU is the hero's two passes from `EXT_disjoint_timer_query_webgl2`
+(`gpuTimer` in `tileField.ts`, queried only while the strip is shown; desktop
+Chromium only, hidden elsewhere); green ≤ half the 60 Hz budget, amber ≤ the
+budget. "rAF capped" shows when frames are even at about 30 fps: the browser caps
+rAF (Low Power Mode, battery saver), and the page is not the cause.
+
