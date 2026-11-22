@@ -19,18 +19,22 @@ let raf = 0
 let last = 0
 const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
+/** Previews redraw at 30 fps at most: plenty for a thumbnail, and it leaves
+ *  the frame to the hero on 60 and 120 Hz screens. */
+const FRAME_MS = 1000 / 30
 function tick(now: number) {
-  const dt = last ? Math.min(0.05, (now - last) / 1000) : 0
-  last = now
   let any = false
+  for (const e of entries) if (e.visible && e.rate !== 0) { any = true; break }
+  if (!any) { raf = 0; last = 0; return }
+  raf = requestAnimationFrame(tick)
+  if (last && now - last < FRAME_MS - 1) return
+  const dt = last ? Math.min(0.1, (now - last) / 1000) : 0
+  last = now
   for (const e of entries) {
     if (!e.visible || e.rate === 0) continue
-    any = true
     e.t += dt * e.rate
     e.draw()
   }
-  raf = any ? requestAnimationFrame(tick) : 0
-  if (!any) last = 0
 }
 function wake() {
   if (!raf && !reduced) raf = requestAnimationFrame(tick)

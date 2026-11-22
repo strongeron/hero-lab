@@ -5,6 +5,7 @@ import {
   setInitialState,
   setAlphaLayer,
   setAnimationConfig,
+  setShaderConfig,
   setCopyVariant,
   setLayoutConfig,
   setButtonConfig,
@@ -40,7 +41,7 @@ import SliderRow from '../../lab/ui/SliderRow'
 import SectionLabel from '../../lab/ui/SectionLabel'
 import Toggle from '../../lab/ui/Toggle'
 import LivePreview from '../../lab/ui/LivePreview'
-import { drawField, loopPointer, type SketchLayer } from './panelSketch'
+import { drawField, drawHero, loopPointer, type SketchLayer } from './panelSketch'
 
 /* The Design Panel offers curated choices only: every option keeps the resting
    state and the hover intact. Renderer, edge, scene and hover mode belong to
@@ -51,6 +52,8 @@ const SHAPES: DitheringShape[] = ['simplex', 'warp', 'dots', 'wave', 'ripple', '
 const SPEEDS = [0, 0.5, 1, 2] as const
 const SPEED_LABELS = ['Still', 'Calm', 'Live', 'Wild']
 const GRAIN_LABELS = { fine: 'Fine', medium: 'Medium', coarse: 'Coarse', chunky: 'Chunky' }
+/** The hero size the Shape previews stand for (CSS px). */
+const HERO = { w: 1440, h: 900 }
 const GAP_LABELS = { none: 'No gap', tight: 'Tight', open: 'Open' }
 
 const hint = 'text-lab-xs leading-snug text-lab-fg-subtle'
@@ -127,6 +130,16 @@ export default function DitherPanel() {
   const gpuPath = pg.enabled && (a.tileDisplay === 'points' || pg.snap)
   /** Preview clock rate: the hero's speed, 0 while paused. */
   const tempo = a.playing ? a.speed : 0
+  // The hero's shape clock, as DitherHero computes it: Paper's u_time runs at
+  // shader.speed × Speed (× 1.8 for a playing scene at rest on Problem), and
+  // the shape reads half of it. Scene scan and drift are not drawn here.
+  const sceneBoost = state.initialState === 'problem' && a.tileDisplay === 'color' && state.activeScene != null && state.activeScene !== 'solid-classic' ? 1.8 : 1
+  const shapeRate = 0.5 * c.speed * sceneBoost * tempo
+  /** The hero's tiles in CSS px: pitch, gap and corner radius. */
+  const tile = pg.enabled
+    ? { pitch, gap: pg.gap, radius: a.tileDisplay === 'points' ? pitch / 2 : pg.radius }
+    : { pitch: c.size, gap: 0, radius: 0 }
+  const heroSketch = { back: c.colorBack, scale: c.scale, rotation: c.rotation, spread: c.alphaSpread, heroW: HERO.w, heroH: HERO.h, ...tile }
   const pairShown = typePairs[state.typePair ?? 'editorial']
   const copyFace = resolveCopy(state.copyVariant, null).headlineFont
 
@@ -233,18 +246,14 @@ export default function DitherPanel() {
           </div>
         </Group>
 
-        <Group title="Grain" showWhy={showWhy}
-          value={pg.enabled ? `${pitch}px pieces · ${pg.gap}px gap · 1:1` : `${c.size}px dots · 1:1`}
-          why="Whole pixels only. Every size and gap is an integer, so tiles stay sharp at 1× and 2×. The strip shows the real size.">
-          <LivePreview className="w-full h-12 rounded-md border border-lab-border" rate={tempo * 0.5} draw={(ctx, time, W, H, dpr) => {
-            const p = (pg.enabled ? pitch : c.size) * dpr
-            drawField(ctx, W, H, {
-              back: c.colorBack, layers: c.alphaLayers, t: time, zoom: 1.2,
-              pitch: p, gap: pg.enabled ? pg.gap * dpr : 0,
-              round: pg.enabled ? (gpuPath && a.tileDisplay === 'points' ? 1 : Math.min(1, (pg.radius * 2) / pitch)) : 0,
-            })
+        <Group title="Grid" showWhy={showWhy}
+          value={pg.enabled ? `${pitch}px tiles · ${pg.gap}px gap` : `${c.size}px dots`}
+          why="Whole pixels only. Every size and gap is an integer, so tiles stay sharp at 1× and 2×. The strip shows whole tiles at their real size.">
+          <LivePreview className="w-full h-20 rounded-md border border-lab-border" rate={shapeRate} draw={(ctx, time, W, H, dpr) => {
+            // 1:1 crop of the hero's top band, whole tiles only, centred.
+            drawHero(ctx, W, H, dpr, { ...heroSketch, layers: c.alphaLayers, t: time, zoom: 1, cy: HERO.h / 2 - 80, whole: true })
           }} />
-          <Segmented size="xs" stretch label="Grain" value={grain} onChange={setGrain}
+          <Segmented size="xs" stretch label="Tile size" value={grain} onChange={setGrain}
             options={grainIds.map((g) => ({ value: g, label: GRAIN_LABELS[g] }))} />
           {pg.enabled && (
             <Segmented size="xs" stretch label="Gap" value={gap} onChange={setGap}
@@ -252,14 +261,22 @@ export default function DitherPanel() {
           )}
         </Group>
 
-        <Group title="Shape & speed" value={speed === 0 ? 'paused' : `${a.speed}×`} showWhy={showWhy}
-          why="Each resting layer draws one shape; the big preview shows the picked layer on top of the others. Speed drives every loop, here and in the hero.">
+        <Group title="Shape & speed" value={speed === 0 ? 'paused' : `${SPEED_LABELS[SPEEDS.indexOf(speed ?? 1)] ?? ''} · ${a.speed}×`} showWhy={showWhy}
+          why="Previews use the hero's own shape maths, tile size and scale, scaled down to the panel. Layers stack: a layer on top can hide the one below, as in the hero.">
           {gpuPath ? (
             <p className={hint}>
               This template draws point sizes from its own noise, so layer shapes do not change it. Start from Problem or Fine Grain to use shapes.
             </p>
           ) : (
             <>
+              <div className="space-y-1">
+                <LivePreview className="w-full h-20 rounded-md border border-lab-border" rate={shapeRate} draw={(ctx, time, W, H, dpr) => {
+                  // The whole hero width, top first: what the hero shows, all layers.
+                  const zoom = W / dpr / HERO.w
+                  drawHero(ctx, W, H, dpr, { ...heroSketch, layers: c.alphaLayers, t: time, zoom, cy: HERO.h / 2 - H / dpr / zoom / 2 })
+                }} />
+                <p className={hint}>The hero, all layers. Tiles below: the picked layer alone.</p>
+              </div>
               <div role="group" aria-label="Layer" className="grid grid-cols-3 gap-1.5">
                 {c.alphaLayers.map((l, i) => (
                   <button key={i} type="button" aria-pressed={layer === i} onClick={() => setLayer(i)} className={`${card} flex min-h-7 items-center gap-1.5 px-1.5 py-1`}>
@@ -268,28 +285,24 @@ export default function DitherPanel() {
                   </button>
                 ))}
               </div>
-              <LivePreview className="w-full h-16 rounded-md border border-lab-border" rate={tempo} draw={(ctx, time, W, H, dpr) => {
-                drawField(ctx, W, H, {
-                  back: c.colorBack, layers: c.alphaLayers, t: time, pitch: 3 * dpr, gap: 0,
-                  alpha: c.alphaLayers.map((_, i) => (i === layer ? 1 : 0.18)),
-                })
-              }} />
               <div className="grid grid-cols-4 gap-1.5">
                 {SHAPES.map((s) => (
                   <button key={s} type="button" aria-pressed={c.alphaLayers[layer]?.shape === s} onClick={() => setAlphaLayer(layer, { shape: s })} className={`${card} grid gap-1 p-1`}>
-                    <LivePreview className="w-full aspect-[3/2] rounded-sm" rate={tempo} draw={(ctx, time, W, H, dpr) => {
+                    <LivePreview className="w-full aspect-[8/5] rounded-sm" rate={shapeRate} draw={(ctx, time, W, H, dpr) => {
                       const l = c.alphaLayers[layer]
-                      drawField(ctx, W, H, { back: c.colorBack, layers: [{ color: l?.color ?? '#fff', shape: s, opacity: 1 }], t: time, pitch: 2 * dpr, gap: 0 })
+                      drawHero(ctx, W, H, dpr, { ...heroSketch, layers: [{ color: l?.color ?? '#fff', shape: s, opacity: 1 }], t: time, zoom: W / dpr / HERO.w })
                     }} />
                     <span className="truncate px-0.5 text-lab-xs">{s}</span>
                   </button>
                 ))}
               </div>
+              <SliderRow label="Shape size" value={c.scale} min={0.1} max={2} step={0.05} suffix="×" onChange={(v) => setShaderConfig({ scale: v })} />
             </>
           )}
           <Segmented size="xs" stretch label="Speed" value={speed}
             onChange={(v) => setAnimationConfig(v === 0 ? { playing: false } : { playing: true, speed: v })}
             options={SPEEDS.map((s, i) => ({ value: s, label: SPEED_LABELS[i] }))} />
+          <p className={hint}>Speed scales every loop in the hero: shape motion, scan and drift. The previews move at the hero's shape pace.</p>
         </Group>
 
         <Group title="Hover · warp" showWhy={showWhy}

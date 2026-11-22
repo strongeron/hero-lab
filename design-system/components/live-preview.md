@@ -1,5 +1,5 @@
 ---
-sourcesHash: fabb13983dc705a665fca8ad2b4d4f87b6f949d47346b8d30b738c0411a68cf2
+sourcesHash: bb37dbd2c0a5dd67955d6e7821d632a2052aa08d1c79a4e877b58363731396ce
 id: live-preview
 description: >-
   Show what a setting does with a small live canvas next to or inside its
@@ -38,7 +38,9 @@ sources:
 
 All previews share one `requestAnimationFrame` loop. A preview advances only
 while it is on screen (IntersectionObserver), so a closed or scrolled-away panel
-costs nothing; the loop stops when no visible preview animates. Each preview is a
+costs nothing; the loop stops when no visible preview animates. Previews redraw
+at 30 fps at most, so they leave the frame to the hero on 60 and 120 Hz screens.
+Each preview is a
 2D canvas; it never creates a WebGL context. It redraws on every render, so a
 paused preview still follows the settings.
 

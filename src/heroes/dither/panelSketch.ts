@@ -133,3 +133,176 @@ export function drawField(ctx: CanvasRenderingContext2D, W: number, H: number, o
 export function loopPointer(t: number, W: number, H: number) {
   return { x: W * (0.5 + 0.32 * Math.sin(t * 0.9)), y: H * (0.5 + 0.28 * Math.sin(t * 1.4 + 0.6)) }
 }
+
+/* ── Paper-faithful sketch ──
+   The Shape and Grid previews use Paper's own shape maths (Dithering shader,
+   @paper-design/shaders) in hero CSS px, so a preview shows the same pattern
+   at the same scale and pace as the hero, only smaller. */
+
+// 2D simplex noise (Ashima / Gustavson), the same function Paper uses.
+const mod289 = (x: number) => x - Math.floor(x / 289) * 289
+const permute = (x: number) => mod289((x * 34 + 1) * x)
+function snoise(x: number, y: number) {
+  const C0 = 0.211324865405187, C1 = 0.366025403784439, C2 = -0.577350269189626, C3 = 0.024390243902439
+  const s = (x + y) * C1
+  let ix = Math.floor(x + s), iy = Math.floor(y + s)
+  const t = (ix + iy) * C0
+  const x0 = x - ix + t, y0 = y - iy + t
+  const i1x = x0 > y0 ? 1 : 0, i1y = x0 > y0 ? 0 : 1
+  const x1 = x0 + C0 - i1x, y1 = y0 + C0 - i1y
+  const x2 = x0 + C2, y2 = y0 + C2
+  ix = mod289(ix); iy = mod289(iy)
+  const p0 = permute(permute(iy) + ix), p1 = permute(permute(iy + i1y) + ix + i1x), p2 = permute(permute(iy + 1) + ix + 1)
+  let n = 0
+  for (const [p, dx, dy] of [[p0, x0, y0], [p1, x1, y1], [p2, x2, y2]] as const) {
+    let m = Math.max(0.5 - dx * dx - dy * dy, 0)
+    m = m * m; m = m * m
+    const fx = 2 * ((p * C3) % 1 + ((p * C3) % 1 < 0 ? 1 : 0)) - 1
+    const h = Math.abs(fx) - 0.5
+    const a0 = fx - Math.floor(fx + 0.5)
+    m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h)
+    n += m * (a0 * dx + h * dy)
+  }
+  return 130 * n
+}
+const fract = (x: number) => x - Math.floor(x)
+const hash11 = (p: number) => { p = fract(p * 0.3183099) + 0.1; p *= p + 19.19; return fract(p * p) }
+const smooth = (a: number, b: number, x: number) => { const k = Math.max(0, Math.min(1, (x - a) / (b - a))); return k * k * (3 - 2 * k) }
+
+/** Paper's shape value (0…1) at a hero point. x, y: CSS px from the hero
+ *  centre, y up. W, H: hero size. t: Paper time (0.5 × u_time). */
+export function paperShape(shape: DitheringShape, x: number, y: number, t: number, W: number, H: number, scale: number, rotation: number): number {
+  const r = rotation * Math.PI / 180, c = Math.cos(r), s = Math.sin(r)
+  const pattern = shape === 'simplex' || shape === 'warp' || shape === 'dots'
+  // Pattern shapes: CSS px × (min / max) for fit cover; object shapes: ÷ max side.
+  const k = pattern ? Math.min(W, H) / Math.max(W, H) : 1 / Math.max(W, H)
+  let u = (x * k) / scale, v = (y * k) / scale
+  ;[u, v] = [c * u + s * v, -s * u + c * v]
+  if (pattern) { u += 0.5; v += 0.5 }
+  switch (shape) {
+    case 'simplex': {
+      u *= 0.001; v *= 0.001
+      const n = 0.5 * snoise(u, v - 0.3 * t) + 0.5 * snoise(2 * u, 2 * v + 0.32 * t)
+      return smooth(0.3, 0.9, 0.5 + 0.5 * n)
+    }
+    case 'warp': {
+      u *= 0.003; v *= 0.003
+      for (let i = 1; i < 6; i++) {
+        u += 0.6 / i * Math.cos(i * 2.5 * v + t)
+        v += 0.6 / i * Math.cos(i * 1.5 * u + t)
+      }
+      return smooth(0.02, 1, 0.15 / Math.max(0.001, Math.abs(Math.sin(t - v - u))))
+    }
+    case 'dots': {
+      u *= 0.05; v *= 0.05
+      const idx = Math.floor(2 * u / (2 * Math.PI))
+      let rnd = hash11(idx * 10)
+      rnd = Math.sign(rnd - 0.5) * Math.pow(0.1 + Math.abs(rnd), 0.4)
+      return Math.pow(Math.abs(Math.sin(u) * Math.cos(v - 5 * rnd * t)), 6)
+    }
+    case 'wave': {
+      u *= 4; v *= 4
+      const wave = Math.cos(0.5 * u - 2 * t) * Math.sin(1.5 * u + t) * (0.75 + 0.25 * Math.cos(3 * t))
+      return 1 - smooth(-1, 1, v + wave)
+    }
+    case 'ripple': return Math.sin(Math.pow(Math.hypot(u, v), 1.7) * 7 - 3 * t) * 0.5 + 0.5
+    case 'swirl': {
+      const l = Math.max(Math.hypot(u, v), 1e-6)
+      const offset = 1 / Math.pow(l, 1.2) + (6 * Math.atan2(v, u) + 4 * t) / (2 * Math.PI)
+      return smooth(0, 1, Math.pow(l, 1.2)) * fract(offset)
+    }
+    case 'sphere': {
+      u *= 2; v *= 2
+      const d = 1 - (u * u + v * v)
+      if (d < 0) return 0
+      const lx = Math.cos(1.5 * t), ly = 0.8, lz = Math.sin(1.25 * t), ln = Math.hypot(lx, ly, lz)
+      return 0.5 + 0.5 * (lx * u + ly * v + lz * Math.sqrt(d)) / ln
+    }
+  }
+}
+
+const BAYER8 = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21].map((n) => n / 64)
+const rgb = (hex: string) => { const n = parseInt(hex.slice(1, 7), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255] }
+
+export interface HeroSketch {
+  back: string
+  layers: SketchLayer[]
+  /** Paper time. */
+  t: number
+  scale: number
+  rotation: number
+  /** shader.alphaSpread: each layer's small offset. */
+  spread: number
+  /** Hero size the preview stands for (CSS px). */
+  heroW: number
+  heroH: number
+  /** Preview px per hero CSS px (1 = true size). */
+  zoom: number
+  /** Hero point at the preview centre (CSS px from the hero centre, y up). */
+  cx?: number
+  cy?: number
+  /** Tile pitch, gap and corner radius in hero CSS px. */
+  pitch: number
+  gap: number
+  radius: number
+  /** Draw only whole tiles, centred: no tile is cut at the edge. */
+  whole?: boolean
+}
+
+/** Draw the hero as Paper composes it: one dither cell per tile, Bayer 8×8,
+ *  every layer screen-blended at its opacity. W, H in device px; dpr maps
+ *  CSS px to device px. */
+export function drawHero(ctx: CanvasRenderingContext2D, W: number, H: number, dpr: number, o: HeroSketch) {
+  // Tile pitch in device px. A scaled-down preview of a fine grid samples
+  // coarser cells: at least 2 px, and at most ~4000 cells per canvas.
+  const pd = Math.max(2, Math.sqrt((W * H) / 4000), o.pitch * o.zoom * dpr)
+  const gd = pd >= 3 ? Math.min(pd - 1, Math.round(o.gap * o.zoom * dpr)) : 0
+  const cols = o.whole ? Math.max(1, Math.floor(W / pd)) : Math.ceil(W / pd) + 1
+  const rows = o.whole ? Math.max(1, Math.floor(H / pd)) : Math.ceil(H / pd) + 1
+  const ox = o.whole ? Math.round((W - cols * pd) / 2) : Math.round(W / 2 - Math.ceil(W / 2 / pd) * pd)
+  const oy = o.whole ? Math.round((H - rows * pd) / 2) : Math.round(H / 2 - Math.ceil(H / 2 / pd) * pd)
+  const n = o.layers.length
+  const groups = new Map<number, number[]>()
+  const M = Math.max(o.heroW, o.heroH)
+  for (let iy = 0; iy < rows; iy++) {
+    for (let ix = 0; ix < cols; ix++) {
+      const px = ox + (ix + 0.5) * pd, py = oy + (iy + 0.5) * pd
+      const hx = (o.cx ?? 0) + (px - W / 2) / (o.zoom * dpr)
+      const hy = (o.cy ?? 0) - (py - H / 2) / (o.zoom * dpr)
+      const thr = 1 - BAYER8[(iy & 7) * 8 + (ix & 7)]
+      let mask = 0
+      for (let k = 0; k < n; k++) {
+        const l = o.layers[k]
+        if (l.opacity <= 0) continue
+        const sp = o.spread * k
+        if (paperShape(l.shape, hx - sp * 2 * M, hy + sp * 1.5 * M, o.t, o.heroW, o.heroH, o.scale, o.rotation) >= thr) mask |= 1 << k
+      }
+      if (!mask) continue
+      let a = groups.get(mask)
+      if (!a) groups.set(mask, (a = []))
+      a.push(Math.round(ox + ix * pd + gd / 2), Math.round(oy + iy * pd + gd / 2), Math.round(ox + (ix + 1) * pd - gd / 2), Math.round(oy + (iy + 1) * pd - gd / 2))
+    }
+  }
+  ctx.globalAlpha = 1
+  ctx.fillStyle = o.back
+  ctx.fillRect(0, 0, W, H)
+  const back = rgb(o.back)
+  const rad = o.radius * o.zoom * dpr
+  for (const [mask, a] of groups) {
+    // Screen blend of the lit layers over the back: 1 − Π(1 − c·α).
+    const out = back.map((b, ch) => {
+      let inv = 1 - b / 255
+      for (let k = 0; k < n; k++) if (mask & (1 << k)) inv *= 1 - (rgb(o.layers[k].color)[ch] / 255) * o.layers[k].opacity
+      return Math.round((1 - inv) * 255)
+    })
+    ctx.fillStyle = `rgb(${out[0]} ${out[1]} ${out[2]})`
+    ctx.beginPath()
+    for (let i = 0; i < a.length; i += 4) {
+      const w = a[i + 2] - a[i], h = a[i + 3] - a[i + 1]
+      if (w <= 0 || h <= 0) continue
+      if (rad >= 0.5 && w > 2) ctx.roundRect(a[i], a[i + 1], w, h, Math.min(rad, w / 2))
+      else ctx.rect(a[i], a[i + 1], w, h)
+    }
+    ctx.fill()
+  }
+}

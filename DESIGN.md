@@ -114,3 +114,11 @@ and warp feels under a looping pointer. Shape is hidden on the GPU tile field
 says so. Prism and Aurora give each layer its own hue (the old multi-colour mode
 stays removed).
 
+2026-11-22, faithful previews: the Grid and Shape previews use `drawHero`
+(`panelSketch.ts`), a port of Paper's Dithering shape maths in hero CSS px. They
+show the hero's own tile pitch, gap, shape scale (new **Shape size** slider,
+`shader.scale`) and shape clock (`shader.speed` × Speed), one dither cell per
+tile, layers screen-blended. The Grid strip (was "Grain") draws whole tiles only,
+at 1:1. Scene scan, drift and colour cycling are not drawn. Each preview caps at
+~4000 cells.
+
