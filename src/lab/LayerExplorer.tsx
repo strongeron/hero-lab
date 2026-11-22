@@ -11,12 +11,15 @@ import {
   applySceneTemplate,
   batchDitherUpdates,
   setStableColorField,
+  setSceneMotion,
   getTabSourceId,
   getDitherState,
   defaultEdgeConfig,
   heroTemplates,
   sceneTemplates,
   type DitherState,
+  type DitherAnimationConfig,
+  type DitherShaderConfig,
   type SceneTemplateId,
 } from '../heroes/dither/ditherStore'
 import LabToolbarTitle from './LabToolbarTitle'
@@ -37,6 +40,8 @@ const PAD = 40
 const TOGGLE_COL = 400
 
 type Verdict = 'core' | 'signature' | 'situational' | 'redundant'
+// Scoped exception to "tokens only" (DESIGN.md): each badge hue names a verdict
+// category, and the lab has no category tokens.
 const verdictStyle: Record<Verdict, string> = {
   core: 'text-emerald-300/80 border-emerald-400/30 bg-emerald-400/10',
   signature: 'text-amber-300/80 border-amber-400/30 bg-amber-400/10',
@@ -49,16 +54,30 @@ const verdictStyle: Record<Verdict, string> = {
  *  pans like Gentle Drift; Breath and Breathe spin and pulse like Living;
  *  Error Sweep is a faster Radar. Their extra parts (gap pulse, tile size,
  *  colour cycling) only show with the pixel grid or outside this view, where
- *  stableColorField holds the colour still. The Break-loop modes are left out
- *  for the same reason: Drift, Rotate and Orbit are the pan and spin these
- *  scenes already have, and each scene keeps its own default mode. */
-const LAYER_SCENES: { id: SceneTemplateId; moves: string }[] = [
-  { id: 'solid-classic', moves: 'shape changes slowly · nothing moves' },
-  { id: 'gentle-drift', moves: 'shape changes · field pans' },
-  { id: 'living-texture', moves: 'shape changes · field spins and pulses' },
-  { id: 'orbit', moves: 'shape changes · field pans and spins' },
-  { id: 'radar-scan', moves: 'shape changes · field scans back and forth' },
-]
+ *  stableColorField holds the colour still. */
+const LAYER_SCENES: SceneTemplateId[] = ['solid-classic', 'gentle-drift', 'living-texture', 'orbit', 'radar-scan']
+
+/** Speed presets: every motion rate of the scene times x, so "2×" makes the
+ *  whole scene twice as fast, not only the shape changes. Loop-break amount is
+ *  its pan/spin rate (DitherHero), so it scales too. */
+const SPEEDS = [0.5, 1, 2]
+const RATE_SHADER = ['speed', 'colorCycleSpeed'] as const
+const RATE_ANIM = ['driftX', 'driftY', 'rotationDrift', 'pulseSpeed', 'scanSpeed', 'waveSpeed', 'gapPulseSpeed', 'tileSizeSpeed', 'loopBreakAmount'] as const
+
+/** What the motion visibly does, read from the same values DitherHero uses. */
+function describeMotion(a: DitherAnimationConfig, speed: number) {
+  const lb = a.loopBreakAmount > 0 ? a.loopBreak : 'none'
+  const pans = a.driftX !== 0 || a.driftY !== 0 || lb === 'drift' || lb === 'orbit' || lb === 'wander'
+  const spins = a.rotationDrift !== 0 || lb === 'rotate' || lb === 'orbit' || lb === 'wander'
+  const scans = a.scanMode === 'oscillate' && a.scanAmplitude > 0
+  const parts = [speed < 0.05 ? 'shape changes slowly' : 'shape changes']
+  if (scans) parts.push('scans back and forth')
+  if (pans || spins) parts.push(`field ${pans && spins ? 'pans and spins' : pans ? 'pans' : 'spins'}`)
+  if (a.waveAmplitude > 0) parts.push('wave sweeps')
+  if (a.pulseAmount >= 0.03) parts.push('pulses')
+  if (!pans && !spins && !scans) parts.push('nothing pans or spins')
+  return parts.join(' · ')
+}
 
 export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   const s = useDitherStore()
@@ -68,6 +87,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   // step can restore that template's own value for its setting.
   const target = useRef<DitherState | null>(null)
   const t = target.current ?? s
+  const [speedX, setSpeedX] = useState(1)
 
   // Without the grid, the shader's own cell size shows. A gridded template
   // keeps a large size (16) that only reads through the grid, so the bare step
@@ -107,7 +127,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
     },
     {
       name: tileLabel, verdict: 'core', vlabel: 'Core',
-      value: `dots sized by the dither · spread ${t.animation.tileSizeSpread}`,
+      value: `${t.animation.tileDisplay === 'size' ? 'tiles' : 'dots'} sized by the dither · spread ${t.animation.tileSizeSpread}`,
       used: t.pixelGrid.enabled && t.animation.tileDisplay !== 'color',
       on: s.pixelGrid.enabled && s.animation.tileDisplay === t.animation.tileDisplay,
       set: (on) => {
@@ -151,11 +171,34 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   function applyLevel(lv: number) {
     batchDitherUpdates(() => STACK.forEach((L, i) => L.set(i < lv)))
   }
+  /** Step 0: a scene (null = the template's own motion) at speed x. Re-applies
+   *  the scene first, so x always scales the scene's own rates. */
+  function applyMotion(scene: SceneTemplateId | null, x: number) {
+    const tg = target.current
+    if (!tg) return
+    batchDitherUpdates(() => {
+      if (scene) applySceneTemplate(scene)
+      else {
+        setShaderConfig({ speed: tg.shader.speed, colorCycleSpeed: tg.shader.colorCycleSpeed })
+        // tileDisplay is a step (Point sizes), not motion: keep the current one.
+        setAnimationConfig({ ...tg.animation, tileDisplay: getDitherState().animation.tileDisplay, playing: true })
+      }
+      if (x !== 1) {
+        const { shader, animation } = getDitherState()
+        setSceneMotion(
+          Object.fromEntries(RATE_SHADER.map((k) => [k, shader[k] * x])) as Partial<DitherShaderConfig>,
+          Object.fromEntries(RATE_ANIM.map((k) => [k, animation[k] * x])) as Partial<DitherAnimationConfig>,
+        )
+      }
+    })
+    setSpeedX(x)
+  }
   // Load a template and strip it to its bare scene.
   function explore(id: string) {
     applyHeroTemplate(id)
     target.current = structuredClone(getDitherState())
     restoreId.current = id
+    setSpeedX(1)
     // Calm the screen-blended Color/alpha base while exploring layers — see
     // DitherState.stableColorField. applyHeroTemplate resets it, so set it after.
     setStableColorField(true)
@@ -212,12 +255,14 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
     return `${window.location.pathname}?${p.toString()}`
   }, [])
 
-  const activeScene = LAYER_SCENES.find((x) => x.id === s.activeScene)
-  const activeSceneHint = activeScene
-    ? `${sceneTemplates[activeScene.id].label} · ${activeScene.moves} · speed ${s.shader.speed}`
-    : s.activeScene
-      ? `${sceneTemplates[s.activeScene].label} · the template's scene · speed ${s.shader.speed}`
-      : `the template's own motion · speed ${s.shader.speed}`
+  const ownMotion = s.activeScene === t.activeScene
+  const sceneName = s.activeScene ? sceneTemplates[s.activeScene].label : 'Template motion'
+  const activeSceneHint = `${sceneName}${ownMotion && s.activeScene ? ' (template)' : ''} · ${describeMotion(s.animation, s.shader.speed)} · speed ${+s.shader.speed.toFixed(3)} (${speedX}×)`
+  // Shared by the Layers buttons: 150ms colour, and a press scale only when
+  // the viewer allows motion and the button is enabled.
+  const pressable = 'cursor-pointer transition-[color,background-color,border-color,scale] duration-150 ease-out motion-safe:enabled:active:scale-[0.96] disabled:opacity-40 disabled:cursor-not-allowed lab-focus'
+  const smallBtn = `grid place-items-center rounded-md border border-lab-border bg-transparent text-lab-fg-muted enabled:hover:text-lab-fg enabled:hover:border-lab-border-strong ${pressable}`
+  const topBtn = `text-lab-xs font-medium px-3 py-1.5 rounded-lg border border-lab-border text-lab-fg-muted hover:text-lab-fg hover:border-lab-border-strong bg-lab-fill ${pressable}`
 
   return (
     <div className="h-screen flex flex-col bg-lab-canvas">
@@ -228,8 +273,8 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
           strap="one template, taken apart — add its layers back one at a time"
         />
         <div className="flex items-center gap-1.5">
-          <button onClick={() => applyLevel(0)} className="text-lab-xs font-medium px-3 py-1.5 rounded-lg border border-lab-border text-lab-fg-muted hover:text-lab-fg hover:border-lab-border-strong bg-lab-fill cursor-pointer transition-colors lab-focus">Bare scene</button>
-          <button onClick={() => applyLevel(STACK.length)} className="text-lab-xs font-medium px-3 py-1.5 rounded-lg border border-lab-border text-lab-fg-muted hover:text-lab-fg hover:border-lab-border-strong bg-lab-fill cursor-pointer transition-colors lab-focus">Full stack</button>
+          <button onClick={() => applyLevel(0)} disabled={level === 0} className={topBtn}>Bare scene</button>
+          <button onClick={() => applyLevel(STACK.length)} disabled={level === STACK.length} className={topBtn}>Full stack</button>
         </div>
       </div>
 
@@ -248,8 +293,10 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
                 style={{ width: DESK.width, height: DESK.height, transform: `scale(${scale})`, transformOrigin: 'top left', border: 0, display: 'block' }}
               />
             </div>
-            <p className="mt-2.5 text-lab-xs font-mono text-lab-fg-subtle">
-              Live desktop hero · real WebGL · {level === 0 ? 'bare scene (Paper dither + motion)' : `${level} of ${STACK.length} layers stacked`}
+            <p className="mt-2.5 text-lab-xs font-mono text-lab-fg-subtle" aria-live="polite">
+              Live desktop hero · real WebGL · {level === 0
+                ? 'bare scene: Paper dither, scene motion, default edge'
+                : `step ${level} of ${STACK.length} · ${STACK[level - 1].name} added`}
             </p>
           </div>
 
@@ -267,39 +314,67 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
             <div>
               <SectionLabel className="mb-2" action={
                 <div className="flex items-center gap-1">
-                  <button onClick={() => applyLevel(Math.max(0, level - 1))} className="w-6 h-6 grid place-items-center rounded-md border border-lab-border bg-transparent text-lab-fg-muted hover:text-lab-fg hover:border-lab-border-strong cursor-pointer text-lab-md lab-focus" title="Remove top layer" aria-label="Remove top layer">◀</button>
-                  <span className="font-mono text-lab-xs text-lab-fg-subtle w-9 text-center">{level}/{STACK.length}</span>
-                  <button onClick={() => applyLevel(Math.min(STACK.length, level + 1))} className="w-6 h-6 grid place-items-center rounded-md border border-lab-border bg-transparent text-lab-fg-muted hover:text-lab-fg hover:border-lab-border-strong cursor-pointer text-lab-md lab-focus" title="Add next layer" aria-label="Add next layer">▶</button>
+                  <button onClick={() => applyLevel(level - 1)} disabled={level === 0} className={`w-6 h-6 text-lab-md ${smallBtn}`} title="Remove top layer" aria-label="Remove top layer">◀</button>
+                  <span className="font-mono tabular-nums text-lab-xs text-lab-fg-subtle w-9 text-center">{level}/{STACK.length}</span>
+                  <button onClick={() => applyLevel(level + 1)} disabled={level === STACK.length} className={`w-6 h-6 text-lab-md ${smallBtn}`} title="Add next layer" aria-label="Add next layer">▶</button>
                 </div>
               }>Steps — each adds to the output</SectionLabel>
               <div className="flex flex-col gap-2">
                 {/* Step 0 — the scene. Always on: the animated Paper dither. */}
                 <div className="grid grid-cols-[28px_1fr] gap-3 items-start p-3 rounded-xl border border-lab-accent/25 bg-lab-accent/5">
                   <span className="mt-0.5 w-6 h-6 grid place-items-center rounded-md bg-lab-accent/15 text-lab-accent font-mono text-lab-xs">0</span>
-                  <span>
-                    <span className="font-mono text-lab-md text-lab-fg">Scene motion</span>
+                  <span className="min-w-0">
+                    <span className="flex items-center justify-between gap-2 min-h-6">
+                      <span className="font-mono text-lab-md text-lab-fg">Scene motion</span>
+                      {(!ownMotion || speedX !== 1) && (
+                        <button onClick={() => applyMotion(t.activeScene, 1)} className={`h-6 px-2 text-lab-xs ${smallBtn}`} title="Back to the template's own motion at 1×">
+                          Template motion
+                        </button>
+                      )}
+                    </span>
                     <span className="block text-lab-sm text-lab-fg-subtle mt-1 leading-snug font-mono">{activeSceneHint}</span>
-                    <span className="block mt-2.5">
-                      <Segmented
-                        size="xs"
-                        label="Scene"
-                        value={s.activeScene}
-                        onChange={applySceneTemplate}
-                        options={LAYER_SCENES.map(({ id }) => ({ value: id, label: sceneTemplates[id].label }))}
-                      />
+                    <span className="flex flex-wrap items-center gap-x-3 gap-y-2 mt-2.5">
+                      {/* Scrolls on a phone instead of pushing past the card;
+                          the padding keeps the focus ring inside the clip. */}
+                      <span className="max-w-full overflow-x-auto p-0.5 -m-0.5">
+                        <Segmented
+                          size="xs"
+                          label="Scene"
+                          value={s.activeScene}
+                          onChange={(id) => applyMotion(id, speedX)}
+                          options={LAYER_SCENES.map((id) => ({ value: id, label: sceneTemplates[id].label }))}
+                        />
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span className="text-lab-xs font-mono text-lab-fg-subtle" aria-hidden>speed</span>
+                        <Segmented
+                          size="xs"
+                          label="Scene speed"
+                          value={speedX}
+                          onChange={(x) => applyMotion(s.activeScene, x)}
+                          options={SPEEDS.map((x) => ({ value: x, label: `${x}×`, title: `${x}× the scene's own speed` }))}
+                        />
+                      </span>
                     </span>
                   </span>
                 </div>
                 {STACK.map((L, i) => {
                   const on = L.on
+                  // The newest step in the stack: what the last ◀ ▶ changed.
+                  const top = i === level - 1
                   return (
                     <div key={L.name}
-                      className={`rounded-xl border transition-colors ${
-                        on ? 'border-lab-accent/25 bg-lab-accent/5' : 'border-lab-border bg-lab-fill hover:border-lab-border-strong'
+                      className={`rounded-xl border transition-colors duration-150 ease-out ${
+                        top ? 'border-lab-accent/60 bg-lab-accent/5'
+                          : on ? 'border-lab-accent/25 bg-lab-accent/5'
+                          : 'border-lab-border bg-lab-fill hover:border-lab-border-strong'
                       }`}>
-                      <button onClick={() => batchDitherUpdates(() => L.set(!on))} aria-pressed={on}
+                      {/* A click goes to this step: steps 1…i on, later ones off.
+                          Clicking the top step removes it. */}
+                      <button onClick={() => applyLevel(top ? i : i + 1)} aria-pressed={on}
+                        title={top ? `Remove step ${i + 1}` : `Show steps 0–${i + 1}`}
                         className="w-full grid grid-cols-[28px_1fr] gap-3 items-start text-left p-3 rounded-xl cursor-pointer lab-focus">
-                        <span className={`mt-0.5 w-6 h-6 grid place-items-center rounded-md font-mono text-lab-xs ${on ? 'bg-lab-accent/15 text-lab-accent' : 'bg-lab-fill text-lab-fg-subtle'}`}>{i + 1}</span>
+                        <span className={`mt-0.5 w-6 h-6 grid place-items-center rounded-md font-mono text-lab-xs transition-colors duration-150 ease-out ${on ? 'bg-lab-accent/15 text-lab-accent' : 'bg-lab-fill text-lab-fg-subtle'}`}>{i + 1}</span>
                         <span>
                           <span className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono text-lab-md text-lab-fg">{L.name}</span>
