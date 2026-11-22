@@ -1419,15 +1419,21 @@ export default function DitherHero() {
 
       </div>
 
+      {/* Copy background: ends the resting field above the copy. Under the
+          hover layers, so the reveal shows over the copy area too. */}
+      {!textUnderScene && contentTop != null && (
+        <div className="absolute inset-x-0 bottom-0 z-[5] pointer-events-none" style={{ top: contentTop, backgroundColor: c.colorBack }} aria-hidden="true" />
+      )}
+
       {/* Hover cover — hides the resting tiles under the cursor ('mask' path) */}
       {hover.enabled && hoverPath === 'mask' && (
-        <div ref={coverRef} className="absolute inset-0 pointer-events-none" style={{ visibility: 'hidden', backgroundColor: c.colorBack }} aria-hidden="true" />
+        <div ref={coverRef} className="absolute inset-0 z-[6] pointer-events-none" style={{ visibility: 'hidden', backgroundColor: c.colorBack }} aria-hidden="true" />
       )}
 
       {/* Reveal — the other state's layers, mounted on first hover. Outside the
           resting mask, so it is not cut by the dissolve band. */}
       {hover.enabled && hoverActive && !pointCanvasMode && (
-        <div key={`hover-gl${glEpoch}`} className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <div key={`hover-gl${glEpoch}`} className="absolute inset-0 z-[6] pointer-events-none" aria-hidden="true">
           <div
             ref={fixLayerRef}
             className="absolute inset-0"
@@ -1535,7 +1541,9 @@ export default function DitherHero() {
 
       {/* Bottom content section */}
       <div ref={contentRef} className="relative z-10 mt-auto">
-        <div style={{ backgroundColor: textUnderScene ? 'transparent' : c.colorBack }}>
+        {/* The copy's solid background is drawn by copyBg (section level) once
+            measured, so the hover reveal can sit between it and the text. */}
+        <div style={{ backgroundColor: textUnderScene || contentTop != null ? 'transparent' : c.colorBack }}>
           {/* Mobile spacing follows proximity: the copy block's OUTER padding
               (40px) is larger than any gap INSIDE it (12–16px), so the text
               reads as one unit separated from the shader rather than glued to
