@@ -1487,7 +1487,7 @@ export const heroTemplates: HeroTemplate[] = [
   {
     id: "problem",
     name: "Problem",
-    desc: "Square error tiles on a 96px grid with wide gaps, pink problem state at rest; hover reveals the green fix. AI-native copy in Space Mono.",
+    desc: "Square error tiles on a 96px grid with wide gaps, pink problem state at rest; hover reveals the green fix. AI-native copy in JetBrains Mono.",
     swatch: ["#E6307A", "#FF6B2B", "#FF3366"],
     initialState: "problem",
     // AI-native headline baked in: "Your AI built the app. Who's watching it run?"
