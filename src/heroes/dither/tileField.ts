@@ -271,6 +271,8 @@ uniform float u_dpr, u_pitch;
 uniform vec2 u_align;
 uniform bool u_warp;
 uniform vec2 u_wRot;            // cos, sin of the warp rotation
+uniform vec2 u_hp;              // warp centre, css px (same as pass 1)
+uniform float u_hr;             // warp radius, css px
 out vec4 o;
 ${COMMON}
 // Pixel alignment: a piece is a whole number of device pixels with the same
@@ -304,6 +306,20 @@ void main() {
   if (!u_warp) { o = base; return; }
   vec4 f = texelFetch(u_fix, tx, 0);
   vec4 fixv = vec4(f.rgb, 1.) * f.a * cover(local, pc.y, pc.w);
+
+  // Far from the cursor no tile in the 3×3 block is a warp tile (pass 1 marks
+  // a tile when its centre is within the snapped radius R). A neighbour's
+  // centre is at most pitch·√2 from this tile's centre, so beyond R + 1.5
+  // pitch every neighbour keeps its resting shape, which never reaches past
+  // its own cell. The 3×3 union then equals this tile's own shape: one fetch
+  // instead of nine, with the same pixels.
+  vec2 tc = u_align + (vec2(ci) + .5) * u_pitch;
+  if (distance(tc, u_hp) > floor(u_hr / u_pitch + .5) * u_pitch + 1.5 * u_pitch) {
+    vec4 w = texelFetch(u_warpTex, tx, 0);
+    float sz = w.x * u_pitch;
+    o = sz < .5 ? vec4(0.) : base * cover(local, sz, w.y * u_pitch);
+    return;
+  }
 
   // Warp masks: union of the 3×3 neighbourhood's (rotated) tile shapes.
   float mb = 0., ms = 0.;
@@ -549,6 +565,8 @@ export class TileFieldRenderer {
     if (w) {
       const r = w.rotateDeg * Math.PI / 180
       gl.uniform2f(p.u_wRot, Math.cos(r), Math.sin(r))
+      gl.uniform2f(p.u_hp, w.px, w.py)
+      gl.uniform1f(p.u_hr, w.r)
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }

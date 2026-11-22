@@ -14,7 +14,7 @@ sources:
 
 ## When to use
 
-- First element of every lab view toolbar (Canvas, Breakpoints, Layers).
+- First element of every lab view toolbar (Canvas, Breakpoints, Recipe).
 
 ## When not to use
 
@@ -24,7 +24,7 @@ sources:
 
 | Prop | Meaning |
 | --- | --- |
-| `view` | View name, e.g. "Layers" |
+| `view` | View name, e.g. "Recipe" |
 | `strap` | One-line explanation; hidden below `lg` and truncated, never wrapped |
 | `onHome` | Go to Canvas; omit on Canvas itself |
 

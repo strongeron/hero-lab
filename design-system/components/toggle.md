@@ -22,7 +22,7 @@ sources:
 
 - A choice between named options: use `Segmented`, even for two options.
 - An action (Reset, Copy config): use a button. A toggle always reflects state.
-- A large selectable card (the Layers stack steps): that is its own control.
+- A large selectable card (the Recipe stack steps): that is its own control.
 
 ## Public API
 

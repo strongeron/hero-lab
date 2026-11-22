@@ -18,7 +18,7 @@ sources:
   shows its result, not only a name.
 - As a strip above a `Segmented` or `SliderRow` to show the current value at
   real size.
-- As a thumbnail at the end of a Layers step row, showing the hero after that
+- As a thumbnail at the end of a Recipe step row, showing the hero after that
   step (`src/lab/layerSketch.ts` `drawStep`, built on `drawField`).
 
 ## When not to use

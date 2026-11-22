@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState , type ReactNode } from 'react'
 import { getTabSourceId } from '../heroes/dither/ditherStore'
 import LabToolbarTitle from './LabToolbarTitle'
 import Segmented from './ui/Segmented'
@@ -19,7 +19,8 @@ const LABEL_H = 28
 
 type ZoomMode = 'fit' | 0.5 | 1
 
-export default function PreviewCanvas({ onHome }: { onHome?: () => void }) {
+/** `actions`: toolbar buttons from the lab shell (the Design toggle). */
+export default function PreviewCanvas({ onHome, actions }: { onHome?: () => void; actions?: ReactNode }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [availWidth, setAvailWidth] = useState(0)
   const [zoom, setZoom] = useState<ZoomMode>('fit')
@@ -64,6 +65,7 @@ export default function PreviewCanvas({ onHome }: { onHome?: () => void }) {
           view="Breakpoints"
           strap="the current hero across devices — reflects Live & the selected template"
         />
+        <div className="flex items-center gap-2">
         <Segmented
           size="xs"
           label="Zoom"
@@ -75,6 +77,8 @@ export default function PreviewCanvas({ onHome }: { onHome?: () => void }) {
             { value: 1, label: '100%' },
           ]}
         />
+        {actions}
+        </div>
       </div>
 
       {/* Scrollable / pannable canvas area */}

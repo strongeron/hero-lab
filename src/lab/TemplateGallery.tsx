@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState , type ReactNode } from 'react'
 import { useDitherStore, applyHeroTemplate, heroTemplates, getTabSourceId } from '../heroes/dither/ditherStore'
 import LabToolbarTitle from './LabToolbarTitle'
 import { DEVICES } from './PreviewCanvas'
@@ -15,7 +15,8 @@ const BOARD_GAP = 56
  *  sync. Other artboards snap back to canonical. */
 type ZoomMode = 'fit' | 0.75 | 1
 
-export default function TemplateGallery() {
+/** `actions`: toolbar buttons from the lab shell (the Design toggle). */
+export default function TemplateGallery({ actions }: { actions?: ReactNode }) {
   const state = useDitherStore()
   const wrapRef = useRef<HTMLDivElement>(null)
   const [availWidth, setAvailWidth] = useState(0)
@@ -78,6 +79,7 @@ export default function TemplateGallery() {
           view="Canvas"
           strap="baked snapshots — select an artboard to load the live animation & edit in the Design Panel"
         />
+        <div className="flex items-center gap-2">
         <Segmented
           size="xs"
           label="Zoom"
@@ -89,6 +91,8 @@ export default function TemplateGallery() {
             { value: 1, label: '100%' },
           ]}
         />
+        {actions}
+        </div>
       </div>
 
       {/* Scrollable artboard stack */}

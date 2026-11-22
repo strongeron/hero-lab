@@ -3,7 +3,7 @@
 Hero Lab has two kinds of interface. The **hero** is the product being designed:
 the dither background, headline and CTA that a visitor of the demo site sees. The
 **lab UI** is the tool around it: the bottom view bar, view toolbars, the Design
-Panel, Layers, Canvas, Breakpoints and the perf strip. This file governs the lab
+Panel, Recipe, Canvas, Breakpoints and the perf strip. This file governs the lab
 UI. The hero keeps its own palette tokens (`--color-t-*`, `[data-palette]` in
 `src/index.css`) and is out of scope here.
 
@@ -47,7 +47,7 @@ used settings behind a disclosure over adding more rows.
 
 | Token | Role |
 | --- | --- |
-| `lab-canvas` | Page background of lab views (Canvas, Breakpoints, Layers) |
+| `lab-canvas` | Page background of lab views (Canvas, Breakpoints, Recipe) |
 | `lab-artboard` | Black behind each artboard, before the hero paints |
 | `lab-toolbar` | Sticky view toolbar, translucent over the canvas |
 | `lab-surface` | Floating chrome: bottom view bar, popovers |
@@ -61,7 +61,7 @@ used settings behind a disclosure over adding more rows.
 | `lab-good` / `lab-warn` / `lab-poor` | Measured status only (perf strip ratings) |
 | `text-lab-2xs` … `text-lab-md` | 10 / 11 / 12 / 13 px |
 | `shadow-lab-float` | Floating chrome and chips: bottom view bar, toolbar pill, hover chip |
-| `shadow-lab-raised` | Artboards on the canvas (Canvas, Breakpoints, Layers) |
+| `shadow-lab-raised` | Artboards on the canvas (Canvas, Breakpoints, Recipe) |
 
 - Themes: the lab UI has one dark theme. Hero palettes do not apply to it.
 
@@ -91,6 +91,15 @@ Component internals and business logic (store, handlers, effects) stay project-o
 
 No open gaps. Decisions taken 2026-11-21 with the user: connect the design system,
 then align the lab chrome and the Design Panel on it. No Storybook in this repo.
+
+2026-11-22, Design toggle: the bottom view bar only switches views. `DesignToggle`
+(`src/lab/ui/DesignToggle.tsx`) opens the Design Panel from the right end of the
+Canvas and Breakpoints toolbars, and from an edge tab in Live, which has no lab
+toolbar. Recipe shows no toggle: the panel does not edit that view.
+
+2026-11-22, view rename: the Layers view is now called **Recipe** ("how the hero
+is made"). The internal mode id stays `layers`, and the code keeps the
+`LayerExplorer` name. Older entries below say "Layers" for this view.
 
 2026-11-21, panel cleanup: the Design Panel keeps only colour, size, speed, shape
 and warp settings (the state map is in

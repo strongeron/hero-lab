@@ -1,20 +1,6 @@
 import DitherPanel from '../heroes/dither/DitherPanel'
+import { SlidersIcon } from './ui/DesignToggle'
 
-function SlidersIcon() {
-  return (
-    <svg aria-hidden="true" width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="21" y1="4" x2="14" y2="4" />
-      <line x1="10" y1="4" x2="3" y2="4" />
-      <line x1="21" y1="12" x2="12" y2="12" />
-      <line x1="8" y1="12" x2="3" y2="12" />
-      <line x1="21" y1="20" x2="16" y2="20" />
-      <line x1="12" y1="20" x2="3" y2="20" />
-      <line x1="14" y1="2" x2="14" y2="6" />
-      <line x1="8" y1="10" x2="8" y2="14" />
-      <line x1="16" y1="18" x2="16" y2="22" />
-    </svg>
-  )
-}
 
 /** The docked Design Panel: a header with a close button, and the hero's
  *  panel body. Full width on phones (it overlays there; HeroLab drops the

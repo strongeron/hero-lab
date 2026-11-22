@@ -7,6 +7,7 @@ import SiteFooter from '../components/SiteFooter'
 import { prefersLessData } from '../utils/network'
 import PreviewCanvas from './PreviewCanvas'
 import TemplateGallery from './TemplateGallery'
+import DesignToggle from './ui/DesignToggle'
 import PerfStrip, { PERF_STRIP_HEIGHT } from './PerfStrip'
 import Segmented from './ui/Segmented'
 
@@ -222,11 +223,8 @@ const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
   { value: 'live', label: 'Live' },
   { value: 'breakpoints', label: 'Breakpoints' },
   { value: 'templates', label: 'Canvas' },
-  { value: 'layers', label: 'Layers' },
+  { value: 'layers', label: 'Recipe' },
 ]
-/** The Design toggle matches a `Segmented shape="pill"` option. It is a
- *  separate on/off toggle, not one more view, so it is not in that group. */
-const designBtn = 'shrink-0 cursor-pointer border-0 font-medium transition-colors lab-focus rounded-full px-3 py-1.5 text-lab-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-lab-fg-muted'
 
 export default function HeroLab() {
   const fontPair = fontPairs['jakarta-dm']
@@ -347,11 +345,15 @@ export default function HeroLab() {
     )
   }
 
+  // The Design toggle sits in each view's own toolbar, only where the panel
+  // edits that view. Layers has none: its stack is the control surface.
+  const designToggle = <DesignToggle open={panelOpen} onToggle={() => setPanelOpen((o) => !o)} />
+
   return (
     <>
       {viewMode === 'templates' ? (
         <div style={{ marginRight: panelOffset }}>
-          <TemplateGallery />
+          <TemplateGallery actions={designToggle} />
         </div>
       ) : viewMode === 'layers' ? (
         <div style={{ marginRight: panelOffset }}>
@@ -359,7 +361,7 @@ export default function HeroLab() {
         </div>
       ) : viewMode === 'breakpoints' ? (
         <div style={{ marginRight: panelOffset }}>
-          <PreviewCanvas onHome={() => setViewMode('templates')} />
+          <PreviewCanvas onHome={() => setViewMode('templates')} actions={designToggle} />
         </div>
       ) : (
         <div
@@ -374,6 +376,9 @@ export default function HeroLab() {
           <SiteFooter />
         </div>
       )}
+
+      {/* Live has no lab toolbar, so a closed panel leaves an edge tab. */}
+      {viewMode === 'live' && !panelOpen && <DesignToggle variant="edge" open={false} onToggle={() => setPanelOpen(true)} />}
 
       {/* Sized fallback: the panel column paints at once instead of an empty
           320px gap while its chunk loads. */}
@@ -392,29 +397,13 @@ export default function HeroLab() {
           most visibly on Layers, where the panel is hidden entirely, so the one
           control that is present on every view was the one that moved between
           them. It is global chrome; it should be in the same place everywhere.
-          The pill also carries the Design toggle, so a closed panel
-          always has a labelled way back in, in every view. At 1440 it spans
+          The Design toggle moved to each view's own toolbar (and an edge tab
+          in Live), so this bar only switches views. At 1440 it spans
           roughly 440–1000px and the panel starts at 1040px, so viewport-centring
           does not put it under the panel. */}
       <div style={{ bottom: chromeBottom }} className="fixed left-0 right-0 z-[1002] flex justify-center pointer-events-none px-2">
-        <div className={`pointer-events-auto flex items-center pr-1 rounded-full border bg-lab-surface border-lab-border shadow-lab-float max-w-full overflow-x-auto`}>
+        <div className="pointer-events-auto flex items-center rounded-full border bg-lab-surface border-lab-border shadow-lab-float max-w-full overflow-x-auto">
           <Segmented shape="pill" label="View" options={VIEW_OPTIONS} value={viewMode} onChange={setViewMode} />
-          <span aria-hidden="true" className="w-px h-4 ml-0.5 mr-1.5 bg-lab-border-strong shrink-0" />
-          {/* Layers hides the panel on purpose (the stack is the control
-              surface there), so the toggle is shown but disabled with the
-              reason, rather than vanishing from one view. */}
-          <button
-            onClick={() => setPanelOpen(!panelOpen)}
-            disabled={viewMode === 'layers'}
-            aria-pressed={viewMode === 'layers' ? undefined : panelOpen}
-            aria-keyshortcuts="Meta+Shift+E Control+Shift+E"
-            title={viewMode === 'layers'
-              ? 'The Design panel is hidden in Layers — the stack is the control surface here'
-              : `${panelOpen ? 'Close' : 'Open'} the Design panel (⌘/Ctrl + Shift + E)`}
-            className={`${designBtn} ${showPanel ? 'bg-lab-fill-selected text-lab-fg' : 'bg-transparent text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover'}`}
-          >
-            Design
-          </button>
         </div>
       </div>
     </>

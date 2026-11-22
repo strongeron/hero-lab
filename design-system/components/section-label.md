@@ -14,7 +14,7 @@ sources:
 ## When to use
 
 - At the top of each settings group in the Design Panel, and above step lists such
-  as the Layers stack.
+  as the Recipe stack.
 
 ## When not to use
 
