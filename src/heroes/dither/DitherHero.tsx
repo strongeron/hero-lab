@@ -1,6 +1,6 @@
 import { useMemo, useRef, useEffect, useState, useLayoutEffect } from 'react'
 import { Dithering } from '@paper-design/shaders-react'
-import { useDitherStore, copyVariants, warpErrorSnippets, warpFixSnippets, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
+import { useDitherStore, resolveCopy, palettes, warpErrorSnippets, warpFixSnippets, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
 import { getThemeById } from '../../themes/terminalThemes'
 import { TileFieldRenderer, type TileFieldFrame } from './tileField'
 import { getAccessibleCtaPair } from '../../utils/colorContrast'
@@ -462,7 +462,7 @@ const MIN_RESPONSE_CTA_GAP = 24
 type Tip = { px: number; py: number; r: number }
 
 export default function DitherHero() {
-  const { shader: c, edge, copyVariant, hover, pixelGrid, animation: storeAnim, layout, button, terminalTheme: termThemeId, initialState, activeScene, stableColorField } = useDitherStore()
+  const { shader: c, edge, copyVariant, typePair, palette, hover, pixelGrid, animation: storeAnim, layout, button, terminalTheme: termThemeId, initialState, activeScene, stableColorField } = useDitherStore()
   const reducedMotion = usePrefersReducedMotion()
   // Off-screen heroes read as paused: this stops the drift and mask loops and
   // sets the Paper speed to 0, which stops Paper's own rAF.
@@ -475,7 +475,7 @@ export default function DitherHero() {
   const ctaStyle: React.CSSProperties = { borderRadius: button.radius }
   const ctaTextTransform = button.uppercase ? 'uppercase' as const : undefined
 
-  const copy = copyVariants[copyVariant]
+  const copy = resolveCopy(copyVariant, typePair)
   // Delay the two-column split to lg for variants that ask for it (see
   // DitherCopy.tabletLayout). Drives both the grid classes and the baseline
   // lock's media query, which must agree or the lock fires while stacked.
@@ -493,10 +493,10 @@ export default function DitherHero() {
   const ctaTextColor = ctaTextHex
   const headlineColor = activeTheme
     ? activeTheme.fg
-    : (copy.headlineColorMode === 'white' ? '#FFFFFF' : (copy.layout === 'problem' ? '#E6307A' : '#2DD4A8'))
+    : (copy.headlineColorMode === 'white' ? '#FFFFFF' : (copy.layout === 'problem' ? palettes[palette].problem[0] : palettes[palette].fix[0]))
   const responseColor = activeTheme
     ? CTA_BG
-    : (copy.responseColorMode === 'white' ? '#FFFFFF' : '#2DD4A8')
+    : (copy.responseColorMode === 'white' ? '#FFFFFF' : palettes[palette].fix[0])
   const sublineColor = activeTheme
     ? `oklch(from ${activeTheme.accent} calc(l + 0.15) calc(c * 0.6) h)`
     : `color-mix(in oklch, ${DEFAULT_CTA_BG} 45%, white)`
@@ -822,7 +822,7 @@ export default function DitherHero() {
     return () => ro.disconnect()
     // baselineNudge: transforms don't fire the ResizeObserver, so re-measure
     // the exclusion rects after the baseline lock shifts the right column.
-  }, [edge.mode, edge.textRectMode, copyVariant, layout, baselineNudge])
+  }, [edge.mode, edge.textRectMode, copyVariant, typePair, layout, baselineNudge])
 
   // Baseline lock (problem layout) — the right column snaps to the left one:
   // the response's last line shares the headline's last baseline, the CTA
@@ -906,7 +906,7 @@ export default function DitherHero() {
       window.removeEventListener('resize', measure)
       twoCol.removeEventListener('change', measure)
     }
-  }, [copy.layout, copy.responsePin, copyVariant, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
+  }, [copy.layout, copy.responsePin, copyVariant, typePair, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
     containerSize.w])
 
   // Baseline guides — debug overlay for alignment checks. One line per
@@ -938,7 +938,7 @@ export default function DitherHero() {
     ro.observe(content)
     ro.observe(host)
     return () => ro.disconnect()
-  }, [layout.showBaselines, copyVariant, layout, baselineNudge])
+  }, [layout.showBaselines, copyVariant, typePair, layout, baselineNudge])
 
   // Layout guides — debug overlay for the frame every element should sit on.
   // Columns and left/right edges come from CSS (the overlay reuses the copy
@@ -980,7 +980,7 @@ export default function DitherHero() {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [layout.showGuides, copyVariant, layout])
+  }, [layout.showGuides, copyVariant, typePair, layout])
 
   const POINT_FLOW_CELLS = 6
 

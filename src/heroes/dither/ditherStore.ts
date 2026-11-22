@@ -298,6 +298,8 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
   };
 
 export const copyVariantIds: CopyVariantId[] = [
+  "fine-grain",
+  "full-bleed",
   "provocateur",
   "value",
   "ship-it",
@@ -505,6 +507,10 @@ export interface DitherState {
   activeTemplate: string | null;
   /** Active terminal theme ID (null = default colors) */
   terminalTheme: string | null;
+  /** Colour pair for both states (rest and reveal). See `palettes`. */
+  palette: PaletteId;
+  /** Tested type pair laid over the copy's own fonts; null = the copy's own. */
+  typePair: TypePairId | null;
   /** Layers-explorer only: hold the screen-blended Color/alpha layers at their
    *  authored opacity instead of running the per-frame emphasis swing. The swing
    *  pulses the composite under `screen` blend (a recurring blink); the Layers
@@ -962,6 +968,8 @@ const defaults: DitherState = {
   activeTemplate: null,
   terminalTheme: null,
   stableColorField: false,
+  palette: "signal",
+  typePair: null,
 };
 
 /* ─── Store ─── */
@@ -1157,8 +1165,8 @@ export function setHoverLayer(index: number, patch: Partial<DitherAlphaLayer>) {
  *  reveal. Only swaps colors/shapes; motion, scene, and per-layer opacities
  *  stay as the user left them. */
 export function setInitialState(id: InitialStateId) {
-  const base = id === "fix" ? fixLayers : problemLayers;
-  const reveal = id === "fix" ? problemLayers : fixLayers;
+  const base = paletteLayers(state.palette, id);
+  const reveal = paletteLayers(state.palette, id === "fix" ? "problem" : "fix");
   const baseOpacities = state.shader.alphaLayers.map((layer) => layer.opacity);
   const revealOpacities = state.hover.hoverLayers.map((layer) => layer.opacity);
   state.initialState = id;
@@ -1263,6 +1271,160 @@ export function setTerminalTheme(id: string | null) {
   }
   emit();
 }
+
+/* ─── Design Panel presets ───
+   The panel offers curated choices, not free values: each preset is checked to
+   keep the resting state and the hover intact (whole-pixel sizes, readable
+   text, a reveal that contrasts with the rest). */
+
+export type PaletteId = "signal" | "ember" | "ultra" | "mono";
+type Trio = [string, string, string];
+export interface Palette {
+  label: string;
+  hint: string;
+  back: string;
+  problem: Trio;
+  fix: Trio;
+}
+export const palettes: Record<PaletteId, Palette> = {
+  signal: { label: "Signal", hint: "pink → teal", back: "#0A1714",
+    problem: ["#E6307A", "#FF6B2B", "#FF3366"], fix: ["#2DD4A8", "#3ECF8E", "#1A8A70"] },
+  ember: { label: "Ember", hint: "orange → blue", back: "#0B0F1A",
+    problem: ["#FF7A1A", "#FFB020", "#E8432E"], fix: ["#3BA4FF", "#6BC6FF", "#1F5FD1"] },
+  ultra: { label: "Ultra", hint: "violet → lime", back: "#0E0A16",
+    problem: ["#B04BFF", "#FF4FD8", "#7A2CFF"], fix: ["#C6F432", "#7FE06A", "#3FAF5A"] },
+  mono: { label: "Mono", hint: "grey → pink", back: "#0C0C0E",
+    problem: ["#F2F2F2", "#9A9AA2", "#5A5A62"], fix: ["#E6307A", "#FF6B2B", "#FF3366"] },
+};
+export const paletteIds = Object.keys(palettes) as PaletteId[];
+
+/** A state's authored layers (shapes, opacities) in a palette's colours. */
+function paletteLayers(palette: PaletteId, which: InitialStateId): DitherAlphaLayer[] {
+  const src = which === "fix" ? fixLayers : problemLayers;
+  return src.map((l, i) => ({ ...l, color: palettes[palette][which][i] }));
+}
+
+/** Recolour both states; shapes and opacities stay as they are. */
+export function setPalette(id: PaletteId) {
+  const p = palettes[id];
+  const rest = state.initialState;
+  const reveal = rest === "fix" ? "problem" : "fix";
+  state.palette = id;
+  state.terminalTheme = null;
+  state.shader = {
+    ...state.shader,
+    colorBack: p.back,
+    alphaLayers: state.shader.alphaLayers.map((l, i) => ({ ...l, color: p[rest][i] ?? l.color })),
+  };
+  state.hover = {
+    ...state.hover,
+    hoverLayers: state.hover.hoverLayers.map((l, i) => ({ ...l, color: p[reveal][i] ?? l.color })),
+  };
+  emit();
+}
+
+export type TypePairId = "editorial" | "geometric" | "grotesk" | "quirky" | "soft" | "terminal";
+export interface TypePair {
+  label: string;
+  hint: string;
+  headlineFont: string;
+  bodyFont: string;
+  headlineWeight: number;
+  headlineLeading: string;
+  headlineTracking: string;
+  /** Only set where the face needs it (mono advances run wide). */
+  headlineSize?: string;
+}
+export const typePairs: Record<TypePairId, TypePair> = {
+  editorial: { label: "Editorial", hint: "Instrument", headlineFont: "'Instrument Serif', Georgia, serif", bodyFont: "'Instrument Sans', Inter, sans-serif", headlineWeight: 400, headlineLeading: "1.02", headlineTracking: "-0.01em" },
+  geometric: { label: "Geometric", hint: "Outfit", headlineFont: "'Outfit', Inter, sans-serif", bodyFont: "'Outfit', Inter, sans-serif", headlineWeight: 500, headlineLeading: "1.0", headlineTracking: "-0.02em" },
+  grotesk: { label: "Grotesk", hint: "Space Grotesk + Inter", headlineFont: "'Space Grotesk', Inter, sans-serif", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.0", headlineTracking: "-0.03em" },
+  quirky: { label: "Quirky", hint: "Bricolage + Inter", headlineFont: "'Bricolage Grotesque', Inter, sans-serif", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.0", headlineTracking: "-0.03em" },
+  soft: { label: "Soft serif", hint: "Fraunces + DM Sans", headlineFont: "'Fraunces', Georgia, serif", bodyFont: "'DM Sans', Inter, sans-serif", headlineWeight: 500, headlineLeading: "1.04", headlineTracking: "-0.02em" },
+  terminal: { label: "Terminal", hint: "Geist Mono + Inter", headlineFont: "'Geist Mono', ui-monospace, monospace", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.08", headlineTracking: "-0.05em", headlineSize: "clamp(2.25rem, 3.4vw + 1rem, 4rem)" },
+};
+export const typePairIds = Object.keys(typePairs) as TypePairId[];
+
+/** The copy as rendered: the variant's words, with a type pair's faces laid
+ *  over its own when one is picked. */
+export function resolveCopy(id: CopyVariantId, pair: TypePairId | null): DitherCopy {
+  const copy = copyVariants[id];
+  if (!pair) return copy;
+  const p = typePairs[pair];
+  return {
+    ...copy,
+    headlineFont: p.headlineFont,
+    headlineWeight: p.headlineWeight,
+    headlineLeading: p.headlineLeading,
+    headlineTracking: p.headlineTracking,
+    headlineSize: p.headlineSize ?? copy.headlineSize,
+    subFont: p.bodyFont,
+    ctaFont: p.bodyFont,
+    responseFontMode: "headline",
+    responseFontStyle: "normal",
+    tabletLayout: pair === "terminal" ? "stack" : copy.tabletLayout,
+  };
+}
+
+export function setTypePair(id: TypePairId | null) {
+  state.typePair = id;
+  emit();
+}
+
+export type GrainId = "fine" | "medium" | "coarse" | "chunky";
+/** Piece pitch in px when the pixel grid is on. */
+export const grainPitch: Record<GrainId, number> = { fine: 8, medium: 12, coarse: 24, chunky: 32 };
+/** Paper dot size in px when there is no grid (Fine Grain). */
+export const grainDot: Record<GrainId, number> = { fine: 1, medium: 2, coarse: 4, chunky: 6 };
+export const grainIds = Object.keys(grainPitch) as GrainId[];
+
+export type GapId = "none" | "tight" | "open";
+export const gapIds: GapId[] = ["none", "tight", "open"];
+/** Gap in whole px for a pitch: 0, a quarter, or two fifths of it. */
+export function gapFor(id: GapId, pitch: number): number {
+  if (id === "none") return 0;
+  return Math.min(pitch - 1, Math.max(1, Math.round(pitch * (id === "tight" ? 0.25 : 0.4))));
+}
+export function gridPitch(pg: DitherPixelGridConfig): number {
+  return Math.max(2, Math.round(pg.cell / Math.max(1, pg.divisions)));
+}
+
+/** Set the size. On a grid this keeps the gap preset and clamps the corner
+ *  radius, so the new pitch never yields a gap or radius that does not fit. */
+export function setGrain(id: GrainId) {
+  const pg = state.pixelGrid;
+  if (!pg.enabled) {
+    state.shader = { ...state.shader, size: grainDot[id] };
+    emit();
+    return;
+  }
+  const pitch = grainPitch[id];
+  const oldPitch = gridPitch(pg);
+  const gapId = gapIds.find((g) => gapFor(g, oldPitch) === pg.gap);
+  state.pixelGrid = {
+    ...pg,
+    cell: pitch * pg.divisions,
+    gap: gapId ? gapFor(gapId, pitch) : Math.min(pg.gap, pitch - 1),
+    radius: Math.min(pg.radius, Math.floor(pitch / 2)),
+  };
+  emit();
+}
+
+export function setGap(id: GapId) {
+  const pg = state.pixelGrid;
+  state.pixelGrid = { ...pg, gap: gapFor(id, gridPitch(pg)) };
+  emit();
+}
+
+export type WarpFeelId = "crisp" | "soft" | "twist" | "bubble";
+type WarpFeel = Pick<DitherHoverConfig, "warpRotate" | "warpRound" | "warpJitter">;
+export const warpFeels: Record<WarpFeelId, { label: string } & WarpFeel> = {
+  crisp: { label: "Crisp", warpRotate: 0, warpRound: 0, warpJitter: 0 },
+  soft: { label: "Soft", warpRotate: 0, warpRound: 0.5, warpJitter: 0.4 },
+  twist: { label: "Twist", warpRotate: 35, warpRound: 0.2, warpJitter: 0.6 },
+  bubble: { label: "Bubble", warpRotate: 35, warpRound: 1, warpJitter: 1.5 },
+};
+export const warpFeelIds = Object.keys(warpFeels) as WarpFeelId[];
 
 /* ─── Hero templates ─── */
 
@@ -1405,6 +1567,8 @@ export function applyHeroTemplate(id: string) {
     initialState: tmpl.initialState,
     activeScene: tmpl.scene !== undefined ? tmpl.scene : base.activeScene,
     activeTemplate: id,
+    palette: "signal",
+    typePair: null,
   };
   // A baked-in scene contributes its motion overlay on top of the template's
   // look (same motion-only contract as picking the scene in the panel).

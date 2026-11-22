@@ -95,3 +95,11 @@ and warp settings (the state map is in
 `docs/architecture/2026-11-21-state-machines.md`). Added `Toggle` and
 `lab-danger`. Scoped exceptions kept: the Layers verdict badges and the perf strip
 ratings use Tailwind palette colours because each colour carries one fixed meaning.
+
+2026-11-22, opinionated panel: the Design Panel offers curated presets instead of
+free values. Palette pairs (`palettes`), whole-pixel grain and gap stops
+(`grainPitch`, `gapFor`), warp feels (`warpFeels`) and tested type pairs
+(`typePairs`, laid over the copy by `resolveCopy`) live in `ditherStore.ts`. Picks
+are tiles built from lab tokens (`aria-pressed` for the selected state); a "Why"
+switch shows one reason per section. Shape thumbnails are canvas sketches, not
+the shader.
