@@ -1332,10 +1332,14 @@ export const palettes: Record<PaletteId, Palette> = {
   // Multi-colour pairs: one distinct hue per layer instead of three shades of
   // one hue. This replaces the old separate multi-colour mode; the three
   // resting layers already are the colour layers.
-  prism: { label: "Prism", hint: "3 hues each", back: "#0B0C14",
-    problem: ["#E6307A", "#FFB800", "#9B59B6"], fix: ["#2DD4A8", "#3BA4FF", "#C6F432"] },
-  aurora: { label: "Aurora", hint: "warm → cool", back: "#0A0D16",
-    problem: ["#FF4F6D", "#FF9F1C", "#FFE066"], fix: ["#2DD4A8", "#4F8BFF", "#B37BFF"] },
+  // Prism and Aurora were near twins (warm trio at rest, teal-led cool trio
+  // on hover, same #2DD4A8 CTA). Now: Prism is additive vs subtractive
+  // primaries on a neutral black, with its own violet accent; Aurora is a
+  // sunset over a night sky, revealing aurora greens, and keeps a mint CTA.
+  prism: { label: "Prism", hint: "RGB → CMY", back: "#0B0B0F",
+    problem: ["#FF3B5C", "#34E07A", "#3D7BFF"], fix: ["#2EE6E6", "#FF4FD8", "#FFE14D"], cta: "#6D5BFF" },
+  aurora: { label: "Aurora", hint: "sunset → aurora", back: "#070B1A",
+    problem: ["#FF5E7E", "#FF9F45", "#FFD36E"], fix: ["#3DFFB0", "#2BB8FF", "#9D7BFF"] },
 };
 export const paletteIds = Object.keys(palettes) as PaletteId[];
 

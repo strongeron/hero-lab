@@ -207,3 +207,8 @@ ripple showed only its edge. `shapeLift` in `DitherHero.tsx` moves every Paper
 layer up to the middle of the visible band (header inset to copy top); `edge`
 mode `full` keeps the centre. Panel previews pass the same lift to `drawHero`
 (`lift`, fixed at 24% of the height as a stand-in for the measured band).
+
+2026-11-22, Prism vs Aurora: the two were near twins (warm trio at rest, a
+teal-led cool trio on hover, the same `#2DD4A8` CTA). Prism is now RGB → CMY on
+neutral black with its own violet accent (`cta: "#6D5BFF"`, white text); Aurora is
+sunset → aurora on a night blue and keeps a mint CTA (`#3DFFB0`, dark text).
