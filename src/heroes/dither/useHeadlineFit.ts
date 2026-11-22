@@ -67,3 +67,48 @@ export function useHeadlineFit(ref: RefObject<HTMLElement | null>, key: string) 
     }
   }, [ref, key])
 }
+
+/** Display fit (Wild type): the authored size is the ceiling, and the
+ *  headline steps down until no word overflows the column, it sets in at most
+ *  3 lines, and it is no taller than `maxShare` of the hero section. Words are
+ *  never broken: a broken word inside a letter fill reads as noise. Writes
+ *  `--hl-fit-size` like useHeadlineFit. */
+export function useDisplayFit(ref: RefObject<HTMLElement | null>, key: string, maxShare = 0.6) {
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const fits = () => {
+      const cs = getComputedStyle(el)
+      const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize)
+      const h = el.getBoundingClientRect().height
+      const maxH = (el.closest('section')?.clientHeight ?? window.innerHeight) * maxShare
+      return el.scrollWidth <= el.clientWidth + 1 && Math.round(h / lh) <= 3 && h <= maxH
+    }
+    const fit = () => {
+      el.style.removeProperty('--hl-fit-size')
+      if (fits()) return
+      const base = parseFloat(getComputedStyle(el).fontSize)
+      const step = Math.max(1, Math.round(base * 0.03))
+      for (let px = Math.floor(base) - step; px >= 24; px -= step) {
+        el.style.setProperty('--hl-fit-size', `${px}px`)
+        if (fits()) return
+      }
+    }
+    fit()
+    let width = el.clientWidth
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === width) return
+      width = el.clientWidth
+      fit()
+    })
+    ro.observe(el)
+    document.fonts.addEventListener('loadingdone', fit)
+    let live = true
+    document.fonts.ready.then(() => { if (live) fit() })
+    return () => {
+      live = false
+      ro.disconnect()
+      document.fonts.removeEventListener('loadingdone', fit)
+    }
+  }, [ref, key, maxShare])
+}

@@ -9,6 +9,7 @@ import {
   setCopyVariant,
   setLayoutConfig,
   setButtonConfig,
+  setCompositionConfig,
   setPalette,
   setTypePair,
   setGrain,
@@ -35,6 +36,7 @@ import {
   speedStop,
   problemLayers,
   fixLayers,
+  type CompositionId,
   type DitheringShape,
   type TypePairId,
 } from './ditherStore'
@@ -95,6 +97,44 @@ const TEMPLATE_LOOK: Record<string, { pitch: number; gap: number; round: number;
   'full-bleed': { pitch: 5, gap: 1, round: 1 },
   problem: { pitch: 6, gap: 2, round: 0, band: 0.5 },
   'fine-grain': { pitch: 2, gap: 0, round: 0, band: 0.55 },
+  'center-stage': { pitch: 5, gap: 1, round: 1 },
+  'wild-type': { pitch: 2, gap: 0, round: 0, band: 0.55 },
+}
+const COMPOSITIONS: { id: CompositionId; label: string }[] = [
+  { id: 'split', label: 'Split' },
+  { id: 'centered', label: 'Centered' },
+  { id: 'wild', label: 'Wild type' },
+]
+/** A composition at thumbnail size: where the copy sits and where the field shows. */
+function drawComposition(ctx: CanvasRenderingContext2D, W: number, H: number, id: CompositionId, field: (bandTo?: number) => void, back: string) {
+  if (id === 'split') {
+    field(0.55)
+    headline(ctx, W, H)
+    return
+  }
+  field()
+  ctx.globalAlpha = 1
+  if (id === 'centered') {
+    // The halo: a clear box round two centred bars.
+    ctx.fillStyle = back
+    ctx.fillRect(Math.round(W * 0.2), Math.round(H * 0.24), Math.round(W * 0.6), Math.round(H * 0.52))
+    ctx.globalAlpha = 0.9
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(Math.round(W * 0.27), Math.round(H * 0.36), Math.round(W * 0.46), Math.max(2, Math.round(H * 0.11)))
+    ctx.fillRect(Math.round(W * 0.38), Math.round(H * 0.55), Math.round(W * 0.24), Math.max(2, Math.round(H * 0.09)))
+    ctx.globalAlpha = 1
+    return
+  }
+  // Wild type: the field survives only inside big letters.
+  ctx.globalCompositeOperation = 'destination-in'
+  ctx.font = `900 ${Math.round(H * 0.95)}px Anybody, Inter, sans-serif`
+  ctx.textBaseline = 'middle'
+  ctx.textAlign = 'center'
+  ctx.fillText('Aa', W / 2, H * 0.55)
+  ctx.globalCompositeOperation = 'destination-over'
+  ctx.fillStyle = back
+  ctx.fillRect(0, 0, W, H)
+  ctx.globalCompositeOperation = 'source-over'
 }
 const recolor = (layers: SketchLayer[], colors: readonly string[]) => layers.map((l, i) => ({ ...l, color: colors[i] ?? l.color }))
 /** Two white bars where the headline sits, so a template preview reads as a hero. */
@@ -163,18 +203,18 @@ export default function DitherPanel() {
   // shapeLift in DitherHero). ponytail: a fixed 24% of the height stands in
   // for the measured band (header to copy top, ~0.26 of 900px on desktop);
   // pass the hero's measured value if the copy block moves a lot.
-  const lift = state.edge.mode === 'full' ? 0 : HERO.h * 0.24
+  const lift = state.edge.mode === 'full' || state.composition.mode !== 'split' ? 0 : HERO.h * 0.24
   const heroSketch = { lift, back: c.colorBack, scale: c.scale, rotation: c.rotation, spread: c.alphaSpread, heroW: HERO.w, heroH: HERO.h, ...tile }
   const pairShown = typePairs[state.typePair ?? 'editorial']
   const copyFace = resolveCopy(state.copyVariant, null).headlineFont
 
   async function copyConfig() {
-    const { activeTemplate, initialState, activeScene, palette, typePair, shader, edge, hover, pixelGrid, animation, layout, button, copyVariant } = state
+    const { activeTemplate, initialState, activeScene, palette, typePair, composition, shader, edge, hover, pixelGrid, animation, layout, button, copyVariant } = state
     try {
       // navigator.clipboard is undefined on a non-secure origin; the optional
       // call then throws into the catch like a refused write.
       await navigator.clipboard.writeText(JSON.stringify(
-        { _ditherConfig: 3, activeTemplate, initialState, activeScene, palette, typePair, copyVariant, shader, edge, hover, pixelGrid, animation, layout, button },
+        { _ditherConfig: 3, activeTemplate, initialState, activeScene, palette, typePair, composition, copyVariant, shader, edge, hover, pixelGrid, animation, layout, button },
         null, 2,
       ))
       setCopied(true)
@@ -242,6 +282,32 @@ export default function DitherPanel() {
               )
             })}
           </div>
+        </Group>
+
+        <Group title="Layout" value={COMPOSITIONS.find((x) => x.id === state.composition.mode)?.label}>
+          <div role="group" aria-label="Layout" className="grid grid-cols-3 gap-1.5">
+            {COMPOSITIONS.map(({ id, label }) => (
+              <button key={id} type="button" aria-pressed={state.composition.mode === id} onClick={() => setCompositionConfig({ mode: id })} className={`${card} grid gap-1 p-1`}>
+                <LivePreview className="w-full h-10 rounded-sm" rate={0.6 * tempo} draw={(ctx, time, W, H, dpr) => {
+                  drawComposition(ctx, W, H, id, (bandTo) => drawField(ctx, W, H, {
+                    back: c.colorBack, layers: c.alphaLayers, t: time, pitch: 3 * dpr, gap: dpr, round: a.tileDisplay === 'points' ? 1 : 0, bandTo,
+                  }), c.colorBack)
+                }} />
+                <span className="truncate px-0.5 text-lab-xs font-medium">{label}</span>
+              </button>
+            ))}
+          </div>
+          {state.composition.mode === 'centered' && (
+            <Segmented size="xs" stretch label="Halo" value={state.composition.halo} onChange={(halo) => setCompositionConfig({ halo })}
+              options={[{ value: 'tight', label: 'Tight halo' }, { value: 'wide', label: 'Wide halo' }]} />
+          )}
+          {state.composition.mode === 'wild' && gpuPath && (
+            <Segmented size="xs" stretch label="Letter edge" value={state.composition.letterEdge} onChange={(letterEdge) => setCompositionConfig({ letterEdge })}
+              options={[{ value: 'crisp', label: 'Crisp edge' }, { value: 'tiles', label: 'Whole tiles' }]} />
+          )}
+          {state.composition.mode === 'wild' && (
+            <p className={hint}>Heavy faces read best: try the Heavy or Poster type pair.</p>
+          )}
         </Group>
 
         <Group title="At rest" value={`hover reveals ${otherState}`}>

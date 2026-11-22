@@ -12,7 +12,18 @@ A named, authored set of motion and look values for the background (for example 
 _Avoid_: preset, scene preset
 
 **Hero template**:
-A named combination of copy, layout, scene template and initial state shown in the Templates view.
+A named combination of copy, composition, scene template and initial state shown in the Canvas view.
+
+**Composition**:
+Where the copy sits and how the background meets it: Split (headline left, response and CTA right, at the bottom), Centered or Wild type. The Design Panel calls it Layout.
+_Avoid_: layout (in prose; `DitherLayoutConfig` is the Split column grid)
+
+**Halo**:
+In the Centered composition, the clear zone around the whole copy block. Tight or Wide.
+
+**Letter fill**:
+In the Wild type composition, the background shows only inside the headline's letters.
+_Avoid_: text mask, clip text
 
 **Layer**:
 One colour in the background, with its own shape and opacity. Layers combine by screen blending.

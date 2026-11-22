@@ -1,9 +1,9 @@
 import { useMemo, useRef, useEffect, useState } from 'react'
 import { Dithering } from '@paper-design/shaders-react'
-import { useDitherStore, resolveCopy, palettes, heroCtaColors, warpErrorSnippets, warpFixSnippets, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
+import { useDitherStore, resolveCopy, palettes, haloPad, heroCtaColors, warpErrorSnippets, warpFixSnippets, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
 import { getThemeById } from '../../themes/terminalThemes'
 import { TileFieldRenderer, type TileFieldFrame } from './tileField'
-import { useHeadlineFit } from './useHeadlineFit'
+import { useHeadlineFit, useDisplayFit } from './useHeadlineFit'
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
@@ -458,6 +458,65 @@ function canvasToDataUrl(canvas: HTMLCanvasElement): Promise<string | null> {
   })
 }
 
+/** Centered halo on the Paper paths: a static mask that hides the field
+ *  around the copy block. On a tile grid the hole snaps outward to whole
+ *  tiles (a soft edge would cut tiles); without a grid (a fine continuous
+ *  field) it is a soft ellipse. Built once per layout change, never per frame. */
+function buildHaloMask(r: TextRect, pad: number, w: number, h: number, g: TileGrid | null): string {
+  if (!g) {
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2
+    // The box's corners sit at 1/√2 of these radii; clear until 72 %.
+    const rx = (r.w / 2 + pad) * Math.SQRT2, ry = (r.h / 2 + pad) * Math.SQRT2
+    return `radial-gradient(${Math.round(rx)}px ${Math.round(ry)}px at ${Math.round(cx)}px ${Math.round(cy)}px, transparent 72%, black 100%)`
+  }
+  const p = g.pitch
+  const x0 = Math.floor((r.x - pad - g.alignX) / p) * p + g.alignX
+  const y0 = Math.floor((r.y - pad - g.alignY) / p) * p + g.alignY
+  const x1 = Math.ceil((r.x + r.w + pad - g.alignX) / p) * p + g.alignX
+  const y1 = Math.ceil((r.y + r.h + pad - g.alignY) / p) * p + g.alignY
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'><path fill='white' fill-rule='evenodd' d='M0 0H${w}V${h}H0Z M${x0} ${y0}H${x1}V${y1}H${x0}Z'/></svg>`
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
+}
+
+/** Letter fill mask (Wild type): the headline's glyphs, white on
+ *  transparent, on a canvas the size of the hero at `scale` px per CSS px.
+ *  Each glyph is drawn at the position the DOM measured for it, so canvas and
+ *  DOM text agree even where tracking or kerning differ. The DOM headline
+ *  stays the real text (screen readers, selection, fit). */
+function buildLetterMask(el: HTMLElement, host: HTMLElement, scale: number, out?: HTMLCanvasElement): HTMLCanvasElement | null {
+  const hostRect = host.getBoundingClientRect()
+  if (!hostRect.width || !hostRect.height) return null
+  const canvas = out ?? document.createElement('canvas')
+  canvas.width = Math.round(hostRect.width * scale)
+  canvas.height = Math.round(hostRect.height * scale)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  const cs = getComputedStyle(el)
+  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  ctx.clearRect(0, 0, hostRect.width, hostRect.height)
+  ctx.fillStyle = '#fff'
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+  ctx.textBaseline = 'alphabetic'
+  const share = ascentShare(cs)
+  const range = document.createRange()
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.textContent ?? ''
+    for (let i = 0; i < text.length;) {
+      const ch = String.fromCodePoint(text.codePointAt(i)!)
+      const next = i + ch.length
+      if (ch.trim()) {
+        range.setStart(node, i)
+        range.setEnd(node, next)
+        const r = Array.from(range.getClientRects()).find((q) => q.width > 0)
+        if (r) ctx.fillText(ch, r.left - hostRect.left, r.top - hostRect.top + r.height * share)
+      }
+      i = next
+    }
+  }
+  return canvas
+}
+
 /** Smallest gap the baseline lock leaves between the response line and the
  *  CTA (px) — matches the 'cta' pin's md:gap-6. */
 const MIN_RESPONSE_CTA_GAP = 24
@@ -465,12 +524,15 @@ const MIN_RESPONSE_CTA_GAP = 24
 type Tip = { px: number; py: number; r: number }
 
 export default function DitherHero() {
-  const { shader: c, edge, copyVariant, typePair, palette, hover, pixelGrid, animation: storeAnim, layout, button, terminalTheme: termThemeId, initialState, activeScene, stableColorField } = useDitherStore()
+  const { shader: c, edge, composition, copyVariant, typePair, palette, hover, pixelGrid, animation: storeAnim, layout, button, terminalTheme: termThemeId, initialState, activeScene, stableColorField } = useDitherStore()
   const reducedMotion = usePrefersReducedMotion()
   // Off-screen heroes read as paused: this stops the drift and mask loops and
   // sets the Paper speed to 0, which stops Paper's own rAF.
   const [inView, setInView] = useState(true)
-  const anim = inView ? storeAnim : { ...storeAnim, playing: false }
+  // Wild type pauses the field under reduced motion: motion inside letters
+  // reads as moving text, which the 0.15× spatial scale does not prevent.
+  const comp = composition.mode
+  const anim = inView && !(comp === 'wild' && reducedMotion) ? storeAnim : { ...storeAnim, playing: false }
   // Reduced motion shrinks how far things move; Speed scales how fast.
   const spatialMotionScale = reducedMotion ? 0.15 : 1
   const timeScale = Math.max(0, anim.speed)
@@ -492,7 +554,7 @@ export default function DitherHero() {
   const ctaTextColor = cta.text
   const headlineColor = activeTheme
     ? activeTheme.fg
-    : (copy.headlineColorMode === 'white' ? '#FFFFFF' : (copy.layout === 'problem' ? palettes[palette].problem[0] : palettes[palette].fix[0]))
+    : (copy.headlineColorMode === 'white' ? '#FFFFFF' : palettes[palette].problem[0])
   // One accent per theme: the response line and the CTA share CTA_BG, so the
   // line reads as the button's lead-in. Every palette's CTA_BG is ≥ 4.29:1 on
   // its background, and the response is large text (≥ 28px, needs 3:1).
@@ -553,7 +615,7 @@ export default function DitherHero() {
   const paperCell = tileMaskPath ? gridPitch : Math.max(1, Math.round(c.size))
 
   // ── Dissolve edge (Paper + CSS tile grid only; the GPU field draws its own) ──
-  const dissolveOn = gridOn && !pointCanvasMode && edge.mode === 'dissolve'
+  const dissolveOn = gridOn && !pointCanvasMode && edge.mode === 'dissolve' && comp === 'split'
   const [maskAnimT, setMaskAnimT] = useState(0)
   // Accumulated motion time lives in a ref so slider tweaks (which re-run the
   // rAF effect) resume from the current phase instead of snapping back to 0.
@@ -792,22 +854,39 @@ export default function DitherHero() {
   const lockSubRef = useRef<HTMLParagraphElement>(null)
   const lockResponseWrapRef = useRef<HTMLDivElement>(null)
   const lockCtaRef = useRef<HTMLAnchorElement>(null)
-  useHeadlineFit(lockHeadlineRef, `${copyVariant}|${typePair}|${copy.headlineSize}`)
+  /** Centered: the copy block whose box is the halo. */
+  const haloBlockRef = useRef<HTMLDivElement>(null)
+  /** Wild type: the display headline, the source of the letter mask. */
+  const wildHeadlineRef = useRef<HTMLHeadingElement>(null)
+  useHeadlineFit(lockHeadlineRef, `${comp}|${copyVariant}|${typePair}|${copy.headlineSize}`)
+  useDisplayFit(wildHeadlineRef, `${comp}|${copyVariant}|${typePair}`)
   const fontsLoaded = useFontsLoaded()
   const [baselineNudge, setBaselineNudge] = useState({ response: 0, cta: 0, subGap: 0 })
   useEffect(() => {
     const content = contentRef.current
     const host = shaderContainerRef.current
     if (!content || !host) return
-    const needRects = edge.mode === 'full'
+    // Centered: one rect, the copy block (the halo). Wild type: none, the
+    // letter mask decides where the field shows.
+    const needRects = comp === 'centered' || (comp === 'split' && edge.mode === 'full')
     const measure = () => {
       const hostRect = host.getBoundingClientRect()
       setContentTop((prev) => {
         const top = Math.round(content.getBoundingClientRect().top - hostRect.top)
         return prev === top ? prev : top
       })
-      if (!needRects) return
+      if (!needRects) {
+        setTextRects((prev) => (prev.length ? [] : prev))
+        return
+      }
       const rects: TextRect[] = []
+      const block = haloBlockRef.current
+      if (comp === 'centered' && block) {
+        const r = block.getBoundingClientRect()
+        rects.push({ x: r.left - hostRect.left, y: r.top - hostRect.top, w: r.width, h: r.height })
+        setTextRects((prev) => (JSON.stringify(prev) === JSON.stringify(rects) ? prev : rects))
+        return
+      }
       content.querySelectorAll('h1, p, a').forEach((el) => {
         // Buttons and bubbled text keep their element box — the pill IS the
         // visual. In 'lines' mode plain text contributes one rect PER RENDERED
@@ -839,7 +918,48 @@ export default function DitherHero() {
     return () => ro.disconnect()
     // baselineNudge: transforms don't fire the ResizeObserver, so re-measure
     // the exclusion rects after the baseline lock shifts the right column.
-  }, [edge.mode, edge.textRectMode, copyVariant, typePair, layout, baselineNudge, fontsLoaded])
+  }, [comp, edge.mode, edge.textRectMode, copyVariant, typePair, layout, baselineNudge, fontsLoaded])
+
+  // ── Letter fill (Wild type) ──
+  // One mask for every renderer: the GPU field uploads the canvas as a
+  // texture, the Paper paths get it once as a static data: URL mask (a blob:
+  // mask loads async and blinks). Rebuilt only on layout change: the fit, a
+  // font load, copy, type pair or resize. Never per frame.
+  const letterCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const letterVersionRef = useRef(0)
+  const [letterMask, setLetterMask] = useState<{ version: number; url: string | null } | null>(null)
+  useEffect(() => {
+    const el = wildHeadlineRef.current
+    const host = shaderContainerRef.current
+    if (comp !== 'wild' || !el || !host) {
+      setLetterMask(null)
+      return
+    }
+    let live = true
+    let raf = 0
+    const build = () => {
+      const canvas = buildLetterMask(el, host, Math.min(2, Math.max(1, window.devicePixelRatio || 1)), letterCanvasRef.current ?? undefined)
+      if (!canvas) return
+      letterCanvasRef.current = canvas
+      const version = ++letterVersionRef.current
+      if (pointCanvasMode) {
+        setLetterMask({ version, url: null })
+        return
+      }
+      canvasToDataUrl(canvas).then((url) => {
+        if (live && version === letterVersionRef.current) setLetterMask({ version, url })
+      })
+    }
+    // Coalesce: the fit, the font swap and the observer can all fire in one frame.
+    const schedule = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(build) }
+    schedule()
+    const ro = new ResizeObserver(schedule)
+    ro.observe(el)
+    ro.observe(host)
+    return () => { live = false; cancelAnimationFrame(raf); ro.disconnect() }
+  }, [comp, pointCanvasMode, copyVariant, typePair, fontsLoaded])
+  /** Wild type before its mask exists: hide the field, or it flashes unmasked. */
+  const lettersPending = comp === 'wild' && (!letterMask || (!pointCanvasMode && !letterMask.url))
 
   // Baseline lock (problem layout) — the right column snaps to the left one:
   // the response's last line shares the headline's last baseline, the CTA
@@ -847,7 +967,7 @@ export default function DitherHero() {
   // (target minus current, measured post-transform) so the lock converges and
   // then holds across font, size, and copy changes.
   useEffect(() => {
-    if (copy.layout !== 'problem') return
+    if (comp !== 'split') return
     // Generous bound: at wide viewports the CTA's natural distance from the
     // sub's last baseline can exceed 50px — a tight clamp saturates just
     // short of the target and the lock visibly misses.
@@ -923,7 +1043,7 @@ export default function DitherHero() {
       window.removeEventListener('resize', measure)
       twoCol.removeEventListener('change', measure)
     }
-  }, [copy.layout, copy.responsePin, copyVariant, typePair, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
+  }, [comp, copy.responsePin, copyVariant, typePair, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
     containerSize.w, fontsLoaded])
 
   // Baseline guides — debug overlay for alignment checks. One line per
@@ -1327,7 +1447,8 @@ export default function DitherHero() {
       base: field(c.alphaLayers),
       fix: field(hover.hoverLayers),
       edge: {
-        mode: edge.mode,
+        // Centered and Wild type fill the hero; Centered clears the halo.
+        mode: comp === 'split' ? edge.mode : 'full',
         // The solid copy background starts at the measured content top; clamp
         // the band to it so no dot is flat-cut.
         posPx: contentTop != null ? Math.min(posPct, contentTop) : posPct,
@@ -1335,9 +1456,12 @@ export default function DitherHero() {
         dissolveSeed: edge.dissolveSeed,
         textBlendMotion: edge.textBlendMotion,
         topInset: edge.topInset,
-        fullPadding: edge.fullPadding,
+        fullPadding: comp === 'centered' ? haloPad[composition.halo] : edge.fullPadding,
       },
       rects: textRects,
+      letters: comp === 'wild' && letterMask && letterCanvasRef.current
+        ? { mask: letterCanvasRef.current, version: letterMask.version, edge: composition.letterEdge }
+        : null,
       warp: hover.enabled && a.radius > 0 && a.cw > 0 ? {
         px: a.px, py: a.py, r: a.radius,
         rotateDeg: w2.rotate, round: w2.round, scale: w2.scale, spread: Math.min(1.5, w2.spread),
@@ -1384,7 +1508,7 @@ export default function DitherHero() {
   // the copy's top. Paper adds u_offsetY to the object UV before scale and
   // rotation, in units of max(W, H) for fit cover, so the shift is
   // (f − 0.5) × H / max(W, H) for a band centre f (share of H from the top).
-  const shapeLift = contentTop != null && edge.mode !== 'full' && containerSize.h > 0
+  const shapeLift = contentTop != null && edge.mode !== 'full' && comp === 'split' && containerSize.h > 0
     ? (((edge.topInset || 0) + contentTop) / 2 / containerSize.h - 0.5) * containerSize.h / Math.max(containerSize.w, containerSize.h)
     : 0
 
@@ -1458,16 +1582,30 @@ export default function DitherHero() {
       )
     })
 
-  const containerStyle = restMaskStyle
+  // Centered (halo) and Wild type (letters) on the Paper paths: one more
+  // static layer in the container's mask stack. The GPU field draws both itself.
+  const haloRect = comp === 'centered' && !pointCanvasMode ? textRects[0] : undefined
+  const haloMask = useMemo(
+    () => haloRect ? buildHaloMask(haloRect, haloPad[composition.halo], containerSize.w, containerSize.h, tileMaskPath ? grid : null) : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [haloRect?.x, haloRect?.y, haloRect?.w, haloRect?.h, composition.halo, containerSize.w, containerSize.h, tileMaskPath, grid],
+  )
+  const letterUrl = comp === 'wild' && !pointCanvasMode && letterMask?.url ? `url("${letterMask.url}")` : null
+  const compositionMask = haloMask ?? letterUrl
+  const containerStyle: React.CSSProperties | undefined = {
+    ...(compositionMask ? intersectMask(restMaskStyle, compositionMask) : restMaskStyle),
+    ...(lettersPending ? { visibility: 'hidden' } : {}),
+  }
   // The cover only ever shows on the 'mask' path; the reveal escapes the
   // dissolve band, so the hover works over the whole hero, text included.
   const maskBase: React.CSSProperties = { maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat' }
   // A terminal theme reveals one themed colour instead of the other state's layers.
   const revealColor = (color: string) => (activeTheme ? responseColor : color)
-  const textUnderScene = edge.mode === 'full'
-  // Gridded Paper (Problem): the warp is a tile effect, so it stays in the
-  // tile band above the copy, both for the pointer and as a clip at the band
-  // edge. Grid-off (Fine Grain) keeps its reveal over the copy on purpose.
+  const textUnderScene = edge.mode === 'full' || comp !== 'split'
+  // Gridded Paper (Problem, Split): the warp is a tile effect, so it stays in
+  // the tile band above the copy, both for the pointer and as a clip at the
+  // band edge. Grid-off (Fine Grain) keeps its reveal over the copy on
+  // purpose; Centered and Wild type put the text under the scene, so no band.
   const bandOnly = hoverPath === 'mask' && !textUnderScene && contentTop != null
   hoverBandRef.current = bandOnly ? contentTop! : Infinity
   const bandClip: React.CSSProperties | undefined = bandOnly
@@ -1476,6 +1614,39 @@ export default function DitherHero() {
   const textReadabilityStyle: React.CSSProperties | undefined = textUnderScene
     ? { textShadow: `0 2px 28px ${c.colorBack}, 0 1px 6px ${c.colorBack}, 0 0 1px ${c.colorBack}` }
     : undefined
+
+  const headlineStyle: React.CSSProperties = {
+    color: headlineColor,
+    fontFamily: copy.headlineFont || 'var(--font-display, Satoshi, sans-serif)',
+    fontWeight: copy.headlineWeight ?? 900,
+    fontSize: `var(--hl-fit-size, min(${copy.headlineSize || 'clamp(2.5rem, 3.5vw + 1rem, 4rem)'}, 8.5vw))`,
+    letterSpacing: copy.headlineTracking ?? '-0.03em',
+    lineHeight: copy.headlineLeading || '0.95',
+    fontStretch: copy.headlineFont ? undefined : 'var(--font-display-stretch, normal)',
+  }
+  // Wild type letter tint: solid when the GPU field failed (no fill at all).
+  const wildFill = pointCanvasMode && tileFieldFailed
+    ? headlineColor
+    : `color-mix(in oklch, ${c.alphaLayers[0]?.color ?? headlineColor} 22%, transparent)`
+  /** The hero CTA for Centered and Wild type (Split keeps its baseline-locked one). */
+  const heroCta = (className: string) => (
+    <a
+      href="#"
+      className={`inline-flex items-center justify-center whitespace-nowrap px-7 py-3 text-[16px] xl:px-10 xl:py-4 xl:text-[18px] font-semibold tracking-wide transition-colors ${className}`}
+      style={{
+        backgroundColor: CTA_BG,
+        color: ctaTextColor,
+        fontFamily: copy.ctaFont || copy.headlineFont || 'var(--font-display, Satoshi, sans-serif)',
+        ...(copy.ctaSize ? { fontSize: copy.ctaSize } : {}),
+        ...ctaStyle,
+        textTransform: ctaTextTransform,
+      }}
+      onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.style.backgroundColor = CTA_BG_HOVER }}
+      onPointerLeave={(e) => { e.currentTarget.style.backgroundColor = CTA_BG }}
+    >
+      {copy.cta}
+    </a>
+  )
 
   return (
     <section className="min-h-svh flex flex-col relative overflow-hidden" style={{ backgroundColor: c.colorBack }}>
@@ -1514,7 +1685,8 @@ export default function DitherHero() {
       {/* Reveal — the other state's layers, mounted on first hover. Outside the
           resting mask, so it is not cut by the dissolve band. */}
       {hover.enabled && hoverActive && !pointCanvasMode && (
-        <div key={`hover-gl${glEpoch}`} className="absolute inset-0 z-[6] pointer-events-none" style={bandClip} aria-hidden="true">
+        <div key={`hover-gl${glEpoch}`} className="absolute inset-0 z-[6] pointer-events-none" aria-hidden="true"
+          style={comp === 'wild' ? (letterUrl ? intersectMask(undefined, letterUrl) : { visibility: 'hidden' }) : bandClip}>
           <div
             ref={fixLayerRef}
             className="absolute inset-0"
@@ -1600,13 +1772,13 @@ export default function DitherHero() {
         <div className="absolute inset-0 z-[45] pointer-events-none" aria-hidden="true">
           <div className="relative h-full max-w-[1440px] mx-auto w-full px-5 sm:px-8 xl:px-16">
             <div
-              className={`relative h-full grid grid-cols-4 ${copy.layout === 'problem' && stackTablet ? 'lg:grid-cols-12' : 'md:grid-cols-12'}`}
+              className={`relative h-full grid grid-cols-4 ${stackTablet ? 'lg:grid-cols-12' : 'md:grid-cols-12'}`}
               style={{ columnGap: layout.gutter, boxShadow: 'inset 1px 0 0 rgba(0, 220, 255, 0.85), inset -1px 0 0 rgba(0, 220, 255, 0.85)' }}
             >
               {Array.from({ length: 12 }, (_, i) => (
                 <div
                   key={i}
-                  className={i < 4 ? '' : (copy.layout === 'problem' && stackTablet ? 'hidden lg:block' : 'hidden md:block')}
+                  className={i < 4 ? '' : (stackTablet ? 'hidden lg:block' : 'hidden md:block')}
                   style={{ background: 'rgba(0, 220, 255, 0.07)', boxShadow: 'inset 1px 0 0 rgba(0, 220, 255, 0.22), inset -1px 0 0 rgba(0, 220, 255, 0.22)' }}
                 />
               ))}
@@ -1621,7 +1793,7 @@ export default function DitherHero() {
       )}
 
       {/* Bottom content section */}
-      <div ref={contentRef} className="relative z-10 mt-auto">
+      <div ref={contentRef} className={`relative z-10 ${comp === 'split' ? 'mt-auto' : 'my-auto'}`}>
         {/* The copy's solid background is drawn by copyBg (section level) once
             measured, so the hover reveal can sit between it and the text. */}
         <div style={{ backgroundColor: textUnderScene || contentTop != null ? 'transparent' : c.colorBack }}>
@@ -1630,7 +1802,7 @@ export default function DitherHero() {
               reads as one unit separated from the shader rather than glued to
               it. The old 12px top was smaller than its own internal gaps. */}
           <div ref={copyBoxRef} className="max-w-[1440px] mx-auto w-full px-5 sm:px-8 xl:px-16 pb-10 md:pb-20 pt-10 md:pt-8">
-            {copy.layout === 'problem' ? (
+            {comp === 'split' ? (
               <div
                 className={`grid grid-cols-4 items-end [--hl-cols:7] [--rsp-cols:5] xl:[--hl-cols:var(--hl-cols-panel)] xl:[--rsp-cols:var(--rsp-cols-panel)] ${stackTablet ? 'lg:grid-cols-12' : 'md:grid-cols-12'}`}
                 style={{ columnGap: layout.gutter, '--hl-cols-panel': layout.headlineCols, '--rsp-cols-panel': layout.responseCols } as React.CSSProperties}
@@ -1742,44 +1914,47 @@ export default function DitherHero() {
                   </a>
                 </div>
               </div>
+            ) : comp === 'centered' ? (
+              <div ref={haloBlockRef} className="mx-auto flex max-w-[62rem] flex-col items-center text-center">
+                <h1
+                  ref={lockHeadlineRef}
+                  className="text-balance break-words [overflow-wrap:anywhere]"
+                  style={{ ...headlineStyle, ...textReadabilityStyle }}
+                >
+                  {copy.headline}
+                </h1>
+                {copy.sub && (
+                  <p className="mt-4 md:mt-6 text-[17px] md:text-[20px] max-w-[52ch] text-balance leading-[1.55] break-words" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(copy.subSize ? { fontSize: copy.subSize } : {}), ...textReadabilityStyle }}>
+                    {copy.sub}
+                  </p>
+                )}
+                {heroCta('mt-8 md:mt-10')}
+              </div>
             ) : (
-              <div
-                className="grid grid-cols-4 md:grid-cols-12 items-end [--hl-cols:7] [--rsp-cols:5] xl:[--hl-cols:var(--hl-cols-panel)] xl:[--rsp-cols:var(--rsp-cols-panel)]"
-                style={{ columnGap: layout.gutter, '--hl-cols-panel': layout.headlineCols, '--rsp-cols-panel': layout.responseCols } as React.CSSProperties}
-              >
-                <div className="col-span-4 min-w-0 md:[grid-column:span_var(--hl-cols)_/_span_var(--hl-cols)]">
-                  <h1
-                    ref={lockHeadlineRef}
-                    className="text-balance break-words [overflow-wrap:anywhere]"
-                    style={{
-                      color: headlineColor,
-                      fontFamily: copy.headlineFont || 'var(--font-display, Satoshi, sans-serif)',
-                      fontWeight: copy.headlineWeight ?? 900,
-                      fontSize: `var(--hl-fit-size, min(${copy.headlineSize || 'clamp(2.5rem, 3.5vw + 1rem, 4rem)'}, 8.5vw))`,
-                      letterSpacing: copy.headlineTracking ?? '-0.03em',
-                      lineHeight: copy.headlineLeading || '0.95',
-                      fontStretch: copy.headlineFont ? undefined : 'var(--font-display-stretch, normal)',
-                      ...textReadabilityStyle,
-                    }}
-                  >
-                    {copy.headline}
-                  </h1>
-                </div>
-                <div className="col-span-4 min-w-0 flex flex-col items-start justify-end gap-5 md:gap-8 pb-[2px] mt-6 md:mt-0 md:[grid-column:span_var(--rsp-cols)_/_span_var(--rsp-cols)] [container-type:inline-size] [--rsp-cap:6vw] md:[--rsp-cap:9.7cqw] xl:[--rsp-cap:999px]">
+              <div>
+                {/* Wild type: the letters are the only window onto the field.
+                    The DOM text stays real (screen readers, selection, the
+                    fit) and carries a faint tint, the floor that keeps each
+                    letter readable when the dither inside it is sparse. */}
+                <h1
+                  ref={wildHeadlineRef}
+                  className="text-balance"
+                  style={{
+                    ...headlineStyle,
+                    color: wildFill,
+                    fontSize: 'var(--hl-fit-size, min(22vw, 20rem))',
+                    lineHeight: copy.headlineLeading || '0.9',
+                  }}
+                >
+                  {copy.shortHeadline ?? copy.headline}
+                </h1>
+                <div className="mt-6 md:mt-10 flex flex-col items-start gap-5 md:flex-row md:items-center md:gap-10">
                   {copy.sub && (
-                    <p className="text-[17px] md:text-[20px] max-w-[65ch] text-pretty leading-[1.55] break-words [overflow-wrap:anywhere]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(copy.subSize ? { fontSize: copy.subSize } : {}) }}>
+                    <p className="text-[17px] md:text-[20px] max-w-[46ch] text-pretty leading-[1.55]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(copy.subSize ? { fontSize: copy.subSize } : {}) }}>
                       {copy.sub}
                     </p>
                   )}
-                  <a
-                    href="#"
-                    className="inline-flex items-center justify-center whitespace-nowrap px-7 py-3 text-[16px] xl:px-10 xl:py-4 xl:text-[18px] font-semibold tracking-wide transition-colors"
-                    style={{ backgroundColor: CTA_BG, color: ctaTextColor, ...(copy.ctaSize ? { fontSize: copy.ctaSize } : {}), ...ctaStyle, textTransform: ctaTextTransform }}
-                    onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.style.backgroundColor = CTA_BG_HOVER }}
-                    onPointerLeave={(e) => { e.currentTarget.style.backgroundColor = CTA_BG }}
-                  >
-                    {copy.cta}
-                  </a>
+                  {heroCta('shrink-0')}
                 </div>
               </div>
             )}

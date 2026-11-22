@@ -239,3 +239,11 @@ warp answers only inside the tile band above the copy (`hoverBandRef`); below it
 the warp shrinks as on leave, and the cover and reveal layers are clipped to the
 band (`bandClip`). Grid-off templates (Fine Grain, 'cells' path) keep the reveal
 over the copy on purpose; the GPU path draws its own warp.
+
+2026-11-22, compositions (`docs/specs/2026-11-22-hero-layouts.md`): a **Layout**
+group under "Start from" picks the composition: Split, Centered or Wild type, as
+pick tiles with a `LivePreview` sketch (`drawComposition` in `DitherPanel.tsx`).
+Centered adds a Halo `Segmented` (Tight / Wide). Wild type adds a Letter edge
+`Segmented` (Crisp / Whole tiles) on the GPU tile field only, and a hint that
+points to the heavy type pairs (Heavy, Poster). New templates: Center Stage and
+Wild Type.
