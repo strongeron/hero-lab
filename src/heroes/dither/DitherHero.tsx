@@ -1340,9 +1340,12 @@ export default function DitherHero() {
       const a = hoverAnim.current
       const moving = anim.playing || a.radius > 0 || a.hovering
       if (!moving && !tileDirtyRef.current) return
-      tileDirtyRef.current = false
+      // Clear the flag only once a frame is drawn: right after load the host
+      // can still be 0×0, and a paused hero would otherwise stay blank.
       const f = buildTileFrameRef.current()
-      if (f) renderer.render(f, Math.min(2, Math.max(1, window.devicePixelRatio || 1)))
+      if (!f) return
+      tileDirtyRef.current = false
+      renderer.render(f, Math.min(2, Math.max(1, window.devicePixelRatio || 1)))
     }
     raf = requestAnimationFrame(frame)
     return () => { cancelAnimationFrame(raf); renderer.dispose() }

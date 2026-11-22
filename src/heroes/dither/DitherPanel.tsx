@@ -214,11 +214,13 @@ export default function DitherPanel() {
               const p = palettes[id]
               return (
                 <button key={id} type="button" aria-pressed={state.palette === id} onClick={() => setPalette(id)} className={`${card} grid gap-1 p-1`}>
-                  <LivePreview className="w-full h-9 rounded-sm" rate={0.8} draw={(ctx, time, W, H, dpr) => {
-                    const ptr = loopPointer(time, W, H)
+                  {/* Calm on purpose: a still pattern in large soft tiles, and one
+                      slow reveal gliding across, so six swatches do not compete. */}
+                  <LivePreview className="w-full h-9 rounded-sm" rate={0.35} draw={(ctx, time, W, H, dpr) => {
                     drawField(ctx, W, H, {
-                      back: p.back, t: time * 0.5, pitch: 3 * dpr, gap: dpr, layers: recolor(c.alphaLayers, p[state.initialState]),
-                      warp: { ...ptr, r: H * 0.55, layers: recolor(h.hoverLayers, p[otherState]), rotate: 0, round: 0, jitter: 0 },
+                      back: p.back, t: 1.3, pitch: 6 * dpr, gap: dpr, round: 0.35, zoom: 0.9,
+                      layers: recolor(c.alphaLayers, p[state.initialState]),
+                      warp: { x: W * (0.5 + 0.4 * Math.sin(time)), y: H / 2, r: H * 0.75, layers: recolor(h.hoverLayers, p[otherState]), rotate: 0, round: 0.35, jitter: 0 },
                     })
                   }} />
                   <span className="flex min-w-0 items-baseline justify-between gap-1 px-0.5">
