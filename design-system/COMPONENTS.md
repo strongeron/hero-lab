@@ -6,6 +6,10 @@
   - Description: Identify the current lab view at the start of its toolbar: the Hero Lab mark, the view name and a one-line explanation, with the mark linking home.
   - Contract: [contract](components/lab-toolbar-title.md)
 
+- **Live preview**
+  - Description: Show what a setting does with a small live canvas next to or inside its control, such as a template, palette, grain size, shape or warp feel in the Design Panel.
+  - Contract: [contract](components/live-preview.md)
+
 - **Section label**
   - Description: Open a group of related settings in a panel or toolbar column with a short uppercase heading, optionally with one small trailing action.
   - Contract: [contract](components/section-label.md)

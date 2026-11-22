@@ -104,3 +104,13 @@ free values. Palette pairs (`palettes`), whole-pixel grain and gap stops
 are tiles built from lab tokens (`aria-pressed` for the selected state); a "Why"
 switch shows one reason per section. Shape thumbnails are canvas sketches, not
 the shader.
+
+2026-11-22, panel previews: every Design Panel pick shows its result in a
+`LivePreview` (new part, contract in `design-system/components/live-preview.md`)
+drawn by `panelSketch.ts`: template mini-heroes, palette strips with a moving
+reveal, a 1:1 grain strip, per-layer shape previews that run at the hero's speed,
+and warp feels under a looping pointer. Shape is hidden on the GPU tile field
+(points or snapped colour) because that renderer ignores layer shapes; the panel
+says so. Prism and Aurora give each layer its own hue (the old multi-colour mode
+stays removed).
+

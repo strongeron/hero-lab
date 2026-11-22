@@ -1285,7 +1285,7 @@ export function setTerminalTheme(id: string | null) {
    keep the resting state and the hover intact (whole-pixel sizes, readable
    text, a reveal that contrasts with the rest). */
 
-export type PaletteId = "signal" | "ember" | "ultra" | "mono";
+export type PaletteId = "signal" | "ember" | "ultra" | "mono" | "prism" | "aurora";
 type Trio = [string, string, string];
 export interface Palette {
   label: string;
@@ -1303,6 +1303,13 @@ export const palettes: Record<PaletteId, Palette> = {
     problem: ["#B04BFF", "#FF4FD8", "#7A2CFF"], fix: ["#C6F432", "#7FE06A", "#3FAF5A"] },
   mono: { label: "Mono", hint: "grey → pink", back: "#0C0C0E",
     problem: ["#F2F2F2", "#9A9AA2", "#5A5A62"], fix: ["#E6307A", "#FF6B2B", "#FF3366"] },
+  // Multi-colour pairs: one distinct hue per layer instead of three shades of
+  // one hue. This replaces the old separate multi-colour mode; the three
+  // resting layers already are the colour layers.
+  prism: { label: "Prism", hint: "3 hues each", back: "#0B0C14",
+    problem: ["#E6307A", "#FFB800", "#9B59B6"], fix: ["#2DD4A8", "#3BA4FF", "#C6F432"] },
+  aurora: { label: "Aurora", hint: "warm → cool", back: "#0A0D16",
+    problem: ["#FF4F6D", "#FF9F1C", "#FFE066"], fix: ["#2DD4A8", "#4F8BFF", "#B37BFF"] },
 };
 export const paletteIds = Object.keys(palettes) as PaletteId[];
 

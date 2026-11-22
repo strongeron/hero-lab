@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   useDitherStore,
   setHoverConfig,
@@ -30,6 +30,8 @@ import {
   warpFeels,
   warpFeelIds,
   resolveCopy,
+  problemLayers,
+  fixLayers,
   type DitheringShape,
   type TypePairId,
 } from './ditherStore'
@@ -37,6 +39,8 @@ import Segmented from '../../lab/ui/Segmented'
 import SliderRow from '../../lab/ui/SliderRow'
 import SectionLabel from '../../lab/ui/SectionLabel'
 import Toggle from '../../lab/ui/Toggle'
+import LivePreview from '../../lab/ui/LivePreview'
+import { drawField, loopPointer, type SketchLayer } from './panelSketch'
 
 /* The Design Panel offers curated choices only: every option keeps the resting
    state and the hover intact. Renderer, edge, scene and hover mode belong to
@@ -68,14 +72,6 @@ function Stable({ labels, show }: { labels: string[]; show: number }) {
   )
 }
 
-function Dots({ colors }: { colors: readonly string[] }) {
-  return (
-    <span className="flex gap-0.5">
-      {colors.map((c, i) => <i key={i} className="block size-2.5 rounded-[2px]" style={{ background: c }} />)}
-    </span>
-  )
-}
-
 function Group({ title, value, why, showWhy, children }: { title: string; value?: ReactNode; why?: ReactNode; showWhy: boolean; children: ReactNode }) {
   return (
     <section className="space-y-2 pt-3 first:pt-0">
@@ -88,32 +84,22 @@ function Group({ title, value, why, showWhy, children }: { title: string; value?
   )
 }
 
-/* Static thumbnails of the seven shapes. ponytail: these are rough canvas
-   sketches of Paper's shapes, not the shader itself (seven WebGL contexts for
-   a picker is too much). Swap for pre-rendered images if they mislead. */
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((n) => (n + 0.5) / 16)
-const SKETCH: Record<DitheringShape, (u: number, v: number) => number> = {
-  simplex: (u, v) => 0.5 + 0.25 * (Math.sin(u * 3 + 1.3) * Math.sin(v * 2.3 - 0.9) + Math.sin((u + v) * 1.7 + 0.6)),
-  warp: (u, v) => 0.5 + 0.5 * Math.sin(u * 2.5 + 1.6 * Math.sin(v * 2 + 1.3)),
-  dots: (u, v) => 0.5 + 0.5 * Math.sin(u * 9 + 1.3) * Math.sin(v * 9),
-  wave: (u, v) => 0.5 + 0.5 * Math.sin(v * 5 + 1.3 * Math.sin(u * 2 + 1.3)),
-  ripple: (u, v) => 0.5 + 0.5 * Math.sin(Math.hypot(u, v) * 10 - 2.6),
-  swirl: (u, v) => 0.5 + 0.5 * Math.sin(Math.atan2(v, u) * 3 + Math.hypot(u, v) * 6 - 1.3),
-  sphere: (u, v) => Math.max(0, 1.05 - Math.hypot(u, v) * 1.1),
+/* Previews: every pick shows what it does in a small live canvas
+   (LivePreview + panelSketch). They are 2D sketches of the field, not the
+   shader; one shared loop runs them and stops when the panel is off screen. */
+const TEMPLATE_LOOK: Record<string, { pitch: number; gap: number; round: number; band?: number }> = {
+  'full-bleed': { pitch: 5, gap: 1, round: 1 },
+  problem: { pitch: 6, gap: 2, round: 0, band: 0.5 },
+  'fine-grain': { pitch: 2, gap: 0, round: 0, band: 0.55 },
 }
-function ShapeThumb({ shape, color, back }: { shape: DitheringShape; color: string; back: string }) {
-  const ref = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    const ctx = ref.current?.getContext('2d')
-    if (!ctx) return
-    ctx.fillStyle = back
-    ctx.fillRect(0, 0, 60, 40)
-    ctx.fillStyle = color
-    for (let y = 0; y < 13; y++) for (let x = 0; x < 20; x++) {
-      if (SKETCH[shape]((x - 10) / 5.5, (y - 6.5) / 5.5) > BAYER[(y & 3) * 4 + (x & 3)]) ctx.fillRect(x * 3, y * 3, 3, 3)
-    }
-  }, [shape, color, back])
-  return <canvas ref={ref} width={60} height={40} aria-hidden className="block w-full aspect-[3/2] rounded-sm [image-rendering:pixelated]" />
+const recolor = (layers: SketchLayer[], colors: readonly string[]) => layers.map((l, i) => ({ ...l, color: colors[i] ?? l.color }))
+/** Two white bars where the headline sits, so a template preview reads as a hero. */
+function headline(ctx: CanvasRenderingContext2D, W: number, H: number) {
+  ctx.globalAlpha = 0.9
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(Math.round(W * 0.1), Math.round(H * 0.62), Math.round(W * 0.55), Math.max(2, Math.round(H * 0.09)))
+  ctx.fillRect(Math.round(W * 0.1), Math.round(H * 0.77), Math.round(W * 0.36), Math.max(2, Math.round(H * 0.09)))
+  ctx.globalAlpha = 1
 }
 
 const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length)]
@@ -137,6 +123,10 @@ export default function DitherPanel() {
     const w = warpFeels[f]
     return w.warpRotate === h.warpRotate && w.warpRound === h.warpRound && w.warpJitter === h.warpJitter
   }) ?? null
+  /** GPU tile field (points, or snapped colour): it samples its own noise, so layer shapes do not reach it. */
+  const gpuPath = pg.enabled && (a.tileDisplay === 'points' || pg.snap)
+  /** Preview clock rate: the hero's speed, 0 while paused. */
+  const tempo = a.playing ? a.speed : 0
   const pairShown = typePairs[state.typePair ?? 'editorial']
   const copyFace = resolveCopy(state.copyVariant, null).headlineFont
 
@@ -195,12 +185,19 @@ export default function DitherPanel() {
         <Group title="Start from" showWhy={showWhy}
           why="A template sets renderer, edge and scene together. None of those sit in this panel, so nothing below can break the resting state.">
           <div className="grid grid-cols-3 gap-1.5">
-            {heroTemplates.map((t) => (
-              <button key={t.id} type="button" aria-pressed={state.activeTemplate === t.id} onClick={() => applyHeroTemplate(t.id)} className={`${card} grid gap-1`}>
-                <Dots colors={t.swatch} />
-                <span className="truncate text-lab-xs font-medium">{t.name}</span>
-              </button>
-            ))}
+            {heroTemplates.map((t) => {
+              const look = TEMPLATE_LOOK[t.id] ?? TEMPLATE_LOOK['full-bleed']
+              const layers = t.initialState === 'fix' ? fixLayers : problemLayers
+              return (
+                <button key={t.id} type="button" aria-pressed={state.activeTemplate === t.id} onClick={() => applyHeroTemplate(t.id)} className={`${card} grid gap-1 p-1`}>
+                  <LivePreview className="w-full h-10 rounded-sm" rate={0.6} draw={(ctx, time, W, H, dpr) => {
+                    drawField(ctx, W, H, { back: palettes.signal.back, layers, t: time, pitch: look.pitch * dpr, gap: look.gap * dpr, round: look.round, bandTo: look.band })
+                    headline(ctx, W, H)
+                  }} />
+                  <span className="truncate px-0.5 text-lab-xs font-medium">{t.name}</span>
+                </button>
+              )
+            })}
           </div>
         </Group>
 
@@ -210,15 +207,21 @@ export default function DitherPanel() {
             options={[{ value: 'problem', label: 'Problem' }, { value: 'fix', label: 'Fix' }]} />
         </Group>
 
-        <Group title="Palette" value="rest → reveal" showWhy={showWhy}
-          why="Pairs, not pickers. Each pair is checked: the reveal contrasts with the rest, and white text stays readable on the background.">
+        <Group title="Palette" value="rest, hover reveals" showWhy={showWhy}
+          why="Pairs, not pickers. Each of the three resting layers takes one colour of the pair; Prism and Aurora give every layer its own hue. Each pair is checked for contrast with the reveal and readable white text.">
           <div className="grid grid-cols-2 gap-1.5">
             {paletteIds.map((id) => {
               const p = palettes[id]
               return (
-                <button key={id} type="button" aria-pressed={state.palette === id} onClick={() => setPalette(id)} className={`${card} flex items-center gap-2`}>
-                  <span className="grid gap-0.5"><Dots colors={p.problem} /><Dots colors={p.fix} /></span>
-                  <span className="grid min-w-0">
+                <button key={id} type="button" aria-pressed={state.palette === id} onClick={() => setPalette(id)} className={`${card} grid gap-1 p-1`}>
+                  <LivePreview className="w-full h-9 rounded-sm" rate={0.8} draw={(ctx, time, W, H, dpr) => {
+                    const ptr = loopPointer(time, W, H)
+                    drawField(ctx, W, H, {
+                      back: p.back, t: time * 0.5, pitch: 3 * dpr, gap: dpr, layers: recolor(c.alphaLayers, p[state.initialState]),
+                      warp: { ...ptr, r: H * 0.55, layers: recolor(h.hoverLayers, p[otherState]), rotate: 0, round: 0, jitter: 0 },
+                    })
+                  }} />
+                  <span className="flex min-w-0 items-baseline justify-between gap-1 px-0.5">
                     <span className="truncate text-lab-xs font-medium">{p.label}</span>
                     <span className="truncate text-lab-xs text-lab-fg-subtle">{p.hint}</span>
                   </span>
@@ -229,8 +232,16 @@ export default function DitherPanel() {
         </Group>
 
         <Group title="Grain" showWhy={showWhy}
-          value={pg.enabled ? `${pitch}px pieces · ${pg.gap}px gap` : `${c.size}px dots`}
-          why="Whole pixels only. Every size and gap is an integer, so tiles stay sharp at 1× and 2×.">
+          value={pg.enabled ? `${pitch}px pieces · ${pg.gap}px gap · 1:1` : `${c.size}px dots · 1:1`}
+          why="Whole pixels only. Every size and gap is an integer, so tiles stay sharp at 1× and 2×. The strip shows the real size.">
+          <LivePreview className="w-full h-12 rounded-md border border-lab-border" rate={tempo * 0.5} draw={(ctx, time, W, H, dpr) => {
+            const p = (pg.enabled ? pitch : c.size) * dpr
+            drawField(ctx, W, H, {
+              back: c.colorBack, layers: c.alphaLayers, t: time, zoom: 1.2,
+              pitch: p, gap: pg.enabled ? pg.gap * dpr : 0,
+              round: pg.enabled ? (gpuPath && a.tileDisplay === 'points' ? 1 : Math.min(1, (pg.radius * 2) / pitch)) : 0,
+            })
+          }} />
           <Segmented size="xs" stretch label="Grain" value={grain} onChange={setGrain}
             options={grainIds.map((g) => ({ value: g, label: GRAIN_LABELS[g] }))} />
           {pg.enabled && (
@@ -239,42 +250,76 @@ export default function DitherPanel() {
           )}
         </Group>
 
-        <Group title="Shape" value={`layer ${layer + 1}: ${c.alphaLayers[layer]?.shape}`} showWhy={showWhy}
-          why="Shape changes what each resting layer draws. Text clearance and the hover stay the same with any of the seven.">
-          <div role="group" aria-label="Layer" className="flex items-center gap-1.5">
-            {c.alphaLayers.map((l, i) => (
-              <button key={i} type="button" aria-label={`Layer ${i + 1}`} aria-pressed={layer === i} onClick={() => setLayer(i)}
-                className="grid size-7 place-items-center rounded-md border border-lab-border bg-lab-fill aria-pressed:border-lab-fg cursor-pointer transition-[border-color,transform] active:scale-[0.96] lab-focus">
-                <i className="block size-3.5 rounded-[3px]" style={{ background: l.color }} />
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-4 gap-1.5">
-            {SHAPES.map((s) => (
-              <button key={s} type="button" aria-pressed={c.alphaLayers[layer]?.shape === s} onClick={() => setAlphaLayer(layer, { shape: s })} className={`${card} grid gap-1 p-1`}>
-                <ShapeThumb shape={s} color={c.alphaLayers[layer]?.color ?? '#fff'} back={c.colorBack} />
-                <span className="truncate text-lab-xs">{s}</span>
-              </button>
-            ))}
-          </div>
-        </Group>
-
-        <Group title="Motion" value={speed === 0 ? 'paused' : `${a.speed}×`} showWhy={showWhy}
-          why="One speed drives every loop. Still replaces the play toggle.">
+        <Group title="Shape & speed" value={speed === 0 ? 'paused' : `${a.speed}×`} showWhy={showWhy}
+          why="Each resting layer draws one shape; the big preview shows the picked layer on top of the others. Speed drives every loop, here and in the hero.">
+          {gpuPath ? (
+            <p className={hint}>
+              This template draws point sizes from its own noise, so layer shapes do not change it. Start from Problem or Fine Grain to use shapes.
+            </p>
+          ) : (
+            <>
+              <div role="group" aria-label="Layer" className="grid grid-cols-3 gap-1.5">
+                {c.alphaLayers.map((l, i) => (
+                  <button key={i} type="button" aria-pressed={layer === i} onClick={() => setLayer(i)} className={`${card} flex min-h-7 items-center gap-1.5 px-1.5 py-1`}>
+                    <i className="block size-3 shrink-0 rounded-[3px]" style={{ background: l.color }} />
+                    <span className="truncate text-lab-xs"><span className="text-lab-fg-subtle">{i + 1}</span> {l.shape}</span>
+                  </button>
+                ))}
+              </div>
+              <LivePreview className="w-full h-16 rounded-md border border-lab-border" rate={tempo} draw={(ctx, time, W, H, dpr) => {
+                drawField(ctx, W, H, {
+                  back: c.colorBack, layers: c.alphaLayers, t: time, pitch: 3 * dpr, gap: 0,
+                  alpha: c.alphaLayers.map((_, i) => (i === layer ? 1 : 0.18)),
+                })
+              }} />
+              <div className="grid grid-cols-4 gap-1.5">
+                {SHAPES.map((s) => (
+                  <button key={s} type="button" aria-pressed={c.alphaLayers[layer]?.shape === s} onClick={() => setAlphaLayer(layer, { shape: s })} className={`${card} grid gap-1 p-1`}>
+                    <LivePreview className="w-full aspect-[3/2] rounded-sm" rate={tempo} draw={(ctx, time, W, H, dpr) => {
+                      const l = c.alphaLayers[layer]
+                      drawField(ctx, W, H, { back: c.colorBack, layers: [{ color: l?.color ?? '#fff', shape: s, opacity: 1 }], t: time, pitch: 2 * dpr, gap: 0 })
+                    }} />
+                    <span className="truncate px-0.5 text-lab-xs">{s}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <Segmented size="xs" stretch label="Speed" value={speed}
             onChange={(v) => setAnimationConfig(v === 0 ? { playing: false } : { playing: true, speed: v })}
             options={SPEEDS.map((s, i) => ({ value: s, label: SPEED_LABELS[i] }))} />
         </Group>
 
         <Group title="Hover · warp" showWhy={showWhy}
-          why="The warp is the only hover. Size and feel change how it looks, never what it reveals.">
+          why="The warp is the only hover. Size and feel change how it looks, never what it reveals. Each preview runs the warp under a moving pointer.">
           <SliderRow label="Size" value={h.radius} min={40} max={400} step={10} suffix="px" onChange={(v) => setHoverConfig({ radius: v })} />
           {pg.enabled ? (
-            <Segmented size="xs" stretch label="Warp feel" value={feel}
-              onChange={(f) => { const { label: _, ...w } = warpFeels[f]; setHoverConfig(w) }}
-              options={warpFeelIds.map((f) => ({ value: f, label: warpFeels[f].label }))} />
+            <div role="group" aria-label="Warp feel" className="grid grid-cols-4 gap-1.5">
+              {warpFeelIds.map((f) => {
+                const wf = warpFeels[f]
+                return (
+                  <button key={f} type="button" aria-pressed={feel === f} onClick={() => { const { label: _, ...w } = wf; setHoverConfig(w) }} className={`${card} grid gap-1 p-1`}>
+                    <LivePreview className="w-full aspect-square rounded-sm" rate={0.8} draw={(ctx, time, W, H, dpr) => {
+                      drawField(ctx, W, H, {
+                        back: c.colorBack, layers: c.alphaLayers, t: 1.3, pitch: 7 * dpr, gap: dpr, round: 0.3,
+                        warp: { ...loopPointer(time, W, H), r: H * (0.18 + 0.32 * (h.radius - 40) / 360), layers: h.hoverLayers, rotate: wf.warpRotate, round: wf.warpRound, jitter: wf.warpJitter },
+                      })
+                    }} />
+                    <span className="truncate px-0.5 text-lab-xs">{wf.label}</span>
+                  </button>
+                )
+              })}
+            </div>
           ) : (
-            <p className={hint}>Without tiles the warp reveals whole dots of the field itself.</p>
+            <>
+              <LivePreview className="w-full h-16 rounded-md border border-lab-border" rate={0.8} draw={(ctx, time, W, H, dpr) => {
+                drawField(ctx, W, H, {
+                  back: c.colorBack, layers: c.alphaLayers, t: 1.3, pitch: 2 * dpr, gap: 0,
+                  warp: { ...loopPointer(time, W, H), r: H * (0.2 + 0.3 * (h.radius - 40) / 360), layers: h.hoverLayers, rotate: 0, round: 0, jitter: 0 },
+                })
+              }} />
+              <p className={hint}>Without tiles the warp reveals whole dots of the field itself.</p>
+            </>
           )}
         </Group>
 
