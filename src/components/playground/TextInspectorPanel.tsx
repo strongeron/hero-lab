@@ -189,7 +189,7 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
             <button
               type="button"
               onClick={clearAll}
-              className="min-h-6 rounded-md text-lab-xs font-medium text-red-400 hover:text-red-300 cursor-pointer bg-transparent border-0 px-1.5 transition-colors lab-focus"
+              className="min-h-6 rounded-md text-lab-xs font-medium text-lab-danger hover:text-lab-fg cursor-pointer bg-transparent border-0 px-1.5 transition-colors lab-focus"
             >
               Reset all ({totalOverrides})
             </button>
@@ -247,7 +247,7 @@ export default function TextInspectorPanel({ themedRoot, paletteName }: Props) {
                         selectedElement.style.removeProperty(prop)
                       }
                     }}
-                    className="min-h-6 rounded px-1 -mx-1 text-lab-xs font-medium text-red-400 hover:text-red-300 cursor-pointer bg-transparent border-0 transition-colors lab-focus"
+                    className="min-h-6 rounded px-1 -mx-1 text-lab-xs font-medium text-lab-danger hover:text-lab-fg cursor-pointer bg-transparent border-0 transition-colors lab-focus"
                   >
                     Reset ({overrideCount})
                   </button>
@@ -437,7 +437,7 @@ function PresetChips({
           {hoveredId === p.id && (
             <span
               onClick={(e) => { e.stopPropagation(); onDelete(p.id) }}
-              className="ml-0.5 w-3.5 h-3.5 rounded-full bg-lab-fill-selected hover:bg-red-500/30 flex items-center justify-center text-lab-fg-subtle hover:text-red-400 transition-colors"
+              className="ml-0.5 w-3.5 h-3.5 rounded-full bg-lab-fill-selected hover:bg-lab-danger/30 flex items-center justify-center text-lab-fg-subtle hover:text-lab-danger transition-colors"
             >
               <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
                 <path d="M18 6L6 18M6 6l12 12" />
@@ -536,7 +536,7 @@ function PropertyRow({
             type="button"
             onClick={onReset}
             aria-label={`Reset ${label}`}
-            className="min-h-6 rounded px-1 -mx-1 text-lab-xs text-lab-fg-subtle hover:text-red-400 cursor-pointer bg-transparent border-0 transition-colors lab-focus"
+            className="min-h-6 rounded px-1 -mx-1 text-lab-xs text-lab-fg-subtle hover:text-lab-danger cursor-pointer bg-transparent border-0 transition-colors lab-focus"
           >
             reset
           </button>

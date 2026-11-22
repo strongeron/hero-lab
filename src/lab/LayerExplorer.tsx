@@ -3,7 +3,6 @@ import {
   useDitherStore,
   setShaderConfig,
   setPixelGridConfig,
-  setMultiColorConfig,
   setHoverConfig,
   setAnimationConfig,
   setEdgeConfig,
@@ -36,12 +35,11 @@ const DESK = { width: 1440, height: 900 }
 const PAD = 40
 const TOGGLE_COL = 400
 
-type Verdict = 'core' | 'signature' | 'situational' | 'redundant'
+type Verdict = 'core' | 'signature' | 'situational'
 const verdictStyle: Record<Verdict, string> = {
   core: 'text-emerald-300/80 border-emerald-400/30 bg-emerald-400/10',
   signature: 'text-amber-300/80 border-amber-400/30 bg-amber-400/10',
   situational: 'text-sky-300/80 border-sky-400/30 bg-sky-400/10',
-  redundant: 'text-rose-300/80 border-rose-400/30 bg-rose-400/10',
 }
 
 /** Scenes that look different on the bare base. The store has 11; on this
@@ -75,8 +73,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   const bareSize = t.pixelGrid.enabled ? t.pixelGrid.cell / t.pixelGrid.divisions : t.shader.size
   const { topInset: _ti, ...bareEdge } = defaultEdgeConfig
   void _ti
-  const textFlow = t.edge.mode === 'full' || t.edge.textBlend
-  const tileLabel = t.animation.tileDisplay === 'size' ? 'Mask size' : 'Point sizes'
+  const textFlow = t.edge.mode === 'full'
 
   // ── The additive stack. `used` = the template has this layer; only used
   //    layers are steps. `on` reads the REAL store so the UI stays truthful. ──
@@ -106,7 +103,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
       set: (on) => setPixelGridConfig(on ? { enabled: true, snap: true } : { snap: false }),
     },
     {
-      name: tileLabel, verdict: 'core', vlabel: 'Core',
+      name: 'Point sizes', verdict: 'core', vlabel: 'Core',
       value: `dots sized by the dither · spread ${t.animation.tileSizeSpread}`,
       used: t.pixelGrid.enabled && t.animation.tileDisplay !== 'color',
       on: s.pixelGrid.enabled && s.animation.tileDisplay === t.animation.tileDisplay,
@@ -116,19 +113,10 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
       },
     },
     {
-      name: 'Multi-color', verdict: 'redundant', vlabel: 'Redundant',
-      value: `${t.multiColor.colors.length} extra colors · ${t.multiColor.blend}`,
-      used: t.multiColor.enabled,
-      on: s.multiColor.enabled,
-      set: (on) => setMultiColorConfig({ enabled: on }),
-    },
-    {
       name: 'Scene behind text', verdict: 'core', vlabel: 'Core',
-      value: t.edge.mode === 'full'
-        ? `fills the hero · flows around each ${t.edge.textRectMode === 'lines' ? 'line' : 'block'} · clearance ${t.edge.fullPadding}px`
-        : `flows around copy · clearance ${t.edge.textPadding}px`,
+      value: `fills the hero · flows around each ${t.edge.textRectMode === 'lines' ? 'line' : 'block'} · clearance ${t.edge.fullPadding}px`,
       used: textFlow,
-      on: s.edge.mode === t.edge.mode && s.edge.textBlend === t.edge.textBlend,
+      on: s.edge.mode === t.edge.mode,
       set: (on) => {
         const { topInset: _keep, ...edge } = t.edge
         void _keep
@@ -137,7 +125,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
     },
     {
       name: 'Hover reveal', verdict: 'signature', vlabel: 'Signature',
-      value: `${t.hover.mode} · reveals the ${t.initialState === 'problem' ? 'fix (green)' : 'problem (pink)'} · hover the preview`,
+      value: `warp · reveals the ${t.initialState === 'problem' ? 'fix (green)' : 'problem (pink)'} · hover the preview`,
       used: t.hover.enabled,
       on: s.hover.enabled,
       set: (on) => setHoverConfig({ enabled: on }),
@@ -167,8 +155,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
       setPixelGridConfig({ enabled: false, snap: false })
       setShaderConfig({ size: tg.pixelGrid.enabled ? tg.pixelGrid.cell / tg.pixelGrid.divisions : tg.shader.size })
       setAnimationConfig({ tileDisplay: 'color' })
-      setMultiColorConfig({ enabled: false })
-      if (tg.edge.mode === 'full' || tg.edge.textBlend) setEdgeConfig(bareEdge)
+      if (tg.edge.mode === 'full') setEdgeConfig(bareEdge)
       setHoverConfig({ enabled: false })
     })
   }

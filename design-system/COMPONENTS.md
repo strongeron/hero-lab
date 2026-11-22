@@ -17,3 +17,7 @@
 - **Slider row**
   - Description: Set one continuous numeric setting within a fixed range and see its current value, such as speed, scale or gap in the Design Panel.
   - Contract: [contract](components/slider-row.md)
+
+- **Toggle**
+  - Description: Turn one independent setting on or off, such as play/pause, uppercase buttons or a debug overlay. The change applies immediately.
+  - Contract: [contract](components/toggle.md)

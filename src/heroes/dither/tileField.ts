@@ -22,8 +22,7 @@
 export const MAX_LAYERS = 8
 export const MAX_RECTS = 48
 
-export type TileEdgeMode = 'fade' | 'sharp' | 'overlap' | 'ripple' | 'dissolve' | 'full'
-export type TileHoverShape = 'circle' | 'square' | 'pixel-circle'
+export type TileEdgeMode = 'dissolve' | 'full'
 
 export interface TileFieldLayer { color: string; opacity: number }
 export interface TileRect { x: number; y: number; w: number; h: number }
@@ -56,35 +55,21 @@ export interface TileFieldFrame {
     posPx: number
     dissolveDepth: number
     dissolveSeed: number
-    textBlend: boolean
-    shaderExtend: number
     textBlendMotion: number
     topInset: number
     fullPadding: number
-    textPadding: number
   }
   rects: TileRect[]
-  /** Warp hover, or null when nothing is under the cursor. */
+  /** Warp hover (pixel circle of whole tiles, revealing the hover field), or
+   *  null when nothing is under the cursor. */
   warp: null | {
-    px: number; py: number; rx: number; ry: number
-    shape: TileHoverShape
-    /** Snapped square bounds (whole tiles) when the square snaps, else null. */
-    squareBounds: null | { x0: number; x1: number; y0: number; y1: number }
+    px: number; py: number; r: number
     rotateDeg: number; round: number; scale: number; spread: number
     basePiece: number; baseRadius: number
-    /** Hover-distance reach of the hover field; < 0 = no hover field. */
-    sceneReach: number
-    /** 'dots' = the fix field's dots; 'flat' = a flat colour overlay. */
-    sceneKind: 'dots' | 'flat'
-    overlayColor: string
-    overlayOpacity: number
   }
-  /** Show the hover field everywhere (panel preview), ignoring the warp. */
-  preview: boolean
 }
 
-const EDGE_MODE: Record<TileEdgeMode, number> = { fade: 0, sharp: 1, overlap: 2, ripple: 3, dissolve: 4, full: 5 }
-const SHAPE: Record<TileHoverShape, number> = { circle: 0, square: 1, 'pixel-circle': 2 }
+const EDGE_MODE: Record<TileEdgeMode, number> = { dissolve: 4, full: 5 }
 
 const VERT = /* glsl */ `#version 300 es
 in vec2 a_pos;
@@ -125,23 +110,20 @@ uniform vec2 u_flow[2];
 uniform vec2 u_rot[2];          // cos, sin
 
 uniform int u_edgeMode;
-uniform float u_posPx, u_depthPx, u_extendPx, u_motion, u_topInset, u_fullPad, u_textPad, u_rimPx;
+uniform float u_posPx, u_depthPx, u_motion, u_topInset, u_fullPad, u_rimPx;
 uniform int u_seed;
-uniform bool u_textBlend;
 uniform vec4 u_rects[MAX_RECTS];
 uniform int u_nRects;
 
 uniform bool u_warp;
-uniform vec2 u_hp, u_hr;
-uniform int u_shape;
-uniform bool u_snapSq;
-uniform vec4 u_sqb;             // x0, x1, y0, y1
-uniform float u_wScale, u_wRound, u_wSpread, u_basePiece, u_baseRadius, u_reach;
+uniform vec2 u_hp;
+uniform float u_hr;
+uniform float u_wScale, u_wRound, u_wSpread, u_basePiece, u_baseRadius;
 
 layout(location = 0) out vec4 o_base;   // rgb + alpha
 layout(location = 1) out vec4 o_fix;    // rgb + alpha
 layout(location = 2) out vec4 o_piece;  // base piece / pitch, fix piece / pitch, dot radius / pitch
-layout(location = 3) out vec4 o_warp;   // size / pitch, radius / pitch, inside, scene
+layout(location = 3) out vec4 o_warp;   // size / pitch, radius / pitch, inside
 ${COMMON}
 float noiseFade(float t) { return t * t * t * (t * (t * 6. - 15.) + 10.); }
 float valueNoise2(vec2 p, int seed) {
@@ -173,15 +155,9 @@ float bandVisibility(ivec2 ci, float cy) {
   if (cellBottom <= u_posPx - u_depthPx) return 1.;
   if (cellBottom <= u_posPx) {
     float density = clamp((u_posPx - cellBottom) / u_depthPx, 0., 1.);
-    if (u_edgeMode == 1) return 1.;
-    if (u_edgeMode == 0) return density;
     return density > th ? 1. : 0.;
   }
-  if (u_extendPx <= 0.) return 0.;
-  float overflow = (cellBottom - u_posPx) / u_extendPx;
-  if (overflow >= 1.) return 0.;
-  float density = pow(1. - overflow, 1.55) * .62;
-  return density > th ? density : 0.;
+  return 0.;
 }
 
 // fullEdgeVisibility — whole-tile text clearance with a dissolving rim.
@@ -237,22 +213,10 @@ vec4 fieldDot(int f, ivec2 ci, float edgeAlpha, out float piece) {
   return vec4(col, clamp((.28 + alphaV * .72) * op * edgeAlpha, 0., .95));
 }
 
+// Pixel circle: a tile is in when its centre is inside the radius, snapped to
+// whole tile rings (pixelCircleRadius in DitherHero).
 bool inHover(vec2 tc) {
-  if (u_shape == 1 && u_snapSq) return tc.x >= u_sqb.x && tc.x <= u_sqb.y && tc.y >= u_sqb.z && tc.y <= u_sqb.w;
-  if (u_shape == 1) {
-    vec2 d = abs(tc - u_hp);
-    return (u_hr.x <= 0. || d.x <= u_hr.x) && (u_hr.y <= 0. || d.y <= u_hr.y);
-  }
-  float r = u_shape == 2 && u_pitch > 1. ? floor(u_hr.x / u_pitch + .5) * u_pitch : u_hr.x;
-  return distance(tc, u_hp) <= r;
-}
-float hoverDistance(vec2 tc) {
-  if (u_shape == 1) {
-    vec2 d = abs(tc - u_hp);
-    return max(u_hr.x > 0. ? d.x / u_hr.x : 0., u_hr.y > 0. ? d.y / u_hr.y : 0.);
-  }
-  float r = u_shape == 2 && u_pitch > 1. ? floor(u_hr.x / u_pitch + .5) * u_pitch : u_hr.x;
-  return r > 0. ? distance(tc, u_hp) / r : 0.;
+  return distance(tc, u_hp) <= floor(u_hr / u_pitch + .5) * u_pitch;
 }
 
 void main() {
@@ -274,8 +238,7 @@ void main() {
     }
     float targetRound = baseRound + clamp(u_wRound, 0., 1.) * (u_basePiece * .5 - baseRound);
     float desired = maxSz > 0. ? baseRound + (targetRound - baseRound) * (sz / maxSz) : baseRound;
-    bool scene = u_reach >= 0. && hoverDistance(tc) <= u_reach;
-    o_warp = vec4(sz / u_pitch, clampR(desired, sz) / u_pitch, 1., scene ? 1. : 0.);
+    o_warp = vec4(sz / u_pitch, clampR(desired, sz) / u_pitch, 1., 0.);
   } else {
     o_warp = vec4(u_basePiece / u_pitch, clampR(baseRound, u_basePiece) / u_pitch, 0., 0.);
   }
@@ -289,7 +252,6 @@ void main() {
     edgeAlpha = u_nRects > 0 ? clearance(cell, ci, u_fullPad) : 1.;
   } else {
     edgeAlpha = bandVisibility(ci, cell.y + .5 * u_pitch);
-    if (edgeAlpha > 0. && u_textBlend && u_nRects > 0) edgeAlpha *= clearance(cell, ci, u_textPad);
   }
   float pb, pf;
   o_base = fieldDot(0, ci, edgeAlpha, pb);
@@ -307,15 +269,24 @@ uniform ivec2 u_cell0, u_cells;
 uniform vec2 u_res;
 uniform float u_dpr, u_pitch;
 uniform vec2 u_align;
-uniform bool u_warp, u_preview, u_flat;
+uniform bool u_warp;
 uniform vec2 u_wRot;            // cos, sin of the warp rotation
-uniform vec4 u_overlay;         // rgb, opacity
 out vec4 o;
 ${COMMON}
+// Pixel alignment: a piece is a whole number of device pixels with the same
+// parity as the pitch, so a piece centred in its cell has every edge on a
+// pixel boundary (no half-pixel blur). Sizes arrive 8-bit quantised from
+// pass 1, so they are snapped here, after decoding.
+float snapPiece(float piece) {
+  float p = floor(u_pitch * u_dpr + .5);
+  float s = floor(piece * u_dpr + .5);
+  s -= mod(p - s, 2.);
+  return max(0., s) / u_dpr;
+}
 float cover(vec2 p, float piece, float r) {
+  piece = snapPiece(piece);
   if (piece <= 0.) return 0.;
-  // Canvas 2D fills the dot with fillRect when the radius is below half a px.
-  return clamp(.5 - roundedBox(p, vec2(piece * .5), r) * u_dpr, 0., 1.);
+  return clamp(.5 - roundedBox(p, vec2(piece * .5), floor(r + .5)) * u_dpr, 0., 1.);
 }
 void main() {
   vec2 css = vec2(gl_FragCoord.x, u_res.y - gl_FragCoord.y) / u_dpr;
@@ -330,14 +301,9 @@ void main() {
   float cb = cover(local, pc.x, pc.z);
   vec4 base = vec4(b.rgb, 1.) * b.a * cb;
 
-  bool needFix = u_preview || u_warp;
-  vec4 fixv = vec4(0.);
-  if (needFix) {
-    vec4 f = texelFetch(u_fix, tx, 0);
-    fixv = vec4(f.rgb, 1.) * f.a * cover(local, pc.y, pc.w);
-  }
-  if (u_preview && !u_warp) { o = fixv; return; }
   if (!u_warp) { o = base; return; }
+  vec4 f = texelFetch(u_fix, tx, 0);
+  vec4 fixv = vec4(f.rgb, 1.) * f.a * cover(local, pc.y, pc.w);
 
   // Warp masks: union of the 3×3 neighbourhood's (rotated) tile shapes.
   float mb = 0., ms = 0.;
@@ -351,12 +317,9 @@ void main() {
     if (sz < .5) continue;
     float c = cover(p, sz, w.y * u_pitch);
     mb = max(mb, c);
-    if (w.w > .5) ms = max(ms, c);
+    if (w.z > .5) ms = max(ms, c);
   }
-  vec4 scene = u_flat
-    ? vec4(u_overlay.rgb, 1.) * u_overlay.a + base * (1. - u_overlay.a)
-    : fixv;
-  o = mix(base, scene, ms) * mb;
+  o = mix(base, fixv, ms) * mb;
 }`
 
 function hexToRgb(color: string): [number, number, number] {
@@ -532,14 +495,11 @@ export class TileFieldRenderer {
     gl.uniform1i(u.u_edgeMode, EDGE_MODE[e.mode])
     gl.uniform1f(u.u_posPx, e.posPx)
     gl.uniform1f(u.u_depthPx, rim)
-    gl.uniform1f(u.u_extendPx, e.textBlend ? Math.max(0, e.shaderExtend) : 0)
     gl.uniform1f(u.u_motion, e.textBlendMotion)
     gl.uniform1f(u.u_topInset, e.topInset)
     gl.uniform1f(u.u_fullPad, e.fullPadding)
-    gl.uniform1f(u.u_textPad, e.textPadding)
     gl.uniform1f(u.u_rimPx, rim)
     gl.uniform1i(u.u_seed, e.dissolveSeed | 0)
-    gl.uniform1i(u.u_textBlend, e.textBlend ? 1 : 0)
     const n = Math.min(MAX_RECTS, f.rects.length)
     for (let i = 0; i < n; i++) {
       const r = f.rects[i]
@@ -552,16 +512,12 @@ export class TileFieldRenderer {
     gl.uniform1i(u.u_warp, w ? 1 : 0)
     if (w) {
       gl.uniform2f(u.u_hp, w.px, w.py)
-      gl.uniform2f(u.u_hr, w.rx, w.ry || w.rx)
-      gl.uniform1i(u.u_shape, SHAPE[w.shape])
-      gl.uniform1i(u.u_snapSq, w.squareBounds ? 1 : 0)
-      if (w.squareBounds) gl.uniform4f(u.u_sqb, w.squareBounds.x0, w.squareBounds.x1, w.squareBounds.y0, w.squareBounds.y1)
+      gl.uniform1f(u.u_hr, w.r)
       gl.uniform1f(u.u_wScale, w.scale)
       gl.uniform1f(u.u_wRound, w.round)
       gl.uniform1f(u.u_wSpread, w.spread)
       gl.uniform1f(u.u_basePiece, w.basePiece)
       gl.uniform1f(u.u_baseRadius, w.baseRadius)
-      gl.uniform1f(u.u_reach, w.sceneReach)
     } else {
       gl.uniform1f(u.u_basePiece, pitch - Math.max(0, Math.min(gap, pitch - 1)))
       gl.uniform1f(u.u_baseRadius, radius)
@@ -588,13 +544,9 @@ export class TileFieldRenderer {
     gl.uniform1f(p.u_pitch, pitch)
     gl.uniform2f(p.u_align, alignX, alignY)
     gl.uniform1i(p.u_warp, w ? 1 : 0)
-    gl.uniform1i(p.u_preview, f.preview ? 1 : 0)
-    gl.uniform1i(p.u_flat, w?.sceneKind === 'flat' ? 1 : 0)
     if (w) {
       const r = w.rotateDeg * Math.PI / 180
       gl.uniform2f(p.u_wRot, Math.cos(r), Math.sin(r))
-      const oc = this.rgb(w.overlayColor)
-      gl.uniform4f(p.u_overlay, oc[0], oc[1], oc[2], w.overlayOpacity)
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }

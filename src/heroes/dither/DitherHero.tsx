@@ -1,7 +1,6 @@
-import { useMemo, useRef, useEffect, useState, useCallback, useLayoutEffect } from 'react'
+import { useMemo, useRef, useEffect, useState, useLayoutEffect } from 'react'
 import { Dithering } from '@paper-design/shaders-react'
-import { useWebHaptics } from 'web-haptics/react'
-import { useDitherStore, copyVariants, warpErrorSnippets, warpFixSnippets, type EdgeMode, type HoverShape, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
+import { useDitherStore, resolveCopy, palettes, warpErrorSnippets, warpFixSnippets, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
 import { getThemeById } from '../../themes/terminalThemes'
 import { TileFieldRenderer, type TileFieldFrame } from './tileField'
 import { getAccessibleCtaPair } from '../../utils/colorContrast'
@@ -18,20 +17,12 @@ function usePrefersReducedMotion() {
   return reduced
 }
 
-/** Build CSS mask based on edge mode + position. 'dissolve' is handled at the
- *  container level (combined with the tiles), so no per-layer mask here. */
-function buildMask(mode: EdgeMode, pos: number): string | undefined {
-  if (mode === 'overlap' || mode === 'ripple' || mode === 'dissolve') return undefined
-  if (mode === 'sharp') return `linear-gradient(to bottom, black 0%, black ${pos}%, transparent ${pos}%)`
-  const fadeStart = Math.max(0, pos - 15)
-  return `linear-gradient(to bottom, black 0%, black ${fadeStart}%, transparent ${pos + 5}%)`
-}
+/* ─── Pixel grid geometry ───
+   Every tile edge sits on a whole pixel: the pitch, gap, inset and phase are
+   integers. An odd gap puts the extra pixel after the piece (inset =
+   floor(gap / 2)) instead of centring the piece on a half pixel. */
 
-
-/** Piece pitch = tile size / divisions, in whole pixels. The master tile is
- *  divided into `divisions` equal pieces, so the piece grid always tiles the
- *  master exactly (aligned). This pitch is the mask repeat AND the dither-dot
- *  size the shader locks to. */
+/** Piece pitch = tile size / divisions, in whole pixels. */
 function pixelGridPitch(cfg: DitherPixelGridConfig): number {
   const cell = Math.max(1, Math.round(cfg.cell))
   const divisions = Math.max(1, Math.round(cfg.divisions))
@@ -42,84 +33,49 @@ function positiveModulo(value: number, base: number): number {
   return ((value % base) + base) % base
 }
 
-/** Metrics derived from Pixel Grid — single source for static + animated masks. */
-interface PixelGridMetrics {
+function clampTileRadius(radius: number, piece: number): number {
+  return Math.max(0, Math.min(Math.round(radius), piece / 2))
+}
+
+/** Resolved tile lattice: pitch, whole-pixel gap, resting piece, its inset in
+ *  the cell, corner radius and phase. */
+interface TileGrid {
   pitch: number
   gap: number
-  /** Resting piece = pitch − gap (matches buildTileMaskUrl). */
-  maxPiece: number
+  piece: number
   inset: number
   radius: number
   alignX: number
   alignY: number
 }
 
-function clampTileRadius(radius: number, piece: number): number {
-  return Math.max(0, Math.min(Math.round(radius), piece / 2))
-}
-
-function pixelGridMetrics(cfg: DitherPixelGridConfig): PixelGridMetrics {
+function tileGrid(cfg: DitherPixelGridConfig, alignX: number, alignY: number): TileGrid {
   const pitch = pixelGridPitch(cfg)
-  // Keep animated gaps fractional. Rounding here turned a slow pulse into
-  // long static holds followed by a one-pixel "blink".
-  const gap = Math.max(0, Math.min(cfg.gap, pitch - 1))
-  const maxPiece = pitch - gap
-  return {
-    pitch,
-    gap,
-    maxPiece,
-    inset: gap / 2,
-    radius: clampTileRadius(cfg.radius, maxPiece),
-    alignX: cfg.alignX,
-    alignY: cfg.alignY,
-  }
+  const gap = Math.max(0, Math.min(Math.round(cfg.gap), pitch - 1))
+  const piece = pitch - gap
+  return { pitch, gap, piece, inset: Math.floor(gap / 2), radius: clampTileRadius(cfg.radius, piece), alignX, alignY }
 }
 
-/** Per-cell piece size from spread + noise — pitch locked, inset derived so
- *  piece + 2×inset = pitch (same geometry as the repeating tile SVG). */
-function scaledGridPiece(
-  grid: PixelGridMetrics, spread: number, noise: number,
-): { piece: number; inset: number; radius: number } {
-  const minScale = spread <= 0
-    ? 1
-    : Math.max(grid.gap / Math.max(1, grid.maxPiece), 1 - Math.min(1, spread))
-  const scale = minScale + (1 - minScale) * noise
-  const piece = grid.maxPiece * scale
-  const inset = (grid.pitch - piece) / 2
-  const radius = clampTileRadius(grid.radius, piece)
-  return { piece, inset, radius }
-}
-
-/** Build a repeating rounded-piece CSS mask. Each piece fills its pitch minus
- *  the gap, centered so the gap splits equally on all four sides; the corner
- *  radius is clamped so rounding is always respected. At gap 0 the piece fills
- *  its pitch with no seam. Pieces tile the master exactly (pitch = cell /
- *  divisions). Returns undefined when disabled. */
-function buildTileMaskUrl(cfg: DitherPixelGridConfig): string {
-  const g = pixelGridMetrics(cfg)
+/** One resting piece in a pitch × pitch cell, as an SVG data URL. */
+function buildTileMaskUrl(g: TileGrid): string {
   const svg =
     `<svg xmlns='http://www.w3.org/2000/svg' width='${g.pitch}' height='${g.pitch}'>` +
-    `<rect x='${g.inset}' y='${g.inset}' width='${g.maxPiece}' height='${g.maxPiece}' rx='${g.radius}' ry='${g.radius}' fill='black'/></svg>`
+    `<rect x='${g.inset}' y='${g.inset}' width='${g.piece}' height='${g.piece}' rx='${g.radius}' ry='${g.radius}' fill='black'/></svg>`
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
 
-function buildPixelGridMask(cfg: DitherPixelGridConfig): React.CSSProperties | undefined {
-  if (!cfg.enabled) return undefined
-  const pitch = pixelGridPitch(cfg)
-  const url = buildTileMaskUrl(cfg)
-  const size = `${pitch}px ${pitch}px`
-  const pos = `${cfg.alignX}px ${cfg.alignY}px`
+function buildPixelGridMask(g: TileGrid): React.CSSProperties {
+  const url = buildTileMaskUrl(g)
+  const size = `${g.pitch}px ${g.pitch}px`
+  const pos = `${g.alignX}px ${g.alignY}px`
   return {
-    maskImage: url,
-    WebkitMaskImage: url,
-    maskRepeat: 'repeat',
-    WebkitMaskRepeat: 'repeat',
-    maskSize: size,
-    WebkitMaskSize: size,
-    maskPosition: pos,
-    WebkitMaskPosition: pos,
+    maskImage: url, WebkitMaskImage: url,
+    maskRepeat: 'repeat', WebkitMaskRepeat: 'repeat',
+    maskSize: size, WebkitMaskSize: size,
+    maskPosition: pos, WebkitMaskPosition: pos,
   }
 }
+
 
 /** Stable per-tile threshold in [0,1) from grid coords + seed — a fixed random
  *  map (like a Photoshop dissolve threshold), so the dither doesn't flicker
@@ -161,36 +117,6 @@ function fbmNoise(x: number, y: number, t: number, seed: number): number {
   )
 }
 
-function easeInOut(t: number): number {
-  return t * t * (3 - 2 * t)
-}
-
-const TILE_SIZE_EFFECT_STRENGTH = 0.65
-const TILE_SIZE_MIN_VALUE = 0.18
-
-/** Smooth proportional size map for tile-size mode.
- *  Every grid cell stays in place; only the rounded piece size changes. */
-function tileSizeMapValue(
-  col: number,
-  row: number,
-  t: number,
-  scale: number,
-  flowX = 0,
-  flowY = 0,
-): number {
-  // flowX/Y pan the sampled pattern (in cell units) so scene drift/scan makes
-  // the point field visibly flow directionally, not just breathe in place.
-  const fc = col + flowX
-  const fr = row + flowY
-  const phase = t * Math.PI * 2
-  const width = Math.max(0.4, Math.min(3, scale))
-  const spatial = 0.095 / width
-  const organic = fbmNoise(fc * spatial, fr * spatial, t * 0.8, 2401)
-  const wave = 0.5 + 0.5 * Math.sin(fc * 0.33 + fr * 0.21 + phase * 0.55)
-  const value = easeInOut(Math.max(0, Math.min(1, organic * 0.72 + wave * 0.28)))
-  return TILE_SIZE_MIN_VALUE + (1 - TILE_SIZE_MIN_VALUE) * value
-}
-
 interface TextRect { x: number; y: number; w: number; h: number }
 
 /** Viewport-space baseline of an element's LAST rendered text line —
@@ -207,13 +133,11 @@ function lastLineBaseline(el: Element): number | null {
 
 /** Build a dither edge mask (Photoshop-dissolve style): a white→black gradient
  *  where each tile is kept while the gradient value exceeds its fixed random
- *  threshold. The gradient runs to the edge `positionPct`; with a `wave` it
- *  follows the ripple, otherwise it's a flat horizontal band. Aligned to the
- *  tile grid, in px. Returns undefined until measured. */
+ *  threshold. A flat band ending at `positionPct`, aligned to the tile grid, in
+ *  px. Returns undefined until measured. */
 function buildDissolveMaskUrl(
   positionPct: number, depthRows: number, pitch: number,
   w: number, h: number, alignY: number, alignX: number, seed: number,
-  wave?: { ampVh: number; freq: number; phase: number },
   motion?: { t: number; strength: number; scale: number },
   extendPx = 0,
 ): string | undefined {
@@ -225,11 +149,9 @@ function buildDissolveMaskUrl(
   const xPhase = ((alignX % pitch) + pitch) % pitch
   const x0 = xPhase > 0 ? xPhase - pitch : 0
   const posPx = (positionPct / 100) * h
-  const ampPx = wave ? (wave.ampVh / 100) * h : 0
   const bandH = Math.max(pitch, Math.round(depthRows) * pitch)
-  const minEdge = posPx - ampPx
-  const maxEdge = Math.min(h, posPx + ampPx)
-  const solidBottom = Math.max(0, snap(minEdge - bandH))
+  const maxEdge = Math.min(h, posPx)
+  const solidBottom = Math.max(0, snap(posPx - bandH))
   const extendEnd = extendPx > 0 ? Math.min(h, snap(posPx + extendPx)) : posPx
   const rects: string[] = []
   if (solidBottom > 0) rects.push(`<rect x='0' y='0' width='${w}' height='${solidBottom}'/>`)
@@ -248,13 +170,7 @@ function buildDissolveMaskUrl(
   }
 
   for (let y = solidBottom; y < maxEdge; y += pitch) {
-    for (let x = x0; x < w; x += pitch) {
-      const xMid = x + pitch / 2
-      const edgeY = wave
-        ? posPx + ampPx * Math.sin((xMid / w) * wave.freq * Math.PI * 2 + wave.phase)
-        : posPx
-      addTile(x, y, (edgeY - y) / bandH)
-    }
+    for (let x = x0; x < w; x += pitch) addTile(x, y, (posPx - y) / bandH)
   }
 
   // Shader extend — solid tiles below Position, soft fade at the bottom rim.
@@ -278,95 +194,13 @@ function buildDissolveMaskUrl(
 
 /** Container mask combining the repeating tile mask with the full-size dissolve
  *  mask (intersect) — a pixel shows only where both keep it. */
-function buildDissolveContainerStyle(cfg: DitherPixelGridConfig, dissolveUrl: string): React.CSSProperties {
-  const tileUrl = buildTileMaskUrl(cfg)
-  const pitch = pixelGridPitch(cfg)
-  const imgs = `${tileUrl}, ${dissolveUrl}`
-  return {
-    maskImage: imgs,
-    WebkitMaskImage: imgs,
-    maskRepeat: 'repeat, no-repeat',
-    WebkitMaskRepeat: 'repeat, no-repeat',
-    maskSize: `${pitch}px ${pitch}px, 100% 100%`,
-    WebkitMaskSize: `${pitch}px ${pitch}px, 100% 100%`,
-    maskPosition: `${cfg.alignX}px ${cfg.alignY}px, 0px 0px`,
-    WebkitMaskPosition: `${cfg.alignX}px ${cfg.alignY}px, 0px 0px`,
-    maskComposite: 'intersect',
-    WebkitMaskComposite: 'source-in',
-  }
+function buildDissolveContainerStyle(g: TileGrid, dissolveUrl: string): React.CSSProperties {
+  return intersectMask(buildPixelGridMask(g), dissolveUrl)
 }
 
-/** Scene-behind-text exclusion mask — white (visible) everywhere except the
- *  whole tiles whose padded box would touch a text block (dropped entirely)
- *  and a dissolving rim around them. Shares the tile grid's phase, so shapes
- *  are never cut: a tile is either fully shown or fully gone. Mode-agnostic —
- *  it gets intersected with whatever edge mask is active. */
-function buildTextClearMaskUrl(
-  w: number, h: number, pitch: number, alignX: number, alignY: number,
-  exclusions: TextRect[], padding: number, rimPx: number, seed: number,
-  motion?: { t: number; strength: number },
-): string | undefined {
-  if (!w || !h || pitch < 2 || !exclusions.length) return undefined
-  const xPhase = ((alignX % pitch) + pitch) % pitch
-  const yPhase = ((alignY % pitch) + pitch) % pitch
-  const x0 = xPhase > 0 ? xPhase - pitch : 0
-  const y0 = yPhase > 0 ? yPhase - pitch : 0
-  const zones = exclusions.map((r) => ({
-    x0: r.x - padding, y0: r.y - padding, x1: r.x + r.w + padding, y1: r.y + r.h + padding,
-  }))
-  // Everything above the first row that can be influenced is one solid rect —
-  // keeps the SVG tiny (text lives in the bottom third of the hero).
-  const influenceTop = Math.min(...zones.map((z) => z.y0)) - rimPx
-  let firstRowY = y0
-  while (firstRowY + pitch < influenceTop) firstRowY += pitch
-  const rects: string[] = []
-  if (firstRowY > 0) rects.push(`<rect x='0' y='0' width='${w}' height='${Math.min(firstRowY, h)}'/>`)
-  for (let y = firstRowY; y < h; y += pitch) {
-    let runStart: number | null = null
-    const flushRun = (xEnd: number) => {
-      if (runStart == null) return
-      rects.push(`<rect x='${runStart}' y='${y}' width='${xEnd - runStart}' height='${pitch}'/>`)
-      runStart = null
-    }
-    for (let x = x0; x < w; x += pitch) {
-      const cx = x + pitch / 2
-      const cy = y + pitch / 2
-      let minD = Infinity
-      let drop = false
-      for (const z of zones) {
-        if (x + pitch > z.x0 && x < z.x1 && y + pitch > z.y0 && y < z.y1) { drop = true; break }
-        const dx = Math.max(z.x0 - cx, 0, cx - z.x1)
-        const dy = Math.max(z.y0 - cy, 0, cy - z.y1)
-        const d = Math.hypot(dx, dy)
-        if (d < minD) minD = d
-      }
-      if (drop) { flushRun(x); continue }
-      if (minD >= rimPx) {
-        if (runStart == null) runStart = x
-        continue
-      }
-      flushRun(x)
-      const col = Math.round((x - xPhase) / pitch)
-      const row = Math.round((y - yPhase) / pitch)
-      const g = minD / rimPx
-      const edgeMotion = motion
-        ? (fbmNoise(col * 0.33, row * 0.33, motion.t * 0.8, seed + 89) - 0.5) * motion.strength * 0.55
-        : 0
-      const threshold = Math.max(0, Math.min(1, tileThreshold(col, row, seed) + edgeMotion))
-      if (g > threshold) {
-        rects.push(`<rect x='${x}' y='${y}' width='${pitch}' height='${pitch}' fill-opacity='${Math.max(0.45, g).toFixed(2)}'/>`)
-      }
-    }
-    flushRun(w)
-  }
-  const svg =
-    `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' fill='white'>${rects.join('')}</svg>`
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
-}
+/** Add a full-size mask image to a style's mask stack (or start one). The
+ *  layers intersect: a pixel shows only where every layer keeps it. */
 
-/** Intersect an extra full-size mask layer with whatever mask a style already
- *  carries (or start a new one). Used to compose the text-clear mask with any
- *  edge style's own masking. */
 function intersectMask(style: React.CSSProperties | undefined, url: string): React.CSSProperties {
   if (!style || !style.maskImage) {
     return {
@@ -392,160 +226,6 @@ function intersectMask(style: React.CSSProperties | undefined, url: string): Rea
   }
 }
 
-/** Full-viewport mask — every grid cell gets a piece sized from Pixel Grid
- *  (pitch, gap, radius). Section edge uses row-based visibility (full width).
- *  Draws into the given canvas; the caller exports it (toBlob) off the render
- *  path. Returns false when there is nothing to draw. */
-function drawTileSizeMask(
-  canvas: HTMLCanvasElement, w: number, h: number, cfg: DitherPixelGridConfig,
-  t: number, spread: number, noiseScale: number,
-  section?: { positionPct: number; depthRows: number; extendPx: number; seed: number },
-  topInset = 0,
-): boolean {
-  if (!w || !h || spread <= 0) return false
-  const grid = pixelGridMetrics(cfg)
-  const effectiveSpread = Math.max(0, Math.min(1, spread)) * TILE_SIZE_EFFECT_STRENGTH
-  const { pitch, alignX, alignY } = grid
-  const dpr = Math.min(2, Math.max(1, typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1))
-  const canvasW = Math.max(1, Math.round(w * dpr))
-  const canvasH = Math.max(1, Math.round(h * dpr))
-  if (canvas.width !== canvasW || canvas.height !== canvasH) {
-    canvas.width = canvasW
-    canvas.height = canvasH
-  }
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return false
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.clearRect(0, 0, w, h)
-  ctx.fillStyle = '#fff'
-
-  const posPx = section ? (section.positionPct / 100) * h : h
-  const bandH = section ? Math.max(pitch, Math.round(section.depthRows) * pitch) : 0
-  const extendEnd = section && section.extendPx > 0
-    ? Math.min(h, posPx + section.extendPx)
-    : h
-  const snapY = (y: number) => Math.round((y - alignY) / pitch) * pitch + alignY
-  const bandTop = section ? Math.max(0, snapY(posPx - bandH)) : 0
-
-  const colLo = Math.floor((0 - alignX) / pitch) - 1
-  const colHi = Math.ceil((w - alignX) / pitch) + 1
-  const rowLo = Math.floor((0 - alignY) / pitch) - 1
-  const rowHi = Math.ceil((h - alignY) / pitch) + 1
-  for (let row = rowLo; row <= rowHi; row++) {
-    const rowTop = alignY + row * pitch
-    if (topInset > 0 && rowTop < topInset) continue
-    if (rowTop + pitch > h + 0.5) continue
-    const cy = rowTop + pitch / 2
-    if (section) {
-      if (cy < bandTop - pitch / 2) continue
-      if (cy > extendEnd + pitch / 2) continue
-      if (cy < posPx) {
-        const g = (posPx - cy) / bandH
-        if (g <= 0) continue
-        if (g < 1) {
-          const rowT = tileThreshold(0, row, section.seed)
-          if (g <= rowT) continue
-        }
-      }
-    }
-    const cellY = alignY + row * pitch
-    for (let col = colLo; col <= colHi; col++) {
-      const cellX = alignX + col * pitch
-      const n = tileSizeMapValue(col, row, t, noiseScale)
-      const { piece, inset, radius } = scaledGridPiece(grid, effectiveSpread, n)
-      if (piece < 0.5) continue
-      if (radius < 0.5) {
-        ctx.fillRect(cellX + inset, cellY + inset, piece, piece)
-      } else {
-        roundRectPath(ctx, cellX + inset, cellY + inset, piece, piece, radius)
-        ctx.fill()
-      }
-    }
-  }
-  return true
-}
-
-function buildSizeMaskContainerStyle(sizeUrl: string, dissolveUrl?: string): React.CSSProperties {
-  // sizeUrl is a bare blob URL — must be wrapped in url() to be valid CSS,
-  // else the browser rejects the assignment and keeps the previous mask.
-  const cssUrl = `url(${sizeUrl})`
-  if (dissolveUrl) {
-    const imgs = `${cssUrl}, ${dissolveUrl}`
-    return {
-      maskImage: imgs,
-      WebkitMaskImage: imgs,
-      maskRepeat: 'no-repeat, no-repeat',
-      WebkitMaskRepeat: 'no-repeat, no-repeat',
-      maskSize: '100% 100%, 100% 100%',
-      WebkitMaskSize: '100% 100%, 100% 100%',
-      maskPosition: '0 0, 0 0',
-      WebkitMaskPosition: '0 0, 0 0',
-      maskComposite: 'intersect',
-      WebkitMaskComposite: 'source-in',
-    }
-  }
-  return {
-    maskImage: cssUrl,
-    WebkitMaskImage: cssUrl,
-    maskRepeat: 'no-repeat',
-    WebkitMaskRepeat: 'no-repeat',
-    maskSize: '100% 100%',
-    WebkitMaskSize: '100% 100%',
-    maskPosition: '0 0',
-    WebkitMaskPosition: '0 0',
-  }
-}
-
-/** Generate SVG clip-path polygon for ripple edge */
-function buildRippleSvg(pos: number, amp: number, freq: number, phase: number): string {
-  const steps = 120
-  const points: string[] = ['0,0', '100,0']
-  for (let i = steps; i >= 0; i--) {
-    const x = (i / steps) * 100
-    const wave = Math.sin((i / steps) * freq * Math.PI * 2 + phase) * amp
-    const y = pos + wave
-    points.push(`${x.toFixed(1)},${y.toFixed(1)}`)
-  }
-  return `polygon(${points.map((p) => p.split(',').map((v) => v + '%').join(' ')).join(', ')})`
-}
-
-/** Pixelated ripple: a blocky tile-wave. The wave is sampled once per tile
- *  column and its y snapped to the tile grid, so the edge is a staircase of
- *  whole tiles — the ripple is "built from dots" like the rest of the scene.
- *  Works in px (matches the tile mask). Returns undefined until measured. */
-function buildPixelRippleClip(
-  pos: number, amp: number, freq: number, phase: number,
-  pitch: number, w: number, h: number, alignY: number, alignX = 0,
-): string | undefined {
-  if (!w || !h || pitch < 2) return undefined
-  const posPx = (pos / 100) * h
-  const ampPx = (amp / 100) * h
-  const xPhase = ((alignX % pitch) + pitch) % pitch
-  const x0 = xPhase > 0 ? xPhase - pitch : 0
-  const cols = Math.ceil((w - x0) / pitch)
-  const snap = (y: number) => {
-    const snapped = Math.round((y - alignY) / pitch) * pitch + alignY
-    return Math.max(0, Math.min(h, snapped))
-  }
-  const pts: string[] = ['0px 0px', `${w}px 0px`]
-  // Bottom staircase, right → left, flat tile-width tops at grid-snapped y.
-  for (let i = cols - 1; i >= 0; i--) {
-    const xR = Math.min(x0 + (i + 1) * pitch, w)
-    const xL = Math.max(0, x0 + i * pitch)
-    const xMid = (xL + xR) / 2
-    const y = snap(posPx + ampPx * Math.sin((xMid / w) * freq * Math.PI * 2 + phase))
-    pts.push(`${xR}px ${y}px`, `${xL}px ${y}px`)
-  }
-  return `polygon(${pts.join(', ')})`
-}
-
-/** Per-layer config: different shapes create distinct dot patterns; screen blend makes black areas transparent */
-const COLOR_LAYERS = [
-  { opacity: 0.8, shape: 'warp' as const },
-  { opacity: 0.75, shape: 'dots' as const },
-  { opacity: 0.7, shape: 'wave' as const },
-]
-
 const DEFAULT_CTA_BG = '#1A8A70'
 const DEFAULT_CTA_BG_HOVER = '#22A080'
 
@@ -555,29 +235,24 @@ interface AnimDrift {
   offsetY: number
   rotation: number
   scale: number
-  frame: number
   colorPhase: number
   /** Wave sweep — origin offset */
   waveOriginX: number
   waveOriginY: number
-  /** Gap breathing — px offset added to the pixel-grid gap */
-  gap: number
   /** Loop-break translation — accumulates on its OWN channel so a scan scene,
-   *  which reassigns offsetX/offsetY every frame, can't wipe it. Added into the
-   *  effective offset alongside offsetX/offsetY. */
+   *  which reassigns offsetX/offsetY every frame, can't wipe it. */
   loopX: number
   loopY: number
 }
 
-const zeroDrift: AnimDrift = { offsetX: 0, offsetY: 0, rotation: 0, scale: 0, frame: 0, colorPhase: 0, waveOriginX: 0, waveOriginY: 0, gap: 0, loopX: 0, loopY: 0 }
+const zeroDrift: AnimDrift = { offsetX: 0, offsetY: 0, rotation: 0, scale: 0, colorPhase: 0, waveOriginX: 0, waveOriginY: 0, loopX: 0, loopY: 0 }
 
-/** A distinct motion baseline for each scene. Scene templates intentionally
- * change motion rather than visual styling, so without a new baseline they
- * inherit the previous scene's accumulated transform and appear unchanged
- * until their different velocity becomes noticeable several seconds later. */
+/** A distinct motion baseline for each scene. Scene templates change motion,
+ *  not styling, so without a new baseline they would inherit the previous
+ *  scene's accumulated transform and look unchanged for several seconds. */
 const sceneStartDrift: Record<SceneTemplateId, Partial<AnimDrift>> = {
   'orbit': { offsetX: 0.18, offsetY: -0.12, rotation: 14, colorPhase: 0.08 },
-  'breathe-tiles': { scale: 0.025, gap: 3, colorPhase: 0.24 },
+  'breathe-tiles': { scale: 0.025, colorPhase: 0.24 },
   'color-flow': { offsetX: -0.55, offsetY: 0.04, colorPhase: 0.52 },
   'gentle-drift': { offsetX: -0.18, offsetY: 0.2, colorPhase: 0.16 },
   'living-texture': { rotation: 28, scale: 0.035, colorPhase: 0.68 },
@@ -585,13 +260,14 @@ const sceneStartDrift: Record<SceneTemplateId, Partial<AnimDrift>> = {
   'signal-sweep': { offsetX: 0.62, rotation: 8, colorPhase: 0.46 },
   'radar-scan': { offsetX: -0.35, waveOriginX: 0.14, colorPhase: 0.74 },
   'error-sweep': { offsetX: 0.28, offsetY: -0.22, rotation: 18, waveOriginY: 0.2, colorPhase: 0.6 },
-  'deep-breath': { scale: 0.07, gap: 6, colorPhase: 0.88 },
+  'deep-breath': { scale: 0.07, colorPhase: 0.88 },
   'solid-classic': { colorPhase: 0 },
 }
 
 function initialDriftForScene(id: SceneTemplateId | null): AnimDrift {
   return id ? { ...zeroDrift, ...sceneStartDrift[id] } : { ...zeroDrift }
 }
+
 
 /** Whole-tile circle as a clip-path polygon (px units). Each grid tile is fully
  *  IN or OUT based on whether its center falls inside the radius — so the
@@ -641,109 +317,62 @@ function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
   ctx.closePath()
 }
 
-/** Whole-tile hover test: tile center is fully in or fully out — no partial
- *  warps at the boundary. Radius defines the zone; every included tile gets
- *  the same full transform. Pixel ◯ snaps radius to whole-tile rings. */
-function tileInHoverArea(
-  tcx: number, tcy: number, px: number, py: number,
-  rx: number, ry: number, hoverShape: HoverShape, pitch: number,
-  squareBounds?: { x0: number; x1: number; y0: number; y1: number },
-): boolean {
-  if (hoverShape === 'square' && squareBounds) {
-    return tcx >= squareBounds.x0 && tcx <= squareBounds.x1
-      && tcy >= squareBounds.y0 && tcy <= squareBounds.y1
-  }
-  if (hoverShape === 'square') {
-    const dx = Math.abs(tcx - px)
-    const dy = Math.abs(tcy - py)
-    return (rx <= 0 || dx <= rx) && (ry <= 0 || dy <= ry)
-  }
-  const r = hoverShape === 'pixel-circle' && pitch > 1
-    ? Math.round(rx / pitch) * pitch
-    : rx
-  return Math.hypot(tcx - px, tcy - py) <= r
+/** Pixel-circle radius: snapped to whole tile rings, so a tile is either fully
+ *  in (centre inside) or fully out. GLSL inHover in tileField.ts matches. */
+function pixelCircleRadius(r: number, pitch: number): number {
+  return Math.round(r / pitch) * pitch
 }
 
-function snapSquareHoverBounds(
-  px: number, py: number, rx: number, ry: number, pitch: number, alignX: number, alignY: number,
-): { x0: number; x1: number; y0: number; y1: number } {
-  const snapLo = (v: number, phase: number) => Math.floor((v - phase) / pitch) * pitch + phase
-  const snapHi = (v: number, phase: number) => Math.ceil((v - phase) / pitch) * pitch + phase
-  return {
-    x0: snapLo(px - rx, alignX),
-    x1: snapHi(px + rx, alignX),
-    y0: snapLo(py - ry, alignY),
-    y1: snapHi(py + ry, alignY),
-  }
+/** Whole device pixels with the same parity as the pitch: a piece centred in
+ *  its cell then has every edge on a pixel boundary. */
+function snapPiece(size: number, pitch: number, dpr: number): number {
+  const p = Math.round(pitch * dpr)
+  const s = Math.max(0, Math.round(size * dpr))
+  return (s - ((p - s) & 1)) / dpr
 }
 
-/** Normalized center-distance in [0,∞). Used only for reveal-reach cutoff. */
-function tileHoverDistance(
-  tcx: number, tcy: number, px: number, py: number,
-  rx: number, ry: number, hoverShape: HoverShape, pitch: number,
-): number {
-  if (hoverShape === 'square') {
-    const dx = Math.abs(tcx - px)
-    const dy = Math.abs(tcy - py)
-    return Math.max(rx > 0 ? dx / rx : 0, ry > 0 ? dy / ry : 0)
-  }
-  const r = hoverShape === 'pixel-circle' && pitch > 1
-    ? Math.round(rx / pitch) * pitch
-    : rx
-  return r > 0 ? Math.hypot(tcx - px, tcy - py) / r : 0
-}
-
-function applyWarpSizeRange(
-  basePiece: number, scale: number, spread: number,
-  col: number, row: number, seed: number,
-): number {
-  const maxSz = basePiece * Math.max(0, Math.min(1, scale))
+/** Size of one warped tile: up to `scale` × piece, spread big→small by a fixed
+ *  per-tile random value. */
+function warpTileSize(piece: number, scale: number, spread: number, col: number, row: number): number {
+  const maxSz = piece * Math.max(0, Math.min(1, scale))
   if (spread <= 0) return maxSz
   const minSz = maxSz * Math.max(0, 1 - Math.min(1.5, spread))
-  const t = tileThreshold(col, row, seed)
-  const u = Math.pow(t, 1 / (1 + spread * 1.25))
+  const u = Math.pow(tileThreshold(col, row, 1337), 1 / (1 + spread * 1.25))
   return minSz + (maxSz - minSz) * u
 }
 
-/** Cached pattern of one resting warp tile (rounded piece centred in a pitch
- *  cell), at device resolution. */
+interface WarpShape { rotate: number; round: number; scale: number; spread: number }
+
+/** Cached pattern of one resting tile at device resolution — the same rect as
+ *  buildTileMaskUrl, so swapping the CSS tile mask for a warp mask moves no
+ *  pixel outside the cursor. */
 let warpPatternCache: { key: string; canvas: HTMLCanvasElement } | null = null
-function warpRestPattern(
-  ctx: CanvasRenderingContext2D, pitch: number, piece: number, radius: number, dpr: number,
-): CanvasPattern | null {
-  const size = Math.ceil(pitch * dpr)
-  const key = `${pitch}:${piece}:${radius}:${dpr}`
+function warpRestPattern(ctx: CanvasRenderingContext2D, g: TileGrid, dpr: number): CanvasPattern | null {
+  const size = Math.round(g.pitch * dpr)
+  const key = `${g.pitch}:${g.piece}:${g.inset}:${g.radius}:${dpr}`
   if (warpPatternCache?.key !== key) {
     const c = document.createElement('canvas')
     c.width = c.height = size
-    const g = c.getContext('2d')
-    if (!g) return null
-    const k = size / pitch
-    g.setTransform(k, 0, 0, k, 0, 0)
-    g.fillStyle = '#000'
-    roundRectPath(g, (pitch - piece) / 2, (pitch - piece) / 2, piece, piece, radius)
-    g.fill()
+    const ctx2 = c.getContext('2d')
+    if (!ctx2) return null
+    ctx2.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx2.fillStyle = '#000'
+    roundRectPath(ctx2, g.inset, g.inset, g.piece, g.piece, g.radius)
+    ctx2.fill()
     warpPatternCache = { key, canvas: c }
   }
   return ctx.createPattern(warpPatternCache.canvas, 'repeat')
 }
 
-/** Cursor-directional WARP mask for the actual scene. Uses the pixel-grid tile
- *  shape (rounded rect from gap + radius) at rest and transforms it under the
- *  cursor. Tile size never exceeds the scene piece (pitch − gap) so gaps stay
- *  open. Size Spread randomizes each warped tile big→small within that cap. */
+/** Warp mask for the Paper + CSS tile grid path. `insideOnly` = false: every
+ *  resting tile, with the tiles in the pixel circle warped (the base mask).
+ *  `insideOnly` = true: only the warped tiles (the reveal mask). */
 function buildWarpMask(
-  canvas: HTMLCanvasElement, cw: number, ch: number,
-  px: number, py: number, rx: number, ry: number, hoverShape: HoverShape, pitch: number,
-  alignX: number, alignY: number, basePiece: number,
-  rotateDeg: number, round: number, scale: number,
-  spread: number, baseRadius: number,
-  insideOnly = false, recolorCutoff?: number,
-  snapSquare = false,
-  maskDpr = 1,
+  canvas: HTMLCanvasElement, cw: number, ch: number, px: number, py: number, r: number,
+  g: TileGrid, w: WarpShape, insideOnly: boolean, dpr: number,
 ): boolean {
+  const { pitch, alignX, alignY } = g
   if (pitch <= 1 || cw <= 0 || ch <= 0) return false
-  const dpr = maskDpr
   const canvasW = Math.max(1, Math.round(cw * dpr))
   const canvasH = Math.max(1, Math.round(ch * dpr))
   if (canvas.width !== canvasW || canvas.height !== canvasH) {
@@ -754,62 +383,42 @@ function buildWarpMask(
   if (!ctx) return false
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, cw, ch)
-  const baseRound = clampTileRadius(baseRadius, basePiece)
-  // Only tiles near the cursor change. Draw the rest as ONE pattern fill of the
-  // resting tile, then clear the cursor's bounding box (whole tiles, one tile
-  // of margin for rotated corners) and draw just those tiles one by one. This
-  // was a per-tile path for every tile of the hero (~3–4k) on each mask.
-  const reachX = (hoverShape === 'pixel-circle' ? Math.round(rx / pitch) * pitch : rx) + pitch
-  const reachY = (hoverShape === 'square' ? (ry || rx) : hoverShape === 'pixel-circle' ? Math.round(rx / pitch) * pitch : rx) + pitch
-  const colLo = Math.max(Math.floor((0 - alignX) / pitch) - 1, Math.floor((px - reachX - alignX) / pitch))
-  const colHi = Math.min(Math.ceil((cw - alignX) / pitch) + 1, Math.ceil((px + reachX - alignX) / pitch))
-  const rowLo = Math.max(Math.floor((0 - alignY) / pitch) - 1, Math.floor((py - reachY - alignY) / pitch))
-  const rowHi = Math.min(Math.ceil((ch - alignY) / pitch) + 1, Math.ceil((py + reachY - alignY) / pitch))
+  // Draw the resting tiles as ONE pattern fill, clear the cursor's box (whole
+  // tiles, one tile of margin for rotated corners), then draw only those tiles.
+  const rr = pixelCircleRadius(r, pitch)
+  const reach = rr + pitch
+  const colLo = Math.floor((px - reach - alignX) / pitch)
+  const colHi = Math.ceil((px + reach - alignX) / pitch)
+  const rowLo = Math.floor((py - reach - alignY) / pitch)
+  const rowHi = Math.ceil((py + reach - alignY) / pitch)
   if (!insideOnly) {
-    const pat = warpRestPattern(ctx, pitch, basePiece, baseRound, dpr)
+    const pat = warpRestPattern(ctx, g, dpr)
     if (pat) {
-      pat.setTransform(new DOMMatrix().translate(alignX, alignY).scale(pitch / Math.ceil(pitch * dpr)))
+      pat.setTransform(new DOMMatrix().translate(alignX, alignY).scale(1 / dpr))
       ctx.fillStyle = pat
       ctx.fillRect(0, 0, cw, ch)
-      const x0 = alignX + colLo * pitch, y0 = alignY + rowLo * pitch
-      ctx.clearRect(x0, y0, (colHi - colLo + 1) * pitch, (rowHi - rowLo + 1) * pitch)
+      ctx.clearRect(alignX + colLo * pitch, alignY + rowLo * pitch, (colHi - colLo + 1) * pitch, (rowHi - rowLo + 1) * pitch)
     }
   }
   ctx.fillStyle = '#000'
-  const maxWarpSz = basePiece * Math.max(0, Math.min(1, scale))
-  const targetRound = baseRound + Math.max(0, Math.min(1, round)) * (basePiece / 2 - baseRound)
-  const fullRot = rotateDeg * Math.PI / 180
-  const effectiveSpread = Math.min(1.5, spread)
-  const squareBounds = hoverShape === 'square' && snapSquare && pitch > 1
-    ? snapSquareHoverBounds(px, py, rx, ry || rx, pitch, alignX, alignY)
-    : undefined
+  const maxSz = g.piece * Math.max(0, Math.min(1, w.scale))
+  const targetRound = g.radius + Math.max(0, Math.min(1, w.round)) * (g.piece / 2 - g.radius)
+  const rot = w.rotate * Math.PI / 180
   let drew = false
   for (let row = rowLo; row <= rowHi; row++) {
     const tcy = alignY + (row + 0.5) * pitch
     for (let col = colLo; col <= colHi; col++) {
       const tcx = alignX + (col + 0.5) * pitch
-      const insideHover = tileInHoverArea(tcx, tcy, px, py, rx, ry || rx, hoverShape, pitch, squareBounds)
-      if (insideOnly && !insideHover) continue
-      if (recolorCutoff != null) {
-        const t = tileHoverDistance(tcx, tcy, px, py, rx, ry || rx, hoverShape, pitch)
-        if (t > recolorCutoff) continue
+      const inside = Math.hypot(tcx - px, tcy - py) <= rr
+      if (!inside) {
+        if (insideOnly) continue
+        roundRectPath(ctx, alignX + col * pitch + g.inset, alignY + row * pitch + g.inset, g.piece, g.piece, g.radius)
+        ctx.fill()
+        continue
       }
-      let sz: number
-      let rot: number
-      let rad: number
-      if (insideHover) {
-        sz = applyWarpSizeRange(basePiece, scale, effectiveSpread, col, row, 1337)
-        rot = fullRot
-        const desiredRad = maxWarpSz > 0
-          ? baseRound + (targetRound - baseRound) * (sz / maxWarpSz)
-          : baseRound
-        rad = clampTileRadius(desiredRad, sz)
-      } else {
-        sz = basePiece
-        rot = 0
-        rad = clampTileRadius(baseRound, sz)
-      }
-      if (sz < 0.5) continue
+      const sz = snapPiece(warpTileSize(g.piece, w.scale, w.spread, col, row), pitch, dpr)
+      if (sz <= 0) continue
+      const rad = clampTileRadius(maxSz > 0 ? g.radius + (targetRound - g.radius) * (sz / maxSz) : g.radius, sz)
       ctx.save()
       ctx.translate(tcx, tcy)
       if (rot) ctx.rotate(rot)
@@ -821,6 +430,7 @@ function buildWarpMask(
   }
   return drew || !insideOnly
 }
+
 
 /** Encode a mask canvas off the main thread. A sync toDataURL here was a
  *  full-hero PNG encode on every cursor step (~75% of the main thread during a
@@ -849,18 +459,23 @@ function canvasToDataUrl(canvas: HTMLCanvasElement): Promise<string | null> {
  *  CTA (px) — matches the 'cta' pin's md:gap-6. */
 const MIN_RESPONSE_CTA_GAP = 24
 
+type Tip = { px: number; py: number; r: number }
+
 export default function DitherHero() {
-  const { shader: c, edge, copyVariant, hover, multiColor: mc, pixelGrid, animation: storeAnim, layout, button, haptic: hap, terminalTheme: termThemeId, initialState, activeScene, stableColorField } = useDitherStore()
+  const { shader: c, edge, copyVariant, typePair, palette, hover, pixelGrid, animation: storeAnim, layout, button, terminalTheme: termThemeId, initialState, activeScene, stableColorField } = useDitherStore()
   const reducedMotion = usePrefersReducedMotion()
-  // Off-screen heroes read as paused: this stops the drift, mask and ripple
-  // loops and sets the shader speed to 0, which stops Paper's own rAF.
+  // Off-screen heroes read as paused: this stops the drift and mask loops and
+  // sets the Paper speed to 0, which stops Paper's own rAF.
   const [inView, setInView] = useState(true)
   const anim = inView ? storeAnim : { ...storeAnim, playing: false }
+  // Reduced motion shrinks how far things move; Speed scales how fast.
   const spatialMotionScale = reducedMotion ? 0.15 : 1
+  const timeScale = Math.max(0, anim.speed)
   // CTA styling shared with the header (radius + caps), art-directable per template.
   const ctaStyle: React.CSSProperties = { borderRadius: button.radius }
   const ctaTextTransform = button.uppercase ? 'uppercase' as const : undefined
-  const copy = copyVariants[copyVariant]
+
+  const copy = resolveCopy(copyVariant, typePair)
   // Delay the two-column split to lg for variants that ask for it (see
   // DitherCopy.tabletLayout). Drives both the grid classes and the baseline
   // lock's media query, which must agree or the lock fires while stacked.
@@ -878,162 +493,87 @@ export default function DitherHero() {
   const ctaTextColor = ctaTextHex
   const headlineColor = activeTheme
     ? activeTheme.fg
-    : (copy.headlineColorMode === 'white' ? '#FFFFFF' : (copy.layout === 'problem' ? '#E6307A' : '#2DD4A8'))
+    : (copy.headlineColorMode === 'white' ? '#FFFFFF' : (copy.layout === 'problem' ? palettes[palette].problem[0] : palettes[palette].fix[0]))
   const responseColor = activeTheme
     ? CTA_BG
-    : (copy.responseColorMode === 'white' ? '#FFFFFF' : '#2DD4A8')
+    : (copy.responseColorMode === 'white' ? '#FFFFFF' : palettes[palette].fix[0])
   const sublineColor = activeTheme
     ? `oklch(from ${activeTheme.accent} calc(l + 0.15) calc(c * 0.6) h)`
     : `color-mix(in oklch, ${DEFAULT_CTA_BG} 45%, white)`
 
-  // Hover dithering color — match response title color when themed
-  const hoverFixColor = activeTheme ? responseColor : hover.fixColor
-
-  // ── Web Haptics ──
-  // On desktop (no navigator.vibrate), auto-enable debug audio so haptics are audible
-  const hapticDebug = hap.debug || (hap.enabled && typeof navigator !== 'undefined' && !navigator.vibrate)
-  const { trigger: hapticTrigger } = useWebHaptics({ debug: hapticDebug, showSwitch: false })
-  const hapticDwellFired = useRef(false)
-
-  const triggerHaptic = useCallback((pattern: string, options?: { intensity?: number }) => {
-    if (!hap.enabled) return
-    hapticTrigger(pattern, options)
-  }, [hap.enabled, hapticTrigger])
-
-  const edgeMask = useMemo(() => {
-    // With Scene behind text on, sharp/fade edges are built from tiles
-    // (ditherFlat path) — the gradient mask would flat-cut the extension.
-    if (pixelGrid.enabled && edge.textBlend && (edge.mode === 'sharp' || edge.mode === 'fade')) return undefined
-    return buildMask(edge.mode, edge.position)
-  }, [edge.mode, edge.position, edge.textBlend, pixelGrid.enabled])
-
-  // When the pixel grid is on with snap, lock the dither lattice to the tile
-  // grid and size it one-dot-per-tile. Layer spread still offsets the sampled
-  // scene underneath that shared lattice, so alpha motion stays visible while
-  // every tile edge remains crisp.
-  const gridSnap = pixelGrid.enabled && pixelGrid.snap
+  // ── Renderer choice (see docs/architecture/2026-11-21-state-machines.md) ──
+  //   grid off                    → Paper stack, warp reveals whole dither cells
+  //   grid on, points or snapped  → GPU tile field (draws the warp itself)
+  //   grid on, colour, snap off   → Paper + CSS tile mask, warp via PNG masks
+  const gridOn = pixelGrid.enabled
+  const gridSnap = gridOn && pixelGrid.snap
+  const pointSizeMode = gridOn && anim.tileDisplay === 'points'
+  const snapColorMode = gridSnap && anim.tileDisplay === 'color'
+  const pointCanvasMode = pointSizeMode || snapColorMode
   const gridPitch = pixelGridPitch(pixelGrid)
-  // Shader `size` is authored in CSS px; the dot pitch tracks it ~1:1, so match
-  // the tile pitch directly. Users can still nudge phase with Align X/Y.
-  const snapDotSize = gridPitch
 
-  // ── Ripple edge animation ──
-  const [ripplePhase, setRipplePhase] = useState(0)
-  // Measured shader-container size, needed to build the pixelated ripple in px.
+  // Measured shader-container size (masks and the GPU field work in px).
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
-  // The Paper dither shader pixelizes from the canvas center, not from 0,0.
-  // Phase CSS/canvas masks to that same origin so rounded tiles do not reveal
-  // off-grid shader fragments as thin slivers. Align X/Y remain manual nudges.
-  const renderPixelGrid = useMemo(() => {
-    if (!gridSnap || !containerSize.w || !containerSize.h) return pixelGrid
-    return {
-      ...pixelGrid,
-      alignX: positiveModulo(containerSize.w / 2 + pixelGrid.alignX, gridPitch),
-      alignY: positiveModulo(containerSize.h / 2 + pixelGrid.alignY, gridPitch),
-    }
-  }, [gridSnap, containerSize.w, containerSize.h, pixelGrid, gridPitch])
+  // The snapped field centres its lattice on the hero, on a whole pixel.
+  const grid = useMemo(() => tileGrid(
+    pixelGrid,
+    gridSnap ? Math.floor(containerSize.w / 2) % gridPitch : 0,
+    gridSnap ? Math.floor(containerSize.h / 2) % gridPitch : 0,
+  ), [pixelGrid, gridSnap, gridPitch, containerSize.w, containerSize.h])
+  // Points mode shifts rows so the first whole row starts at Top start; the
+  // warp must share that row phase or it would cut dots into slivers.
+  const tileAlignY = pointCanvasMode && edge.topInset > 0
+    ? grid.alignY + positiveModulo(edge.topInset - grid.alignY, gridPitch)
+    : grid.alignY
 
-  useEffect(() => {
-    if (edge.mode !== 'ripple') return
-    if (edge.rippleSpeed === 0 || !inView) return
+  // ── Paper render scale ──
+  // Paper draws dither cells per render pixel, so a cell is a whole number of
+  // device pixels only when the render scale is a whole number. Native DPR on
+  // small screens; 1 CSS px per render px on desktop (`image-rendering:
+  // pixelated` in index.css scales it up without blur). The old 500k-pixel cap
+  // gave a fractional scale and blurred every dot.
+  const dpr = Math.max(1, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
+  const paperW = containerSize.w || (typeof window !== 'undefined' ? window.innerWidth : 1440)
+  const paperH = containerSize.h || (typeof window !== 'undefined' ? window.innerHeight : 900)
+  const paperScale = paperW < 1280 && paperW * paperH * dpr * dpr <= 4_200_000 ? dpr : 1
+  const paperMaxPixelCount = Math.ceil(paperW * paperH * paperScale * paperScale)
+  /** Paper dither cell in CSS px — whole pixels. */
+  const paperCell = Math.max(1, Math.round(c.size))
 
-    let running = true
-    let last = performance.now()
-
-    // Commit the phase at ~24fps: the wave is slow, and each commit re-renders the hero.
-    function tick(now: number) {
-      if (!running) return
-      const dt = (now - last) / 1000
-      if (dt >= 1 / 24) {
-        last = now
-        setRipplePhase((p) => p + edge.rippleSpeed * dt * Math.PI * 2)
-      }
-      requestAnimationFrame(tick)
-    }
-
-    requestAnimationFrame(tick)
-    return () => { running = false }
-  }, [edge.mode, edge.rippleSpeed, inView])
-
-  // Ripple dithers the wave (Photoshop dissolve) when its toggle is on; otherwise
-  // it's a hard/pixelated clip. Quantize the animated phase so the dither SVG
-  // doesn't regenerate every single frame.
-  const sectionExtend = edge.shaderExtend > 0 || edge.textBlend
-  const ditherWave = edge.mode === 'ripple' && edge.rippleDither && pixelGrid.enabled
-  const ditherFlat = pixelGrid.enabled && (
-    edge.mode === 'dissolve'
-    || (edge.mode === 'overlap' && sectionExtend)
-    // Scene behind text works with every edge style: sharp/fade switch to the
-    // tile-based mask so the scene can pass into the copy area (sharp keeps a
-    // 1-row band ≈ hard edge; see dissolveUrl below).
-    || (edge.textBlend && (edge.mode === 'sharp' || edge.mode === 'fade'))
-  )
-  const ripplePixel = edge.mode === 'ripple' && edge.ripplePixelate && pixelGrid.enabled && !ditherWave
-  const phaseQ = Math.round(ripplePhase * 3) / 3
+  // ── Dissolve edge (Paper + CSS tile grid only; the GPU field draws its own) ──
+  const dissolveOn = gridOn && !pointCanvasMode && edge.mode === 'dissolve'
   const [maskAnimT, setMaskAnimT] = useState(0)
   // Accumulated motion time lives in a ref so slider tweaks (which re-run the
   // rAF effect) resume from the current phase instead of snapping back to 0.
   const maskAnimTRef = useRef(0)
-  const sizeMaskCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  const rippleClip = useMemo(
-    () => {
-      if (edge.mode !== 'ripple' || ditherWave) return undefined
-      if (ripplePixel) {
-        return buildPixelRippleClip(
-          edge.position, edge.rippleAmplitude, edge.rippleFrequency, ripplePhase,
-          gridPitch, containerSize.w, containerSize.h, renderPixelGrid.alignY,
-          renderPixelGrid.alignX,
-        )
-      }
-      return buildRippleSvg(edge.position, edge.rippleAmplitude, edge.rippleFrequency, ripplePhase)
-    },
-    [edge.mode, edge.position, edge.rippleAmplitude, edge.rippleFrequency, ripplePhase,
-     ripplePixel, ditherWave, gridPitch, containerSize.w, containerSize.h,
-     renderPixelGrid.alignY, renderPixelGrid.alignX],
-  )
-
-  // ── Dither edge — Photoshop-style threshold dissolve. Flat band for
-  // 'dissolve', or following the ripple wave when ripple+dither is on.
-  // Mask regen rate is throttled at the rAF loop (12fps state updates) —
-  // no extra time quantization here, so motion reads as continuous. ──
   const dissolveUrl = useMemo(
-    () => {
-      if (!(ditherFlat || ditherWave)) return undefined
-      const wave = ditherWave
-        ? { ampVh: edge.rippleAmplitude, freq: edge.rippleFrequency, phase: phaseQ }
-        : undefined
-      const motion = edge.textBlendMotion > 0 && (ditherFlat || ditherWave)
-        ? { t: maskAnimT, strength: edge.textBlendMotion, scale: 1.5 }
-        : undefined
-      return buildDissolveMaskUrl(
-        edge.position, edge.mode === 'sharp' ? 1 : edge.dissolveDepth, gridPitch,
-        containerSize.w, containerSize.h, renderPixelGrid.alignY, renderPixelGrid.alignX,
-        edge.dissolveSeed, wave,
-        motion,
-        edge.shaderExtend > 0 ? edge.shaderExtend : 0,
-      )
-    },
-    [ditherFlat, ditherWave, edge.position, edge.dissolveDepth, edge.dissolveSeed,
-     edge.rippleAmplitude, edge.rippleFrequency, edge.textBlendMotion, edge.textBlend,
-     edge.shaderExtend, phaseQ, maskAnimT,
-     gridPitch, containerSize.w, containerSize.h,
-     renderPixelGrid.alignY, renderPixelGrid.alignX],
+    () => dissolveOn
+      ? buildDissolveMaskUrl(
+          edge.position, edge.dissolveDepth, gridPitch,
+          containerSize.w, containerSize.h, grid.alignY, grid.alignX, edge.dissolveSeed,
+          edge.textBlendMotion > 0 ? { t: maskAnimT, strength: edge.textBlendMotion, scale: 1.5 } : undefined,
+          edge.shaderExtend > 0 ? edge.shaderExtend : 0,
+        )
+      : undefined,
+    [dissolveOn, edge.position, edge.dissolveDepth, edge.dissolveSeed, edge.textBlendMotion, edge.shaderExtend,
+      maskAnimT, gridPitch, containerSize.w, containerSize.h, grid.alignY, grid.alignX],
   )
-  // ── Animation drift loop ──
+  const restMaskStyle = !gridOn || pointCanvasMode
+    ? undefined
+    : dissolveUrl ? buildDissolveContainerStyle(grid, dissolveUrl) : buildPixelGridMask(grid)
+
+  // ── Drift loop ──
   // Drift lives in a ref and never re-renders the hero: every frame the loop
   // writes opacities to the layer wrappers and pushes the sizing uniforms
-  // straight to each Paper mount (pushPaperUniforms), and the GPU tile field
-  // reads the ref itself. A 24fps React commit of this whole tree used to be
-  // the hero's main idle cost and made drift step at 24fps. Renders that do
-  // happen read the same ref, so they never snap the field back.
-  // Start on the selected scene's authored baseline. Rendering zeroDrift first
-  // caused a one-frame flash of the generic/default pattern on initial mount.
+  // straight to each Paper mount, and the GPU field reads the ref itself.
+  // Start on the selected scene's baseline (no one-frame flash of zero drift).
   const driftRef = useRef<AnimDrift>(initialDriftForScene(activeScene))
   const drift = driftRef.current
-  // Gap pulse still rebuilds a CSS tile mask, so it alone needs React commits.
+  // Motion clock in seconds, advanced by dt × Speed. Oscillations read it
+  // instead of wall time, so changing Speed never jumps their phase.
+  const clockRef = useRef(0)
   const [, setDriftTick] = useState(0)
   const pushPaperUniformsRef = useRef<() => void>(() => {})
-  const pointCanvasModeRef = useRef(false)
   const colorCycleRef = useRef(c.colorCycleSpeed)
   colorCycleRef.current = c.colorCycleSpeed
   const stableFieldRef = useRef(stableColorField)
@@ -1041,164 +581,122 @@ export default function DitherHero() {
   const alphaLayersRef = useRef(c.alphaLayers)
   alphaLayersRef.current = c.alphaLayers
   const alphaWrapperRefs = useRef<(HTMLDivElement | null)[]>([])
-  const lastTickRef = useRef(0)
   const renderedSceneRef = useRef<SceneTemplateId | null | undefined>(activeScene)
 
   useEffect(() => {
     // A scene selection owns a fresh, recognizable baseline. Fine-tuning the
     // active scene does not reset it because the scene ID remains unchanged.
     if (renderedSceneRef.current !== activeScene) {
-      const start = initialDriftForScene(activeScene)
       renderedSceneRef.current = activeScene
-      driftRef.current = start
+      driftRef.current = initialDriftForScene(activeScene)
       setDriftTick((n) => n + 1)
     }
-
-    if (!anim.playing) {
-      return
-    }
-
-    let running = true
-    lastTickRef.current = performance.now()
-    let lastReactUpdate = 0
-    const REACT_INTERVAL = 1000 / 24 // 24fps for React state (drift props)
+    if (!anim.playing) return
 
     const isOscillate = anim.scanMode === 'oscillate' && anim.scanAmplitude > 0
     const hasWave = anim.waveAmplitude > 0
-    const hasGapPulse = anim.gapPulse > 0
     const hasLoopBreak = anim.loopBreak !== 'none' && anim.loopBreakAmount > 0
     const needsLoopSettle = driftRef.current.loopX !== 0 || driftRef.current.loopY !== 0
-    const hasDrift = anim.driftX !== 0 || anim.driftY !== 0 || anim.rotationDrift !== 0 || anim.pulseAmount !== 0 || colorCycleRef.current > 0 || isOscillate || hasWave || hasGapPulse || hasLoopBreak || needsLoopSettle
-
+    const hasDrift = anim.driftX !== 0 || anim.driftY !== 0 || anim.rotationDrift !== 0 || anim.pulseAmount !== 0
+      || colorCycleRef.current > 0 || isOscillate || hasWave || hasLoopBreak || needsLoopSettle
     if (!hasDrift) return
 
+    let running = true
+    let last = performance.now()
     const scanRad = anim.scanAngle * Math.PI / 180
     const waveRad = anim.waveAngle * Math.PI / 180
+    const m = spatialMotionScale
 
     function tick(now: number) {
       if (!running) return
-      const rawDt = (now - lastTickRef.current) / 1000
-      lastTickRef.current = now
       // Clamp dt to prevent jumps after tab-away
-      const dt = Math.min(rawDt, 0.1)
+      const dt = Math.min((now - last) / 1000, 0.1) * timeScale
+      last = now
+      clockRef.current += dt
+      const t = clockRef.current
       const d = driftRef.current
-      const t = now / 1000
 
-      // Offset motion — oscillating scan or continuous drift
       if (isOscillate) {
-        const phase = t * anim.scanSpeed * Math.PI * 2
-        const scanVal = anim.scanAmplitude * spatialMotionScale * Math.sin(phase)
+        const scanVal = anim.scanAmplitude * m * Math.sin(t * anim.scanSpeed * Math.PI * 2)
         d.offsetX = scanVal * Math.cos(scanRad)
         d.offsetY = scanVal * Math.sin(scanRad)
       } else {
-        d.offsetY += anim.driftY * spatialMotionScale * dt
-        d.offsetX += anim.driftX * spatialMotionScale * dt
+        d.offsetY += anim.driftY * m * dt
+        d.offsetX += anim.driftX * m * dt
         if (d.offsetY > 2) d.offsetY -= 4
         if (d.offsetY < -2) d.offsetY += 4
         if (d.offsetX > 2) d.offsetX -= 4
         if (d.offsetX < -2) d.offsetX += 4
       }
-
-      // Wave sweep — oscillate origin for traveling wave effect
       if (hasWave) {
-        const wavePhase = t * anim.waveSpeed * Math.PI * 2
-        const waveVal = anim.waveAmplitude * spatialMotionScale * Math.sin(wavePhase)
+        const waveVal = anim.waveAmplitude * m * Math.sin(t * anim.waveSpeed * Math.PI * 2)
         d.waveOriginX = waveVal * Math.cos(waveRad)
         d.waveOriginY = waveVal * Math.sin(waveRad)
       }
-
-      d.rotation += anim.rotationDrift * spatialMotionScale * dt
-      d.scale = anim.pulseAmount * spatialMotionScale * Math.sin(t * anim.pulseSpeed * Math.PI * 2)
+      d.rotation += anim.rotationDrift * m * dt
+      d.scale = anim.pulseAmount * m * Math.sin(t * anim.pulseSpeed * Math.PI * 2)
       d.colorPhase += colorCycleRef.current * dt
-      if (hasGapPulse) d.gap = anim.gapPulse * spatialMotionScale * (0.5 + 0.5 * Math.sin(t * anim.gapPulseSpeed * Math.PI * 2))
 
-      // ── Loop break — non-looping motion layered on top of the scene ──
-      // Translation accumulates on d.loopX/d.loopY (a channel of its own) so it
-      // survives scan scenes, which ASSIGN d.offsetX/d.offsetY every frame and
-      // would otherwise wipe it. Rotation already accumulates on d.rotation.
+      // Loop break — non-looping motion on its own channel (loopX/loopY).
       if (hasLoopBreak) {
-        const a2 = anim.loopBreakAmount
+        const amt = anim.loopBreakAmount
         const lb = anim.loopBreak
-        const PAN = 0.06 // units/sec per unit amount — clearly readable, not frantic
-        if (lb === 'rotate' || lb === 'orbit') d.rotation += a2 * 8 * spatialMotionScale * dt
+        const PAN = 0.06 // units/sec per unit amount — readable, not frantic
+        if (lb === 'rotate' || lb === 'orbit') d.rotation += amt * 8 * m * dt
         if (lb === 'drift' || lb === 'orbit') {
-          d.loopX += a2 * PAN * spatialMotionScale * dt
+          d.loopX += amt * PAN * m * dt
           if (d.loopX > 2) d.loopX -= 4
           if (d.loopX < -2) d.loopX += 4
         }
         if (lb === 'wander') {
           const ang = t * 0.06 // direction slowly turns → organic, no clean cycle
-          d.loopX += Math.cos(ang) * a2 * PAN * spatialMotionScale * dt
-          d.loopY += Math.sin(ang) * a2 * PAN * spatialMotionScale * dt
+          d.loopX += Math.cos(ang) * amt * PAN * m * dt
+          d.loopY += Math.sin(ang) * amt * PAN * m * dt
           if (d.loopX > 2) d.loopX -= 4; else if (d.loopX < -2) d.loopX += 4
           if (d.loopY > 2) d.loopY -= 4; else if (d.loopY < -2) d.loopY += 4
-          d.rotation += a2 * 2.5 * spatialMotionScale * dt
+          d.rotation += amt * 2.5 * m * dt
         }
       } else if (d.loopX !== 0 || d.loopY !== 0) {
-        // Loop break turned off — settle the accumulated pan back to neutral so
-        // the field doesn't stay parked at an arbitrary offset.
+        // Loop break turned off — settle the pan back to neutral.
         d.loopX *= 0.92
         d.loopY *= 0.92
         if (Math.abs(d.loopX) < 1e-3) d.loopX = 0
         if (Math.abs(d.loopY) < 1e-3) d.loopY = 0
       }
 
-      // Imperative opacity update for the screen-blended Color/alpha layers.
+      // Opacity of the screen-blended Paper layers.
+      const wrappers = alphaWrapperRefs.current
+      const layers = alphaLayersRef.current
       if (stableFieldRef.current) {
-        // ── Layers explorer: hold each layer at its authored opacity ──
-        // The swing below trades emphasis between the three differently-shaped,
-        // differently-coloured <Dithering> canvases. Under `mixBlendMode:
-        // screen` the composite is 1-(1-a)(1-b)(1-c) — non-linear — so the swap
-        // pulses the whole field once per cycle even with summed alpha
-        // normalized: the recurring blink. The Layers view wants a calm, stable
-        // base to stack onto, so we write the authored value straight through
-        // (also clears any stale opacity a prior swing left on the wrapper).
-        const wrappers = alphaWrapperRefs.current
-        const layers = alphaLayersRef.current
+        // Layers view: hold each layer at its authored opacity. Under screen
+        // blending the swing below pulses the composite once per cycle.
         for (let i = 0; i < layers.length; i++) {
           const el = wrappers[i]
           if (el) el.style.opacity = String(layers[i].opacity)
         }
       } else if (colorCycleRef.current > 0) {
-        // ── Live / Templates: original colour shimmer, unchanged ──
-        const wrappers = alphaWrapperRefs.current
-        const layers = alphaLayersRef.current
+        // Layers trade emphasis; the correction keeps the summed alpha as
+        // authored, so the field never brightens or dims once per cycle.
         const count = layers.length
-        // Preserve the authored combined alpha while the layers trade
-        // emphasis. Without this normalization, unequal layer opacities make
-        // the whole shader brighten/dim once per color-cycle period, which
-        // reads as a recurring blink rather than continuous color flow.
         const authoredTotal = layers.reduce((sum, layer) => sum + layer.opacity, 0)
-        const animated = new Array<number>(count)
-        let animatedTotal = 0
-        for (let i = 0; i < count; i++) {
-          const cycleOffset = (i / count) * Math.PI * 2
-          const cycle = Math.sin(d.colorPhase * Math.PI * 2 + cycleOffset)
-          const opacity = layers[i].opacity * (1 + 0.1 * cycle)
-          animated[i] = opacity
-          animatedTotal += opacity
-        }
+        const animated = layers.map((layer, i) =>
+          layer.opacity * (1 + 0.1 * Math.sin(d.colorPhase * Math.PI * 2 + (i / count) * Math.PI * 2)))
+        const animatedTotal = animated.reduce((sum, v) => sum + v, 0)
         const correction = animatedTotal > 0 ? authoredTotal / animatedTotal : 1
         for (let i = 0; i < count; i++) {
           const el = wrappers[i]
-          if (!el) continue
-          el.style.opacity = String(Math.min(1, animated[i] * correction))
+          if (el) el.style.opacity = String(Math.min(1, animated[i] * correction))
         }
       }
 
       pushPaperUniformsRef.current()
-      // Gap pulse animates a CSS tile mask (Paper path only) — commit it at 24fps.
-      if (hasGapPulse && !pointCanvasModeRef.current && now - lastReactUpdate >= REACT_INTERVAL) {
-        lastReactUpdate = now
-        setDriftTick((n) => n + 1)
-      }
-
       requestAnimationFrame(tick)
     }
 
     requestAnimationFrame(tick)
     return () => { running = false }
-  }, [activeScene, reducedMotion, spatialMotionScale, anim.playing, anim.driftX, anim.driftY, anim.rotationDrift, anim.pulseAmount, anim.pulseSpeed, anim.scanMode, anim.scanAmplitude, anim.scanSpeed, anim.scanAngle, anim.waveAmplitude, anim.waveSpeed, anim.waveAngle, anim.gapPulse, anim.gapPulseSpeed, anim.loopBreak, anim.loopBreakAmount])
+  }, [activeScene, spatialMotionScale, timeScale, anim.playing, anim.driftX, anim.driftY, anim.rotationDrift, anim.pulseAmount, anim.pulseSpeed, anim.scanMode, anim.scanAmplitude, anim.scanSpeed, anim.scanAngle, anim.waveAmplitude, anim.waveSpeed, anim.waveAngle, anim.loopBreak, anim.loopBreakAmount])
+
 
   // Sync hero colors to CSS custom properties so the header matches.
   // Must target the [data-palette] element — it overrides documentElement in the cascade.
@@ -1259,75 +757,14 @@ export default function DitherHero() {
     ? 1.8
     : 1
 
-  // Compose base config + drift
-  const effectiveOffsetX = c.offsetX + (drift.offsetX + drift.loopX) * problemMotionBoost
-  const effectiveOffsetY = c.offsetY + (drift.offsetY + drift.loopY) * problemMotionBoost
+  // Compose base config + drift (Paper path). Paused = fully static: a zero
+  // speed stops the Paper mount's own rAF, so paused frames cost no GPU work.
+  const effectiveOffsetX = (drift.offsetX + drift.loopX) * problemMotionBoost
+  const effectiveOffsetY = (drift.offsetY + drift.loopY) * problemMotionBoost
   const effectiveRotation = c.rotation + drift.rotation * problemMotionBoost
   const effectiveScale = c.scale + drift.scale * problemMotionBoost
-  // Paused = fully static: zeroing the shader speed stops the WebGL mount's
-  // internal rAF entirely, so paused frames (gallery canonical artboards,
-  // panel Pause) cost no GPU work at all.
-  const effectiveSpeed = anim.playing ? c.speed * problemMotionBoost * spatialMotionScale : 0
-  const effectiveFrame = c.frame || undefined
+  const effectiveSpeed = anim.playing ? c.speed * problemMotionBoost * spatialMotionScale * timeScale : 0
 
-  // Animated pixel-grid gap (tile breathing) → rebuild the container mask with
-  // the live gap. Cheap (tiny tile SVG); the dissolve mask is keyed on pitch so
-  // it isn't regenerated by gap motion.
-  const sizeMode = anim.tileDisplay === 'size' && pixelGrid.enabled && anim.tileSizeSpread > 0
-  const pointSizeMode = anim.tileDisplay === 'points' && pixelGrid.enabled && anim.tileSizeSpread > 0
-  // A one-dot-per-tile WebGL source can only change at hard dither
-  // thresholds, so animated Color/alpha appears to hold and then flash. Draw
-  // that exact snapped combination through the stable tile canvas instead:
-  // fixed grid geometry, continuously sampled alpha/color field. Free
-  // Color/alpha remains the Paper shader; Point sizes keeps its own behavior.
-  const snapColorMode = anim.tileDisplay === 'color' && gridSnap
-  const pointCanvasMode = pointSizeMode || snapColorMode
-  const animGap = sizeMode || pointSizeMode
-    ? renderPixelGrid.gap
-    : Math.max(0, Math.min(gridPitch - 1, renderPixelGrid.gap + drift.gap))
-  const effGrid = animGap === renderPixelGrid.gap ? renderPixelGrid : { ...renderPixelGrid, gap: animGap }
-  // Tile-size mask — drawn to a canvas, exported async via toBlob + object URL.
-  // toDataURL was a sync PNG encode + a ~90KB base64 string through CSSOM on
-  // every update, which dropped the whole page to ~30fps. The effect also keys
-  // on scalars (not effGrid's identity, which changes every render during gap
-  // pulse) so redraws happen at the 12fps motion rate, not the render rate.
-  const [sizeMask, setSizeMask] = useState<{ url: string; w: number; h: number } | undefined>(undefined)
-  const sizeMaskGenRef = useRef(0)
-  useEffect(() => {
-    const gen = ++sizeMaskGenRef.current
-    if (!sizeMode || !containerSize.w) {
-      setSizeMask(undefined)
-      return
-    }
-    if (!sizeMaskCanvasRef.current) sizeMaskCanvasRef.current = document.createElement('canvas')
-    const canvas = sizeMaskCanvasRef.current
-    const grid = animGap === renderPixelGrid.gap ? renderPixelGrid : { ...renderPixelGrid, gap: animGap }
-    const drawn = drawTileSizeMask(
-      canvas, containerSize.w, containerSize.h, grid,
-      maskAnimT, anim.tileSizeSpread, anim.tileSizeNoise,
-      undefined, edge.topInset,
-    )
-    if (!drawn) {
-      setSizeMask(undefined)
-      return
-    }
-    canvas.toBlob((blob) => {
-      if (!blob || gen !== sizeMaskGenRef.current) return
-      setSizeMask({ url: URL.createObjectURL(blob), w: containerSize.w, h: containerSize.h })
-    })
-  }, [sizeMode, containerSize.w, containerSize.h, renderPixelGrid, animGap, maskAnimT,
-    anim.tileSizeSpread, anim.tileSizeNoise, edge.dissolveSeed, edge.topInset])
-
-  // Revoke the replaced blob URL only after the new one has committed, so the
-  // mask never points at a dead resource mid-paint.
-  useEffect(() => {
-    const url = sizeMask?.url
-    return () => { if (url) URL.revokeObjectURL(url) }
-  }, [sizeMask])
-
-  const sizeMaskUrl = sizeMask?.w === containerSize.w && sizeMask.h === containerSize.h
-    ? sizeMask.url
-    : undefined
 
   // Measure the copy area in container coordinates: the block's top edge
   // bounds the dot band in every mode (its solid bg must never flat-cut a
@@ -1345,7 +782,7 @@ export default function DitherHero() {
     const content = contentRef.current
     const host = shaderContainerRef.current
     if (!content || !host) return
-    const needRects = edge.mode === 'full' || edge.textBlend
+    const needRects = edge.mode === 'full'
     const measure = () => {
       const hostRect = host.getBoundingClientRect()
       setContentTop((prev) => {
@@ -1385,7 +822,7 @@ export default function DitherHero() {
     return () => ro.disconnect()
     // baselineNudge: transforms don't fire the ResizeObserver, so re-measure
     // the exclusion rects after the baseline lock shifts the right column.
-  }, [edge.mode, edge.textBlend, edge.textRectMode, copyVariant, layout, baselineNudge])
+  }, [edge.mode, edge.textRectMode, copyVariant, typePair, layout, baselineNudge])
 
   // Baseline lock (problem layout) — the right column snaps to the left one:
   // the response's last line shares the headline's last baseline, the CTA
@@ -1469,7 +906,7 @@ export default function DitherHero() {
       window.removeEventListener('resize', measure)
       twoCol.removeEventListener('change', measure)
     }
-  }, [copy.layout, copy.responsePin, copyVariant, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
+  }, [copy.layout, copy.responsePin, copyVariant, typePair, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
     containerSize.w])
 
   // Baseline guides — debug overlay for alignment checks. One line per
@@ -1501,7 +938,7 @@ export default function DitherHero() {
     ro.observe(content)
     ro.observe(host)
     return () => ro.disconnect()
-  }, [layout.showBaselines, copyVariant, layout, baselineNudge])
+  }, [layout.showBaselines, copyVariant, typePair, layout, baselineNudge])
 
   // Layout guides — debug overlay for the frame every element should sit on.
   // Columns and left/right edges come from CSS (the overlay reuses the copy
@@ -1543,40 +980,16 @@ export default function DitherHero() {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [layout.showGuides, copyVariant, layout])
+  }, [layout.showGuides, copyVariant, typePair, layout])
 
   const POINT_FLOW_CELLS = 6
 
-  // Scene-behind-text exclusion mask (color/size modes; points mode culls
-  // per-tile while drawing). Intersected with the active edge mask below.
-  const textClearUrl = useMemo(() => {
-    if (!edge.textBlend || edge.mode === 'full' || pointCanvasMode) return undefined
-    if (!pixelGrid.enabled || !textRects.length || !containerSize.w || !containerSize.h) return undefined
-    const motion = edge.textBlendMotion > 0 ? { t: maskAnimT, strength: edge.textBlendMotion } : undefined
-    return buildTextClearMaskUrl(
-      containerSize.w, containerSize.h, gridPitch,
-      renderPixelGrid.alignX, renderPixelGrid.alignY,
-      textRects, edge.textPadding,
-      Math.max(gridPitch, Math.round(edge.dissolveDepth) * gridPitch),
-      edge.dissolveSeed, motion,
-    )
-  }, [edge.textBlend, edge.mode, edge.textPadding, edge.dissolveDepth, edge.dissolveSeed,
-    edge.textBlendMotion, maskAnimT, pointCanvasMode, pixelGrid.enabled, gridPitch,
-    renderPixelGrid.alignX, renderPixelGrid.alignY, textRects, containerSize.w, containerSize.h])
-
-  const finalContainerStyle = !pixelGrid.enabled
-    ? undefined
-    : pointCanvasMode
-      ? undefined
-      : sizeMode && sizeMaskUrl
-      ? buildSizeMaskContainerStyle(sizeMaskUrl, (ditherFlat || ditherWave) ? dissolveUrl : undefined)
-      : ((ditherFlat || ditherWave) && dissolveUrl)
-        ? buildDissolveContainerStyle(effGrid, dissolveUrl)
-        : buildPixelGridMask(effGrid)
-
+  // ── Mask loop: field time for the dissolve rim, the snapped colour field
+  // and point sizes. The GPU field reads the ref; CSS masks need a commit. ──
+  const pointCanvasModeRef = useRef(false)
+  pointCanvasModeRef.current = pointCanvasMode
   useEffect(() => {
-    const needsDissolveMotion = edge.textBlendMotion > 0 && edge.textBlendSpeed > 0
-      && (edge.mode === 'dissolve' || edge.mode === 'ripple' || edge.textBlend)
+    const needsDissolveMotion = edge.mode === 'dissolve' && edge.textBlendMotion > 0 && edge.textBlendSpeed > 0
     const snapMotionRate = Math.max(
       c.speed * spatialMotionScale,
       c.colorCycleSpeed * 0.25,
@@ -1585,8 +998,7 @@ export default function DitherHero() {
       anim.pulseAmount > 0 ? anim.pulseSpeed * spatialMotionScale : 0,
       anim.waveAmplitude > 0 ? anim.waveSpeed * spatialMotionScale : 0,
     )
-    const needsSizeMotion = (anim.tileDisplay === 'size' || anim.tileDisplay === 'points')
-      && anim.tileSizeSpread > 0 && anim.tileSizeSpeed > 0
+    const needsSizeMotion = pointSizeMode && anim.tileSizeSpread > 0 && anim.tileSizeSpeed > 0
     const needsSnapMotion = snapColorMode && snapMotionRate > 0
     if (!anim.playing || (!needsDissolveMotion && !needsSizeMotion && !needsSnapMotion)) return
 
@@ -1597,13 +1009,11 @@ export default function DitherHero() {
 
     function tick(now: number) {
       if (!running) return
-      const dt = Math.min((now - last) / 1000, 0.1)
+      const dt = Math.min((now - last) / 1000, 0.1) * timeScale
       last = now
       if (needsDissolveMotion) maskAnimTRef.current += dt * edge.textBlendSpeed
       else if (needsSnapMotion) maskAnimTRef.current += dt * snapMotionRate
       else if (needsSizeMotion) maskAnimTRef.current += dt * anim.tileSizeSpeed
-      // The GPU tile field reads maskAnimTRef itself; only CSS-mask modes
-      // need the throttled commit.
       if (!pointCanvasModeRef.current && now - lastUpdate >= interval) {
         lastUpdate = now
         setMaskAnimT(maskAnimTRef.current)
@@ -1613,22 +1023,28 @@ export default function DitherHero() {
 
     requestAnimationFrame(tick)
     return () => { running = false }
-  }, [anim.playing, anim.tileDisplay, anim.tileSizeSpread, anim.tileSizeSpeed,
+  }, [anim.playing, pointSizeMode, snapColorMode, anim.tileSizeSpread, anim.tileSizeSpeed,
     anim.driftX, anim.driftY, anim.rotationDrift, anim.pulseAmount, anim.pulseSpeed,
-    anim.waveAmplitude, anim.waveSpeed, c.speed, c.colorCycleSpeed, snapColorMode,
-    reducedMotion, spatialMotionScale,
-    edge.mode, edge.textBlend, edge.textBlendMotion, edge.textBlendSpeed])
+    anim.waveAmplitude, anim.waveSpeed, c.speed, c.colorCycleSpeed, spatialMotionScale, timeScale,
+    edge.mode, edge.textBlendMotion, edge.textBlendSpeed])
 
-  // ── Hover interaction ──
-  // Performance: rAF loop only runs while hovering or radius is settling.
-  // Mouse influence updates throttled to 10fps to avoid re-rendering all Dithering components.
+  // ── Hover: warp reveal in a pixel circle ──
+  // One rAF loop while the pointer is over the hero or the radius settles. Three
+  // ways to draw it, by renderer (hoverPath):
+  //   'gpu'   — the tile field draws the warp from hoverAnim; only the tip commits
+  //   'mask'  — Paper + CSS tile grid: PNG warp masks for the base and the reveal
+  //   'cells' — Paper without a grid: the reveal layer is clipped to whole dither
+  //             cells (no rotation; the field's own dots, no tile shapes)
   const shaderContainerRef = useRef<HTMLDivElement>(null)
   const fixLayerRef = useRef<HTMLDivElement>(null)
+  // The reveal Paper stack mounts on the first move and unmounts 2 s after the
+  // pointer leaves: each stack holds 3 WebGL contexts (browsers cap ~16).
   const [hoverActive, setHoverActive] = useState(false)
-  // WebGL context-loss recovery. Browsers cap active contexts (~16 per page)
-  // and silently evict the oldest when multi-frame views overshoot — a lost
-  // context leaves its canvas permanently blank. Watch for losses and bump the
-  // epoch, which remounts the shader stacks (fresh canvases, fresh contexts).
+  const hoverActiveRef = useRef(false)
+  hoverActiveRef.current = hoverActive
+  // WebGL context-loss recovery: a lost context leaves its canvas blank, so
+  // bump the epoch, which remounts the stacks with fresh canvases.
+
   const [glEpoch, setGlEpoch] = useState(0)
   useEffect(() => {
     const el = shaderContainerRef.current
@@ -1670,137 +1086,60 @@ export default function DitherHero() {
     return () => ro.disconnect()
   }, [])
 
-  const mouseRef = useRef({ nx: 0.5, ny: 0.5 })
-  const mouse = mouseRef.current
-  // Warp tooltip position for the GPU tile field path (CPU path uses `warp`).
-  const [tip, setTip] = useState<{ px: number; py: number; r: number } | null>(null)
-  const tipRef = useRef<{ px: number; py: number; r: number } | null>(null)
-  const warpTipEnabledRef = useRef(false)
-  warpTipEnabledRef.current = hover.mode === 'warp' && hover.warpRevealEnabled && hover.warpErrorText
-  const hoverAnim = useRef({ radius: 0, radiusY: 0, targetRadius: 0, targetRadiusY: 0, px: 0, py: 0, prevPx: 0, prevPy: 0, velocity: 0, hovering: false, rafId: 0, cw: 0, ch: 0, lastTime: 0, dwellRadius: 0 })
-  const hoverShapeRef = useRef(hover.hoverShape)
-  hoverShapeRef.current = hover.hoverShape
-  // Hover masks must share the SAME row phase as the drawn field: points mode
-  // shifts the grid vertically for Top start, so warp/recolor masks built on
-  // the unshifted grid would clip every dot into partial slivers.
-  const hoverAlignY = pointCanvasMode && edge.topInset > 0
-    ? renderPixelGrid.alignY + positiveModulo(edge.topInset - renderPixelGrid.alignY, gridPitch)
-    : renderPixelGrid.alignY
-  // Tile-snapping params for whole-tile recolor — the cursor rect snaps to this
-  // grid so only complete tiles recolor (no partial tiles at the cursor edge).
-  const tileSnapRef = useRef({ on: false, pitch: 1, alignX: 0, alignY: 0 })
-  tileSnapRef.current = {
-    on: hover.wholeTiles && pixelGrid.enabled,
-    pitch: gridPitch,
-    alignX: renderPixelGrid.alignX,
-    alignY: hoverAlignY,
-  }
-  // Pixel-circle always fills whole tiles when the grid is on (independent of the
-  // Whole-Tiles toggle, which gates the square recolor) — the grid params it needs.
-  const pcGridRef = useRef({ enabled: false, pitch: 1, alignX: 0, alignY: 0 })
-  // Warp needs tiles to transform. With the tile grid off (Fine Grain) it used
-  // to do nothing at all; give it a warp-only grid sized from the reveal's dot
-  // size. Outside the cursor those tiles are gapless squares, so the resting
-  // field is untouched. ponytail: pitch is derived, not a panel control yet.
-  const warpOnlyGrid = hover.mode === 'warp' && !pixelGrid.enabled
-  // Paper lays its dither dots out from the canvas CENTRE at `size` CSS px, so
-  // the warp tiles share that exact pitch and phase — one whole revealed dot
-  // per tile, never a sliced one.
-  const warpOnlyPitch = Math.max(4, hover.fixSize ?? c.size)
-  pcGridRef.current = warpOnlyGrid
-    ? {
-        enabled: true,
-        pitch: warpOnlyPitch,
-        alignX: positiveModulo(containerSize.w / 2, warpOnlyPitch),
-        alignY: positiveModulo(containerSize.h / 2, warpOnlyPitch),
-      }
-    : {
-        enabled: pixelGrid.enabled,
-        pitch: gridPitch,
-        alignX: renderPixelGrid.alignX,
-        alignY: hoverAlignY,
-      }
-  // Warp mode — config + a reused canvas + the resting container mask to restore.
-  const hoverModeRef = useRef(hover.mode)
-  hoverModeRef.current = hover.mode
-  const warpRef = useRef({
-    rotate: 0, round: 0, scale: 1, spread: 0, recolor: 0, recolorEnabled: true, overlayEnabled: false, revealEnabled: false,
-    dynamicSpread: false, basePiece: 1, baseRadius: 0, snapSquare: false, maskDpr: 1,
-  })
-  warpRef.current = {
-    rotate: hover.warpRotate,
-    round: hover.warpRound,
-    scale: hover.warpScale,
-    spread: hover.warpJitter,
-    recolor: hover.warpRecolor,
-    recolorEnabled: hover.warpRecolorEnabled,
-    overlayEnabled: hover.warpOverlayEnabled,
-    revealEnabled: hover.warpRevealEnabled,
-    dynamicSpread: hover.dynamicSize,
-    basePiece: warpOnlyGrid ? warpOnlyPitch : pixelGridPitch(effGrid) - Math.max(0, Math.min(Math.round(effGrid.gap), pixelGridPitch(effGrid) - 1)),
-    baseRadius: warpOnlyGrid ? 0 : effGrid.radius,
-    snapSquare: hover.wholeTiles && (pixelGrid.enabled || warpOnlyGrid),
-    // Each warp mask is a PNG → data URL → CSS mask decode, and that cost
-    // scales with pixels (2× DPR ≈ 2.3× the main-thread time). The warp-only
-    // grid's resting tiles are gapless squares with no edge to soften, so it
-    // encodes at 1×; a real tile grid keeps device DPR for crisp tile edges.
-    maskDpr: warpOnlyGrid ? 1 : Math.min(2, Math.max(1, typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1)),
+  const hoverPath: 'gpu' | 'mask' | 'cells' = pointCanvasMode ? 'gpu' : gridOn ? 'mask' : 'cells'
+  const hoverPathRef = useRef(hoverPath)
+  hoverPathRef.current = hoverPath
+  const [tip, setTip] = useState<Tip | null>(null)
+  const hoverAnim = useRef({ radius: 0, px: 0, py: 0, hovering: false, rafId: 0, cw: 0, ch: 0 })
+  const radiusRef = useRef(hover.radius)
+  radiusRef.current = hover.radius
+  const warpShapeRef = useRef<WarpShape>({ rotate: 0, round: 0, scale: 1, spread: 0 })
+  warpShapeRef.current = { rotate: hover.warpRotate, round: hover.warpRound, scale: hover.warpScale, spread: hover.warpJitter }
+  // 'mask' path grid; the PNG masks are drawn at device DPR (max 2) for crisp tile edges.
+  const maskGridRef = useRef(grid)
+  maskGridRef.current = grid
+  const maskDpr = Math.min(2, dpr)
+  const maskDprRef = useRef(maskDpr)
+  maskDprRef.current = maskDpr
+  // 'cells' path lattice: Paper's dither cells start at floor(W / 2) render px
+  // from the left and ceil(H / 2) from the top (its pixelisation is anchored
+  // at the canvas centre, y up). The clip shares that lattice, so every
+  // revealed cell is whole.
+  const cellGridRef = useRef({ pitch: 1, alignX: 0, alignY: 0 })
+  {
+    const rw = Math.round(containerSize.w * paperScale)
+    const rh = Math.round(containerSize.h * paperScale)
+    cellGridRef.current = {
+      pitch: paperCell,
+      alignX: positiveModulo(Math.floor(rw / 2) / paperScale, paperCell),
+      alignY: positiveModulo(Math.ceil(rh / 2) / paperScale, paperCell),
+    }
   }
   const warpCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const warpSceneCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  const warpGenRef = useRef({ px: -1, py: -1, r: -1, ry: -1, velocity: -1, key: '' })
-  const [warp, setWarp] = useState<{ url: string; sceneUrl: string | null; px: number; py: number; r: number } | null>(null)
+  const warpGenRef = useRef({ px: -1, py: -1, r: -1, key: '' })
+  const [warp, setWarp] = useState<{ url: string; sceneUrl: string | null } | null>(null)
   const warpEncodingRef = useRef(false)
-  // Each new mask re-renders the hero; ~24 swaps/s looks smooth and halves the commits.
   const warpLastStartRef = useRef(0)
   const warpTokenRef = useRef(0)
-  // The hover loop shows the fix layer imperatively, but its mask lands with
-  // the next commit; showing it earlier painted the layer unmasked for 1-2
-  // frames on every hover entry. Gate visibility on a committed mask.
+  // The loop shows the reveal layer imperatively, but its mask lands with the
+  // next commit; showing it earlier painted the layer unmasked for 1–2 frames
+  // on every hover entry. Gate visibility on a committed mask.
   const warpCommittedRef = useRef(false)
   useLayoutEffect(() => {
     warpCommittedRef.current = warp != null
-    // Show the fix layer in the same commit as the masks (before paint); the
-    // hover loop would only flip it a frame later, leaving the base masked out
-    // with nothing behind it.
     if (warp && fixLayerRef.current) fixLayerRef.current.style.visibility = 'visible'
   }, [warp])
-  const dynamicSizeRef = useRef(hover.dynamicSize)
-  dynamicSizeRef.current = hover.dynamicSize
-  const baseRadiusRef = useRef(hover.radius)
-  baseRadiusRef.current = hover.radius
-  const baseRadiusYRef = useRef(hover.radiusY)
-  baseRadiusYRef.current = hover.radiusY
-  // Releases the hover shader stack after the pointer leaves — each mounted
-  // stack holds 3 WebGL contexts and browsers cap ~16 per page, so frames the
-  // cursor merely passed over must not keep them forever (multi-frame canvas
-  // views would evict other frames' contexts, freezing their canvases).
   const hoverReleaseTimer = useRef(0)
-  const hoverPreviewRef = useRef(hover.preview)
-  hoverPreviewRef.current = hover.preview
-  const hoverTriggerRef = useRef(hover.trigger)
-  hoverTriggerRef.current = hover.trigger
-  const dwellSpeedRef = useRef(hover.dwellSpeed)
-  dwellSpeedRef.current = hover.dwellSpeed
-  const dwellFadeBackRef = useRef(hover.dwellFadeBack)
-  dwellFadeBackRef.current = hover.dwellFadeBack
-  // Haptic refs for event handler closures
-  const hapticConfigRef = useRef(hap)
-  hapticConfigRef.current = hap
-  const triggerHapticRef = useRef(triggerHaptic)
-  triggerHapticRef.current = triggerHaptic
+  const tileDirtyRef = useRef(true)
 
   useEffect(() => {
     if (!hover.enabled) return
     const el = shaderContainerRef.current
     if (!el) return
-
     let running = true
     let lastTipUpdate = 0
-    let wasHovering = false
-    // Haptic: distance accumulator for texture-like ticks
-    let hapticDistAccum = 0
-    let prevDwellPct = 0
+    let tipShown = false
 
     function startLoop() {
       if (hoverAnim.current.rafId) return
@@ -1815,34 +1154,16 @@ export default function DitherHero() {
       a.cw = rect.width
       a.ch = rect.height
       a.hovering = true
-      mouseRef.current.nx = a.px / (rect.width || 1)
-      mouseRef.current.ny = a.py / (rect.height || 1)
       if (hoverReleaseTimer.current) {
         clearTimeout(hoverReleaseTimer.current)
         hoverReleaseTimer.current = 0
       }
-      if (!hoverActive) setHoverActive(true)
-
-      // Haptic: trigger on first hover enter
-      if (!wasHovering) {
-        wasHovering = true
-        hapticDwellFired.current = false
-        hapticDistAccum = 0
-        prevDwellPct = 0
-        triggerHapticRef.current(hapticConfigRef.current.hoverEnter)
-      }
-
+      if (!hoverActiveRef.current) setHoverActive(true)
       startLoop()
     }
 
     function handleLeave() {
-      hoverAnim.current.targetRadius = 0
       hoverAnim.current.hovering = false
-      wasHovering = false
-      hapticDistAccum = 0
-      // Haptic: trigger on leave
-      triggerHapticRef.current(hapticConfigRef.current.hoverLeave)
-      // Free the hover stack's WebGL contexts once the effect has settled.
       if (hoverReleaseTimer.current) clearTimeout(hoverReleaseTimer.current)
       hoverReleaseTimer.current = window.setTimeout(() => {
         hoverReleaseTimer.current = 0
@@ -1855,246 +1176,77 @@ export default function DitherHero() {
       const a = hoverAnim.current
       a.rafId = 0
       const now = performance.now()
-      const dt = Math.min((now - (a.lastTime || now)) / 1000, 0.1)
-      a.lastTime = now
+      const target = a.hovering ? radiusRef.current : 0
+      a.radius += (target - a.radius) * 0.08
+      if (a.radius < 1 && target === 0) a.radius = 0
+      tileDirtyRef.current = true
 
-      // Track mouse velocity for dynamic sizing
-      const dx = a.px - a.prevPx
-      const dy = a.py - a.prevPy
-      a.prevPx = a.px
-      a.prevPy = a.py
-      const speed = Math.sqrt(dx * dx + dy * dy)
-      a.velocity += (speed - a.velocity) * 0.12
-
-      // ── Haptic: animation-synced movement ticks ──
-      // Accumulate pixel distance traveled — fire tick every N pixels
-      // Like dragging your finger across a textured surface
-      const hc = hapticConfigRef.current
-      if (hc.enabled && a.hovering && hc.tickDistance > 0 && speed > 0.5) {
-        hapticDistAccum += speed
-        if (hapticDistAccum >= hc.tickDistance) {
-          hapticDistAccum -= hc.tickDistance
-          // Velocity-modulated intensity: faster = lighter touch, slower = heavier press
-          const intensity = hc.velocityIntensity
-            ? Math.min(0.2 + a.velocity / 12, 1)
-            : undefined
-          triggerHapticRef.current(hc.tickPattern, { intensity })
-        }
-      }
-
-      const isDwell = hoverTriggerRef.current === 'dwell'
-
-      if (isDwell) {
-        // Dwell mode: radius grows linearly while hovering, shrinks on leave.
-        // Ceiling = the configured Mask → Radius (capped at the screen diagonal),
-        // so the size control is wired to dwell and Growth/Fade Back feel
-        // responsive instead of crawling toward a full-screen target. Crank
-        // Radius to its max for a full takeover.
-        const diag = Math.sqrt(a.cw * a.cw + a.ch * a.ch)
-        const cap = Math.max(baseRadiusRef.current, baseRadiusYRef.current ?? baseRadiusRef.current)
-        const maxR = Math.min(diag, cap > 0 ? cap : diag)
-        if (a.hovering) {
-          a.dwellRadius = Math.min(a.dwellRadius + dwellSpeedRef.current * dt, maxR)
-
-          // Haptic: progress ticks at percentage milestones
-          if (hc.enabled && hc.dwellTickPercent > 0) {
-            const pct = (a.dwellRadius / maxR) * 100
-            const step = hc.dwellTickPercent
-            if (Math.floor(pct / step) > Math.floor(prevDwellPct / step)) {
-              const progressIntensity = Math.min(0.3 + (pct / 100) * 0.7, 1)
-              triggerHapticRef.current(hc.tickPattern, { intensity: progressIntensity })
-            }
-            prevDwellPct = pct
-          }
-
-          // Haptic: fire once when dwell reaches full coverage
-          if (a.dwellRadius >= maxR && !hapticDwellFired.current) {
-            hapticDwellFired.current = true
-            triggerHapticRef.current(hc.dwellComplete)
-          }
-        } else {
-          a.dwellRadius = Math.max(a.dwellRadius - dwellSpeedRef.current * dwellFadeBackRef.current * dt, 0)
-          prevDwellPct = maxR > 0 ? (a.dwellRadius / maxR) * 100 : 0
-        }
-        a.radius = a.dwellRadius
-      } else {
-        // Instant mode: fixed radius follows cursor
-        if (a.hovering) {
-          const base = baseRadiusRef.current
-          const baseY = baseRadiusYRef.current ?? base
-          if (dynamicSizeRef.current) {
-            const factor = 0.35 + Math.min(a.velocity / 10, 1.65)
-            a.targetRadius = base * factor
-            a.targetRadiusY = baseY * factor
-          } else {
-            a.targetRadius = base
-            a.targetRadiusY = baseY
-          }
-        }
-
-        a.radius += (a.targetRadius - a.radius) * 0.08
-        a.radiusY += (a.targetRadiusY - a.radiusY) * 0.08
-        if (a.radius < 1 && a.targetRadius === 0) a.radius = 0
-        if (a.radiusY < 1 && a.targetRadiusY === 0) a.radiusY = 0
+      // Error-text tip, 12 commits/s at most.
+      if (a.radius <= 0) {
+        if (tipShown) { tipShown = false; setTip(null) }
+      } else if (now - lastTipUpdate >= 1000 / 12) {
+        lastTipUpdate = now
+        tipShown = true
+        setTip({ px: a.px, py: a.py, r: a.radius })
       }
 
       const fixEl = fixLayerRef.current
-      tileDirtyRef.current = true
-      if (hoverModeRef.current === 'warp' && pointCanvasModeRef.current) {
-        // GPU tile field draws the warp itself from hoverAnim — only the
-        // error-text tooltip needs a (throttled) commit.
-        if (warpTipEnabledRef.current) {
-          const r = a.radius
-          if (r <= 0) {
-            if (tipRef.current) { tipRef.current = null; setTip(null) }
-          } else if (now - lastTipUpdate >= 1000 / 12) {
-            lastTipUpdate = now
-            tipRef.current = { px: a.px, py: a.py, r }
-            setTip(tipRef.current)
-          }
+      const path = hoverPathRef.current
+      if (path === 'cells') {
+        if (fixEl) {
+          const g = cellGridRef.current
+          fixEl.style.clipPath = buildWholeTileCircleClip(
+            a.px, a.py, pixelCircleRadius(a.radius, g.pitch), g.pitch, g.alignX, g.alignY, a.cw, a.ch,
+          )
+          fixEl.style.visibility = a.radius > 0 ? 'visible' : 'hidden'
         }
-      } else if (hoverModeRef.current === 'warp') {
-        const g = pcGridRef.current
+      } else if (path === 'mask') {
+        const g = maskGridRef.current
         const gen = warpGenRef.current
-        if (g.enabled && g.pitch > 1 && a.cw > 0 && (a.radius > 0)) {
+        if (a.radius > 0 && a.cw > 0) {
           if (fixEl) fixEl.style.visibility = warpCommittedRef.current ? 'visible' : 'hidden'
-          const wc = warpRef.current
-          const velocitySpread = wc.dynamicSpread
-            ? Math.min(a.velocity / 6, 0.75)
-            : 0
-          const spread = Math.min(1.5, wc.spread + velocitySpread)
-          const spreadChanged = wc.dynamicSpread && Math.abs(a.velocity - gen.velocity) >= 0.75
-          const shape = hoverShapeRef.current
-          const maskKey = [
-            shape, g.pitch, g.alignX, g.alignY, wc.basePiece, wc.baseRadius,
-            wc.rotate, wc.round, wc.scale, spread, wc.recolor, wc.recolorEnabled,
-            wc.overlayEnabled, wc.revealEnabled, wc.snapSquare,
-          ].join(':')
-          // One encode in flight at a time: while it runs, the loop keeps
-          // animating and the next build picks up the latest cursor position.
-          if (!warpEncodingRef.current && now - warpLastStartRef.current >= (warpRef.current.maskDpr > 1 ? WARP_MASK_INTERVAL_HIDPI : WARP_MASK_INTERVAL) && (Math.abs(a.px - gen.px) >= 2 || Math.abs(a.py - gen.py) >= 2 || Math.abs(a.radius - gen.r) >= 2 || Math.abs(a.radiusY - gen.ry) >= 2 || spreadChanged || gen.key !== maskKey)) {
-            if (!warpCanvasRef.current) warpCanvasRef.current = document.createElement('canvas')
-            const drewBase = buildWarpMask(
-              warpCanvasRef.current, a.cw, a.ch, a.px, a.py, a.radius, a.radiusY || a.radius, shape,
-              g.pitch, g.alignX, g.alignY, wc.basePiece, wc.rotate, wc.round, wc.scale, spread, wc.baseRadius,
-              false, undefined, wc.snapSquare, wc.maskDpr,
-            )
-            let drewScene = false
-            if (drewBase && (wc.revealEnabled || (wc.recolorEnabled && wc.recolor > 0))) {
-              // Reveal covers every warped tile (reach 1); recolor uses its reach.
-              if (!warpSceneCanvasRef.current) warpSceneCanvasRef.current = document.createElement('canvas')
-              drewScene = buildWarpMask(
-                warpSceneCanvasRef.current, a.cw, a.ch, a.px, a.py, a.radius, a.radiusY || a.radius, shape,
-                g.pitch, g.alignX, g.alignY, wc.basePiece, wc.rotate, wc.round, wc.scale, spread, wc.baseRadius,
-                true, wc.revealEnabled ? 1 : wc.recolor, wc.snapSquare, wc.maskDpr,
-              )
-            } else if (drewBase && wc.overlayEnabled) {
-              if (!warpSceneCanvasRef.current) warpSceneCanvasRef.current = document.createElement('canvas')
-              drewScene = buildWarpMask(
-                warpSceneCanvasRef.current, a.cw, a.ch, a.px, a.py, a.radius, a.radiusY || a.radius, shape,
-                g.pitch, g.alignX, g.alignY, wc.basePiece, wc.rotate, wc.round, wc.scale, spread, wc.baseRadius,
-                true, 1, wc.snapSquare, wc.maskDpr,
-              )
-            }
+          const w = warpShapeRef.current
+          const dprM = maskDprRef.current
+          const key = [g.pitch, g.alignX, g.alignY, g.piece, g.inset, g.radius, w.rotate, w.round, w.scale, w.spread, dprM].join(':')
+          const moved = Math.abs(a.px - gen.px) >= 2 || Math.abs(a.py - gen.py) >= 2 || Math.abs(a.radius - gen.r) >= 2
+          // One encode in flight at a time; the next build picks up the latest cursor.
+          if (!warpEncodingRef.current && now - warpLastStartRef.current >= (dprM > 1 ? WARP_MASK_INTERVAL_HIDPI : WARP_MASK_INTERVAL) && (moved || gen.key !== key)) {
+            warpCanvasRef.current ??= document.createElement('canvas')
+            warpSceneCanvasRef.current ??= document.createElement('canvas')
+            const drewBase = buildWarpMask(warpCanvasRef.current, a.cw, a.ch, a.px, a.py, a.radius, g, w, false, dprM)
+            const drewScene = drewBase && buildWarpMask(warpSceneCanvasRef.current, a.cw, a.ch, a.px, a.py, a.radius, g, w, true, dprM)
             if (drewBase) {
-              gen.px = a.px; gen.py = a.py; gen.r = a.radius; gen.ry = a.radiusY; gen.velocity = a.velocity; gen.key = maskKey
-              // toBlob snapshots the bitmap at call time, so reusing the two
+              gen.px = a.px; gen.py = a.py; gen.r = a.radius; gen.key = key
+              // toBlob snapshots the bitmap at call time, so reusing the
               // canvases on the next build is safe.
               const token = ++warpTokenRef.current
-              const px = a.px, py = a.py, r = a.radius
               warpEncodingRef.current = true
               warpLastStartRef.current = now
               Promise.all([
                 canvasToDataUrl(warpCanvasRef.current),
-                drewScene && warpSceneCanvasRef.current ? canvasToDataUrl(warpSceneCanvasRef.current) : null,
+                drewScene ? canvasToDataUrl(warpSceneCanvasRef.current) : null,
               ]).then(([url, sceneUrl]) => {
                 warpEncodingRef.current = false
                 // Dropped if the warp was cleared or the effect re-ran meanwhile.
                 if (!running || token !== warpTokenRef.current || !url) return
-                setWarp({ url, sceneUrl, px, py, r })
+                setWarp({ url, sceneUrl })
                 startLoop()
               })
             }
           }
-        } else if (a.radius <= 0 && gen.r !== -1) {
-          gen.px = -1; gen.py = -1; gen.r = -1; gen.ry = -1; gen.velocity = -1; gen.key = ''
-          warpTokenRef.current++; setWarp(null)
+        } else if (gen.r !== -1) {
+          warpGenRef.current = { px: -1, py: -1, r: -1, key: '' }
+          warpTokenRef.current++
+          setWarp(null)
           if (fixEl) fixEl.style.visibility = 'hidden'
-        } else if (fixEl && !hoverPreviewRef.current) {
-          fixEl.style.visibility = 'hidden'
-        }
-      } else if (fixEl && !hoverPreviewRef.current) {
-        // Left warp mode with a mask still up → clear it so React restores the grid.
-        if (warpGenRef.current.r !== -1) { warpGenRef.current = { px: -1, py: -1, r: -1, ry: -1, velocity: -1, key: '' }; warpTokenRef.current++; setWarp(null) }
-        if (a.radius > 0 || a.radiusY > 0) {
-          if (hoverShapeRef.current === 'square') {
-            const ry = a.radiusY || a.radius
-            // Cursor rect edges (absolute), optionally snapped to the tile grid
-            // so the recolor covers only whole tiles.
-            let x0 = a.px - a.radius, x1 = a.px + a.radius
-            let y0 = a.py - ry, y1 = a.py + ry
-            const ts = tileSnapRef.current
-            if (ts.on && ts.pitch > 1) {
-              const snapLo = (v: number, phase: number) => Math.floor((v - phase) / ts.pitch) * ts.pitch + phase
-              const snapHi = (v: number, phase: number) => Math.ceil((v - phase) / ts.pitch) * ts.pitch + phase
-              x0 = snapLo(x0, ts.alignX); x1 = snapHi(x1, ts.alignX)
-              y0 = snapLo(y0, ts.alignY); y1 = snapHi(y1, ts.alignY)
-            }
-            const top = Math.max(0, y0)
-            const right = Math.max(0, a.cw - x1)
-            const bottom = Math.max(0, a.ch - y1)
-            const left = Math.max(0, x0)
-            fixEl.style.clipPath = `inset(${top}px ${right}px ${bottom}px ${left}px)`
-            fixEl.style.maskImage = ''
-            fixEl.style.webkitMaskImage = ''
-          } else if (hoverShapeRef.current === 'pixel-circle') {
-            const g = pcGridRef.current
-            if (g.enabled && g.pitch > 1) {
-              // Whole-tile pixel circle: every tile is fully filled or fully empty
-              // (center-in-radius), so each pixel recolors/reveals COMPLETELY — no
-              // tiles sliced mid-cell at the rim. A staircased circle of full tiles.
-              // Snap the radius to whole-tile steps so the dwell GROWS in discrete
-              // tile rings — a tile pops fully on/off, never caught half-swept by a
-              // smoothly-advancing boundary. No semi-filled pixel at any frame.
-              const rSnap = Math.round(a.radius / g.pitch) * g.pitch
-              const clip = buildWholeTileCircleClip(
-                a.px, a.py, rSnap, g.pitch, g.alignX, g.alignY, a.cw, a.ch,
-              )
-              fixEl.style.maskImage = ''
-              fixEl.style.webkitMaskImage = ''
-              fixEl.style.clipPath = clip
-            } else {
-              // No pixel grid → fall back to a hard-edged radial circle.
-              const m = `radial-gradient(circle ${a.radius}px at ${a.px}px ${a.py}px, black 0%, black 100%, transparent 100%)`
-              fixEl.style.clipPath = ''
-              fixEl.style.maskImage = m
-              fixEl.style.webkitMaskImage = m
-            }
-          } else {
-            // Circle: hard single-size edge (no soft fade) — one crisp size.
-            const m = `radial-gradient(circle ${a.radius}px at ${a.px}px ${a.py}px, black 0%, black 100%, transparent 100%)`
-            fixEl.style.clipPath = ''
-            fixEl.style.maskImage = m
-            fixEl.style.webkitMaskImage = m
-          }
-          fixEl.style.visibility = 'visible'
-        } else {
-          fixEl.style.visibility = 'hidden'
         }
       }
 
-      // Mouse influence goes straight to the Paper mounts, every frame.
-      if (a.hovering) pushPaperUniformsRef.current()
-
-      // Keep looping only while radius is non-zero or settling
-      if (a.radius > 0.5 || a.hovering) {
-        a.rafId = requestAnimationFrame(animate)
-      }
+      if (a.radius > 0.5 || a.hovering) a.rafId = requestAnimationFrame(animate)
     }
 
     el.addEventListener('mousemove', handleMove)
     el.addEventListener('mouseleave', handleLeave)
-
     return () => {
       running = false
       if (hoverAnim.current.rafId) cancelAnimationFrame(hoverAnim.current.rafId)
@@ -2106,14 +1258,20 @@ export default function DitherHero() {
       el.removeEventListener('mousemove', handleMove)
       el.removeEventListener('mouseleave', handleLeave)
     }
-  }, [hover.enabled, hover.radius, hoverActive])
+  }, [hover.enabled])
 
-  // ── GPU tile field (Point sizes, snapped Color/alpha, and Warp on top) ──
+  // Leaving the 'mask' path (template or renderer change) drops a stale mask.
+  useEffect(() => {
+    if (hoverPath === 'mask' || !warp) return
+    warpGenRef.current = { px: -1, py: -1, r: -1, key: '' }
+    warpTokenRef.current++
+    setWarp(null)
+  }, [hoverPath, warp])
+
+  // ── GPU tile field (Point sizes, snapped colour, and the warp on top) ──
   // One WebGL2 canvas drawn from a rAF loop that reads refs: drift, field time,
   // hover. No React commit, no PNG mask, no mask-image swap per frame.
-  pointCanvasModeRef.current = pointCanvasMode
   const tileCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  const tileDirtyRef = useRef(true)
   const [tileFieldFailed, setTileFieldFailed] = useState(false)
   // Frame builder — rebuilt each render so it closes over the latest config;
   // everything that moves is read from refs at call time.
@@ -2122,81 +1280,42 @@ export default function DitherHero() {
     const w = containerSize.w, h = containerSize.h
     if (!w || !h) return null
     const d = driftRef.current
-    const pitch = gridPitch
-    const gap = pointSizeMode
-      ? renderPixelGrid.gap
-      : Math.max(0, Math.min(pitch - 1, renderPixelGrid.gap + d.gap))
-    const maxPiece = pitch - Math.max(0, Math.min(gap, pitch - 1))
-    const baseLayers = c.transparentBg
-      ? c.alphaLayers.map(({ color, opacity }) => ({ color, opacity }))
-      : [{ color: c.colorFront, opacity: 0.9 }]
-    const restLayers = mc.enabled
-      ? [...baseLayers, ...mc.colors.map((color, i) => ({ color, opacity: COLOR_LAYERS[i % COLOR_LAYERS.length].opacity }))]
-      : baseLayers
-    const fixLayers = hover.warpRevealEnabled
-      ? hover.hoverLayers.map((l) => ({ color: l.color, opacity: l.opacity }))
-      : baseLayers.map((l) => ({ color: hoverFixColor, opacity: l.opacity }))
-    const flow = (ox: number, oy: number) => ({
-      flowX: (d.offsetX + d.loopX + d.waveOriginX + (snapColorMode ? ox + (c.originX - 0.5) * 2 : 0)) * POINT_FLOW_CELLS,
-      flowY: (d.offsetY + d.loopY + d.waveOriginY + (snapColorMode ? oy + (c.originY - 0.5) * 2 : 0)) * POINT_FLOW_CELLS,
+    const flowX = (d.offsetX + d.loopX + d.waveOriginX) * POINT_FLOW_CELLS
+    const flowY = (d.offsetY + d.loopY + d.waveOriginY) * POINT_FLOW_CELLS
+    const field = (layers: { color: string; opacity: number }[]) => ({
+      layers: layers.map(({ color, opacity }) => ({ color, opacity })),
+      mapScale: snapColorMode ? c.scale + d.scale : anim.tileSizeNoise * (1 + d.scale),
+      flowX, flowY,
+      rotationDeg: snapColorMode ? c.rotation + d.rotation : d.rotation,
     })
     const posPct = (edge.position / 100) * h
     const a = hoverAnim.current
-    const wc = warpRef.current
-    const warpOn = hover.enabled && hover.mode === 'warp' && a.radius > 0 && a.cw > 0
-    const reveal = wc.revealEnabled
-    const sceneReach = reveal ? 1
-      : wc.recolorEnabled && wc.recolor > 0 ? wc.recolor
-        : wc.overlayEnabled ? 1 : -1
-    const ry = a.radiusY || a.radius
+    const w2 = warpShapeRef.current
     return {
       w, h,
-      grid: { pitch, gap, radius: clampTileRadius(renderPixelGrid.radius, maxPiece), alignX: renderPixelGrid.alignX, alignY: hoverAlignY },
-      t: maskAnimTRef.current * spatialMotionScale + (snapColorMode ? c.frame * 0.01 : 0),
+      grid: { pitch: grid.pitch, gap: grid.gap, radius: grid.radius, alignX: grid.alignX, alignY: tileAlignY },
+      t: maskAnimTRef.current * spatialMotionScale,
       colorPhase: d.colorPhase,
       spread: pointSizeMode ? anim.tileSizeSpread : 0,
-      base: {
-        layers: restLayers,
-        mapScale: snapColorMode ? c.scale + d.scale : anim.tileSizeNoise * (1 + d.scale),
-        ...flow(c.offsetX, c.offsetY),
-        rotationDeg: snapColorMode ? c.rotation + d.rotation : d.rotation,
-      },
-      fix: {
-        layers: fixLayers,
-        mapScale: snapColorMode ? (hover.fixScale ?? c.scale) + d.scale : anim.tileSizeNoise * (1 + d.scale),
-        ...flow(hover.fixOffsetX ?? c.offsetX, hover.fixOffsetY ?? c.offsetY),
-        rotationDeg: snapColorMode ? (hover.fixRotation ?? c.rotation) + d.rotation : d.rotation,
-      },
+      base: field(c.alphaLayers),
+      fix: field(hover.hoverLayers),
       edge: {
         mode: edge.mode,
         // The solid copy background starts at the measured content top; clamp
-        // the band to it so no dot is flat-cut (not with Scene behind text).
-        posPx: contentTop != null && !edge.textBlend ? Math.min(posPct, contentTop) : posPct,
+        // the band to it so no dot is flat-cut.
+        posPx: contentTop != null ? Math.min(posPct, contentTop) : posPct,
         dissolveDepth: edge.dissolveDepth,
         dissolveSeed: edge.dissolveSeed,
-        textBlend: edge.textBlend,
-        shaderExtend: edge.shaderExtend,
         textBlendMotion: edge.textBlendMotion,
         topInset: edge.topInset,
         fullPadding: edge.fullPadding,
-        textPadding: edge.textPadding,
       },
       rects: textRects,
-      warp: warpOn ? {
-        px: a.px, py: a.py, rx: a.radius, ry,
-        shape: hoverShapeRef.current,
-        squareBounds: hoverShapeRef.current === 'square' && wc.snapSquare && pitch > 1
-          ? snapSquareHoverBounds(a.px, a.py, a.radius, ry, pitch, renderPixelGrid.alignX, hoverAlignY)
-          : null,
-        rotateDeg: wc.rotate, round: wc.round, scale: wc.scale,
-        spread: Math.min(1.5, wc.spread + (wc.dynamicSpread ? Math.min(a.velocity / 6, 0.75) : 0)),
-        basePiece: wc.basePiece, baseRadius: wc.baseRadius,
-        sceneReach,
-        sceneKind: wc.overlayEnabled && !wc.recolorEnabled && !reveal ? 'flat' : 'dots',
-        overlayColor: hoverFixColor,
-        overlayOpacity: hover.overlayOpacity,
+      warp: hover.enabled && a.radius > 0 && a.cw > 0 ? {
+        px: a.px, py: a.py, r: a.radius,
+        rotateDeg: w2.rotate, round: w2.round, scale: w2.scale, spread: Math.min(1.5, w2.spread),
+        basePiece: grid.piece, baseRadius: grid.radius,
       } : null,
-      preview: hover.enabled && hover.preview && hover.mode === 'warp',
     }
   }
   // Any committed config change needs one fresh frame even when nothing moves.
@@ -2229,144 +1348,92 @@ export default function DitherHero() {
     return () => { cancelAnimationFrame(raf); renderer.dispose() }
   }, [pointCanvasMode, anim.playing, glEpoch])
 
-  // ── Paper uniforms from refs ──
-  // Each <Dithering> carries data-pk (which formula) and its layer spread
-  // offsets; this writes the moving sizing uniforms straight to the mounts.
-  // Called from the drift loop and the hover loop, never from a render.
+  // ── Paper uniforms from refs ── written straight to each mount by the drift
+  // loop, never from a render. data-sx/sy/fx/fy carry each layer's spread.
   pushPaperUniformsRef.current = () => {
     const host = shaderContainerRef.current
-    if (!host || pointCanvasMode && !(hover.enabled && hoverActive)) return
+    if (!host || pointCanvasMode) return
     const d = driftRef.current
-    const m = mouseRef.current
-    const ox = (hover.enabled ? c.originX + (m.nx - 0.5) * hover.mouseInfluence : c.originX) + d.waveOriginX
-    const oy = (hover.enabled ? c.originY + (m.ny - 0.5) * hover.mouseInfluence : c.originY) + d.waveOriginY
-    const offX = c.offsetX + (d.offsetX + d.loopX) * problemMotionBoost
-    const offY = c.offsetY + (d.offsetY + d.loopY) * problemMotionBoost
-    const rot = gridSnap ? d.rotation : c.rotation + d.rotation * problemMotionBoost
+    const offX = (d.offsetX + d.loopX) * problemMotionBoost
+    const offY = (d.offsetY + d.loopY) * problemMotionBoost
+    const rot = c.rotation + d.rotation * problemMotionBoost
     const scale = c.scale + d.scale * problemMotionBoost
     for (const el of host.querySelectorAll<HTMLElement>('[data-pk]')) {
       const mount = (el as HTMLElement & { paperShaderMount?: { setUniforms: (u: Record<string, number>) => void } }).paperShaderMount
       if (!mount) continue
-      const k = el.dataset.pk
       const sx = Number(el.dataset.sx || 0), sy = Number(el.dataset.sy || 0)
       const fx = Number(el.dataset.fx || 0), fy = Number(el.dataset.fy || 0)
-      const fixK = k === 'f' || k === 'f1'
-      const fOffX = k === 'f' ? (hover.fixOffsetX ?? offX) : hover.fixOffsetX != null ? hover.fixOffsetX + d.offsetX : offX
-      const fOffY = k === 'f' ? (hover.fixOffsetY ?? offY) : hover.fixOffsetY != null ? hover.fixOffsetY + d.offsetY : offY
       mount.setUniforms({
-        u_offsetX: (fixK ? fOffX : offX) + fx,
-        u_offsetY: (fixK ? fOffY : offY) + fy,
-        u_rotation: fixK ? (gridSnap ? 0 : hover.fixRotation != null ? hover.fixRotation + d.rotation : rot) : rot,
-        u_scale: fixK && hover.fixScale != null ? hover.fixScale + d.scale : scale,
-        u_originX: ox + sx,
-        u_originY: oy + sy,
+        u_offsetX: offX + fx,
+        u_offsetY: offY + fy,
+        u_rotation: rot,
+        u_scale: scale,
+        u_originX: 0.5 + d.waveOriginX + sx,
+        u_originY: 0.5 + d.waveOriginY + sy,
       })
     }
   }
 
-  // Clear clip-path/mask when entering preview mode
-  useEffect(() => {
-    const fixEl = fixLayerRef.current
-    if (!fixEl) return
-    if (hover.preview) {
-      fixEl.style.clipPath = ''
-      fixEl.style.maskImage = ''
-      fixEl.style.webkitMaskImage = ''
-      fixEl.style.visibility = 'visible'
-    }
-  }, [hover.preview])
-
-  const baseOriginX = (hover.enabled
-    ? c.originX + (mouse.nx - 0.5) * hover.mouseInfluence
-    : c.originX) + drift.waveOriginX
-  const baseOriginY = (hover.enabled
-    ? c.originY + (mouse.ny - 0.5) * hover.mouseInfluence
-    : c.originY) + drift.waveOriginY
-
-  // Resolve shader colorBack — transparent mode uses black + screen blend (reliable)
-  const shaderColorBack = c.transparentBg ? '#000000' : c.colorBack
-
-  // Shared shader props (base config + drift).
-  // In grid-snap mode we neutralise the sizing so the dither's pxSize maps 1:1
-  // to tile-sized SOLID blocks (one block per tile): scale 1, full-res backing,
-  // axis-aligned. That makes each tile a single flat color, so at gap 0 the
-  // tiles are fully contiguous (no inter-dot lines from the dither).
-  // Backing-store budget. 500k device px keeps big desktop canvases cheap, but
-  // the cap forces a fractional render scale (canvas stretched to CSS size) —
-  // on tablet/mobile that drifts the shader's dot lattice off the pixel-grid
-  // mask and blurs dot edges, so mask tiles visibly slice through dots. Below
-  // xl the canvas is small enough to render at native DPR: exact integer
-  // lattice, crisp and mask-aligned. Safety-capped for tall tablet viewports.
-  const dpr = Math.max(1, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
-  const shaderMaxPixelCount = containerSize.w > 0 && containerSize.w < 1280
-    ? Math.min(4_200_000, Math.ceil(containerSize.w * containerSize.h * dpr * dpr))
-    : 500_000
-
+  // Shared Paper props (base config + drift). Transparent black back + screen
+  // blend: each layer adds only its dots over the section background.
   const sharedProps = {
-    colorBack: shaderColorBack,
+    colorBack: '#000000',
     type: c.type,
-    size: gridSnap ? snapDotSize : c.size,
-    fit: c.fit,
-    worldWidth: c.worldWidth,
-    worldHeight: c.worldHeight,
+    size: paperCell,
+    fit: 'cover',
     offsetX: effectiveOffsetX,
     offsetY: effectiveOffsetY,
-    // In snap mode the BASE rotation stays 0 (tiles axis-aligned) but the drift
-    // rotation still spins the color source under the static tiles — the colors
-    // sweep around, which breaks the looping feel without ragged edges.
-    rotation: gridSnap ? drift.rotation : effectiveRotation,
+    rotation: effectiveRotation,
     scale: effectiveScale,
     speed: effectiveSpeed,
-    frame: effectiveFrame,
-    maxPixelCount: shaderMaxPixelCount,
+    maxPixelCount: paperMaxPixelCount,
     minPixelRatio: 1,
   } as const
 
-  // Hover layer shader props — inherit from base, apply per-layer overrides
-  const hoverSharedProps = {
-    ...sharedProps,
-    ...(hover.fixType != null && { type: hover.fixType }),
-    ...(hover.fixSize != null && { size: hover.fixSize }),
-    ...(hover.fixSpeed != null && { speed: hover.fixSpeed }),
-    ...(hover.fixScale != null && { scale: hover.fixScale + drift.scale }),
-    ...(hover.fixRotation != null && { rotation: hover.fixRotation + drift.rotation }),
-    ...(hover.fixOffsetX != null && { offsetX: hover.fixOffsetX + drift.offsetX }),
-    ...(hover.fixOffsetY != null && { offsetY: hover.fixOffsetY + drift.offsetY }),
-    // Grid snap wins over per-layer overrides so the reveal shares the tile grid.
-    ...(gridSnap && { rotation: 0, size: snapDotSize }),
-  }
+  /** One screen-blended Paper layer per colour layer. */
+  const paperLayers = (layers: typeof c.alphaLayers, colorFor: (color: string) => string, withRefs: boolean) =>
+    layers.map((layer, i) => {
+      // A fully transparent layer gets no WebGL context or draw pass.
+      if (layer.opacity <= 0) return null
+      const spread = c.alphaSpread * i
+      return (
+        <div
+          key={i}
+          ref={withRefs ? (el) => { alphaWrapperRefs.current[i] = el } : undefined}
+          className="absolute inset-0"
+          style={{ opacity: layer.opacity, mixBlendMode: 'screen' }}
+        >
+          <Dithering
+            {...sharedProps}
+            data-pk="" data-sx={spread * 0.8} data-sy={spread * 0.6} data-fx={spread * 2} data-fy={spread * 1.5}
+            colorFront={colorFor(layer.color)}
+            shape={layer.shape}
+            originX={0.5 + drift.waveOriginX + spread * 0.8}
+            originY={0.5 + drift.waveOriginY + spread * 0.6}
+            offsetX={effectiveOffsetX + spread * 2}
+            offsetY={effectiveOffsetY + spread * 1.5}
+            style={{ width: '100%', height: '100%' }}
+          />
+        </div>
+      )
+    })
 
-  const warpActive = hover.mode === 'warp' && warp != null
-  const containerStyleBase: React.CSSProperties | undefined = warpActive && warp
-    ? {
-        maskImage: `url(${warp.url})`, WebkitMaskImage: `url(${warp.url})`,
-        maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
-        maskSize: '100% 100%', WebkitMaskSize: '100% 100%',
-        maskPosition: '0 0', WebkitMaskPosition: '0 0',
-      }
-    : finalContainerStyle
-  const containerStyle = textClearUrl ? intersectMask(containerStyleBase, textClearUrl) : containerStyleBase
-  const warpSceneStyle: React.CSSProperties | undefined = warpActive && warp?.sceneUrl && (hover.warpRevealEnabled || hover.warpRecolorEnabled || hover.warpOverlayEnabled)
-    ? {
-        maskImage: `url(${warp.sceneUrl})`, WebkitMaskImage: `url(${warp.sceneUrl})`,
-        maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
-        maskSize: '100% 100%', WebkitMaskSize: '100% 100%',
-        maskPosition: '0 0', WebkitMaskPosition: '0 0',
-      }
-    : undefined
-  const warpReveal = hover.mode === 'warp' && hover.warpRevealEnabled
-  const warpTip = pointCanvasMode ? tip : warp
-  const fixLayerBg = hover.mode === 'overlay'
-    ? hoverFixColor
-    : (hover.mode === 'warp' && hover.warpOverlayEnabled && !hover.warpRecolorEnabled && !hover.warpRevealEnabled)
-      ? hoverFixColor
-      : c.colorBack
-  const fixLayerOpacity = (hover.mode === 'overlay'
-    || (hover.mode === 'warp' && hover.warpOverlayEnabled && !hover.warpRecolorEnabled && !hover.warpRevealEnabled))
-    ? hover.overlayOpacity
-    : undefined
-  const fixLayerBlend = hover.mode === 'overlay' ? hover.overlayBlend : undefined
-  const textUnderScene = edge.textBlend || edge.mode === 'full'
+  const fullSizeMask = (url: string): React.CSSProperties => ({
+    maskImage: `url(${url})`, WebkitMaskImage: `url(${url})`,
+    maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
+    maskSize: '100% 100%', WebkitMaskSize: '100% 100%',
+    maskPosition: '0 0', WebkitMaskPosition: '0 0',
+  })
+  // While warping, the base mask replaces the CSS tile mask; the dissolve edge
+  // still applies (before, the warp dropped it and the band filled in on hover).
+  const warpActive = hoverPath === 'mask' && warp != null
+  const containerStyle = warpActive && warp
+    ? (dissolveUrl ? intersectMask(fullSizeMask(warp.url), dissolveUrl) : fullSizeMask(warp.url))
+    : restMaskStyle
+  const revealMaskStyle = warpActive && warp?.sceneUrl ? fullSizeMask(warp.sceneUrl) : undefined
+  // A terminal theme reveals one themed colour instead of the other state's layers.
+  const revealColor = (color: string) => (activeTheme ? responseColor : color)
+  const textUnderScene = edge.mode === 'full'
   const textReadabilityStyle: React.CSSProperties | undefined = textUnderScene
     ? { textShadow: `0 2px 28px ${c.colorBack}, 0 1px 6px ${c.colorBack}, 0 0 1px ${c.colorBack}` }
     : undefined
@@ -2383,276 +1450,47 @@ export default function DitherHero() {
           />
         )}
 
-        {/* Base layer — alpha mode renders stacked color layers with screen blend */}
+        {/* Resting field — stacked colour layers, screen blended */}
         {!pointCanvasMode && (
-          <div
-            key={`base-gl${glEpoch}`}
-            className="absolute inset-0"
-            style={{
-              backgroundColor: c.colorBack,
-              ...(rippleClip
-                ? { clipPath: rippleClip }
-                : edgeMask
-                  ? { maskImage: edgeMask, WebkitMaskImage: edgeMask }
-                  : {}),
-            }}
-          >
-            {c.transparentBg ? (
-              c.alphaLayers.map((layer, i) => {
-                // Skip a fully-transparent layer entirely — no WebGL context or
-                // draw pass for something that contributes nothing (perf; frees
-                // a context when a layer is toggled off). Layers >0 unchanged.
-                if (layer.opacity <= 0) return null
-                const spread = c.alphaSpread * i
-                return (
-                  <div
-                    key={i}
-                    ref={(el) => { alphaWrapperRefs.current[i] = el }}
-                    className="absolute inset-0"
-                    style={{ opacity: layer.opacity, mixBlendMode: 'screen' }}
-                  >
-                    <Dithering
-                      {...sharedProps}
-                      data-pk="b" data-sx={spread * 0.8} data-sy={spread * 0.6} data-fx={spread * 2} data-fy={spread * 1.5}
-                      colorBack="#000000"
-                      colorFront={layer.color}
-                      shape={layer.shape}
-                      originX={baseOriginX + spread * 0.8}
-                      originY={baseOriginY + spread * 0.6}
-                      offsetX={effectiveOffsetX + spread * 2}
-                      offsetY={effectiveOffsetY + spread * 1.5}
-                      style={{ width: '100%', height: '100%' }}
-                    />
-                  </div>
-                )
-              })
-            ) : (
-              <Dithering
-                {...sharedProps}
-                data-pk="b"
-                colorFront={c.colorFront}
-                shape={c.shape}
-                originX={baseOriginX}
-                originY={baseOriginY}
-                style={{ width: '100%', height: '100%' }}
-              />
-            )}
+          <div key={`base-gl${glEpoch}`} className="absolute inset-0" style={{ backgroundColor: c.colorBack }}>
+            {paperLayers(c.alphaLayers, (color) => color, true)}
           </div>
         )}
 
-        {/* Multi-color error layers — semi-opacity with offset for natural variation */}
-        {mc.enabled && !pointCanvasMode && (
-          <div
-            key={`mc-gl${glEpoch}`}
-            className="absolute inset-0 pointer-events-none"
-            style={
-              rippleClip
-                ? { clipPath: rippleClip }
-                : edgeMask
-                  ? { maskImage: edgeMask, WebkitMaskImage: edgeMask }
-                  : undefined
-            }
-          >
-            {mc.colors.map((color, i) => {
-              const layer = COLOR_LAYERS[i % COLOR_LAYERS.length]
-              const spread = mc.layerSpread * (i + 1)
-              return (
-                <div
-                  key={i}
-                  className="absolute inset-0"
-                  style={{
-                    opacity: layer.opacity,
-                    mixBlendMode: mc.blend,
-                  }}
-                >
-                  <Dithering
-                    {...sharedProps}
-                    data-pk="b" data-sx={spread * 0.8} data-sy={spread * 0.6} data-fx={spread * 3} data-fy={spread * 2}
-                    colorBack="#000000"
-                    colorFront={color}
-                    shape={layer.shape}
-                    originX={baseOriginX + spread * 0.8}
-                    originY={baseOriginY + spread * 0.6}
-                    offsetX={effectiveOffsetX + spread * 3}
-                    offsetY={effectiveOffsetY + spread * 2}
-                    style={{ width: '100%', height: '100%' }}
-                  />
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Hover layer — lazy-mounted on first hover (or always when preview) */}
-        {hover.enabled && (hoverActive || hover.preview) && !(pointCanvasMode && hover.mode === 'warp') && (
-          <div
-            key={`hover-gl${glEpoch}`}
-            className="absolute inset-0 pointer-events-none"
-            style={
-              rippleClip
-                ? { clipPath: rippleClip }
-                : edgeMask
-                  ? { maskImage: edgeMask, WebkitMaskImage: edgeMask }
-                  : undefined
-            }
-          >
+        {/* Reveal — the other state's layers, mounted on first hover */}
+        {hover.enabled && hoverActive && !pointCanvasMode && (
+          <div key={`hover-gl${glEpoch}`} className="absolute inset-0 pointer-events-none">
             <div
               ref={fixLayerRef}
               className="absolute inset-0"
-              style={{
-                visibility: hover.preview ? 'visible' : 'hidden',
-                backgroundColor: fixLayerBg,
-                opacity: fixLayerOpacity,
-                mixBlendMode: fixLayerBlend,
-                ...(warpSceneStyle ?? {}),
-              }}
+              style={{ visibility: 'hidden', backgroundColor: c.colorBack, ...(revealMaskStyle ?? {}) }}
             >
-              {hover.mode === 'warp' && !hover.warpRevealEnabled ? (
-                hover.warpRecolorEnabled && c.transparentBg ? (
-                  c.alphaLayers.map((layer, i) => {
-                    if (layer.opacity <= 0) return null
-                    const layerSpread = c.alphaSpread * i
-                    return (
-                      <div
-                        key={i}
-                        className="absolute inset-0"
-                        style={{ opacity: layer.opacity, mixBlendMode: 'screen' }}
-                      >
-                        <Dithering
-                          {...sharedProps}
-                          data-pk="b" data-sx={layerSpread * 0.8} data-sy={layerSpread * 0.6} data-fx={layerSpread * 2} data-fy={layerSpread * 1.5}
-                          colorBack="#000000"
-                          colorFront={hoverFixColor}
-                          shape={layer.shape}
-                          originX={baseOriginX + layerSpread * 0.8}
-                          originY={baseOriginY + layerSpread * 0.6}
-                          offsetX={effectiveOffsetX + layerSpread * 2}
-                          offsetY={effectiveOffsetY + layerSpread * 1.5}
-                          style={{ width: '100%', height: '100%' }}
-                        />
-                      </div>
-                    )
-                  })
-                ) : hover.warpRecolorEnabled ? (
-                  <Dithering
-                    {...sharedProps}
-                    data-pk="b"
-                    colorFront={hoverFixColor}
-                    shape={c.shape}
-                    originX={baseOriginX}
-                    originY={baseOriginY}
-                    style={{ width: '100%', height: '100%' }}
-                  />
-                ) : hover.warpOverlayEnabled ? null : null
-              ) : hover.mode === 'overlay' ? null
-              : hover.mode === 'recolor' ? (
-                /* Recolor: mirror the BASE layers exactly (same props), only
-                   swapping the color — so the identical tiles you see at rest
-                   change color under the cursor. No reveal-only overrides here. */
-                c.transparentBg ? (
-                  c.alphaLayers.map((layer, i) => {
-                    if (layer.opacity <= 0) return null
-                    const spread = c.alphaSpread * i
-                    return (
-                      <div
-                        key={i}
-                        className="absolute inset-0"
-                        style={{ opacity: layer.opacity, mixBlendMode: 'screen' }}
-                      >
-                        <Dithering
-                          {...sharedProps}
-                          data-pk="b" data-sx={spread * 0.8} data-sy={spread * 0.6} data-fx={spread * 2} data-fy={spread * 1.5}
-                          colorBack="#000000"
-                          colorFront={hoverFixColor}
-                          shape={layer.shape}
-                          originX={baseOriginX + spread * 0.8}
-                          originY={baseOriginY + spread * 0.6}
-                          offsetX={effectiveOffsetX + spread * 2}
-                          offsetY={effectiveOffsetY + spread * 1.5}
-                          style={{ width: '100%', height: '100%' }}
-                        />
-                      </div>
-                    )
-                  })
-                ) : (
-                  <Dithering
-                    {...sharedProps}
-                    data-pk="b"
-                    colorFront={hoverFixColor}
-                    shape={c.shape}
-                    originX={baseOriginX}
-                    originY={baseOriginY}
-                    style={{ width: '100%', height: '100%' }}
-                  />
-                )
-              ) : (
-                /* Reveal: each hover layer carries its own color + shape + opacity,
-                   so the revealed state is as art-directable as the base. When a
-                   terminal theme is active, fall back to a single themed color. */
-                c.transparentBg ? (
-                  hover.hoverLayers.map((layer, i) => {
-                    if (layer.opacity <= 0) return null
-                    const spread = c.alphaSpread * i
-                    return (
-                      <div
-                        key={i}
-                        className="absolute inset-0"
-                        style={{ opacity: layer.opacity, mixBlendMode: 'screen' }}
-                      >
-                        <Dithering
-                          {...hoverSharedProps}
-                          data-pk="f" data-sx={spread * 0.8} data-sy={spread * 0.6} data-fx={spread * 2} data-fy={spread * 1.5}
-                          colorBack="#000000"
-                          colorFront={activeTheme ? hoverFixColor : layer.color}
-                          shape={layer.shape}
-                          originX={baseOriginX + spread * 0.8}
-                          originY={baseOriginY + spread * 0.6}
-                          offsetX={(hover.fixOffsetX ?? effectiveOffsetX) + spread * 2}
-                          offsetY={(hover.fixOffsetY ?? effectiveOffsetY) + spread * 1.5}
-                          style={{ width: '100%', height: '100%' }}
-                        />
-                      </div>
-                    )
-                  })
-                ) : (
-                  <Dithering
-                    {...hoverSharedProps}
-                    data-pk="f1"
-                    colorFront={hoverFixColor}
-                    shape={hover.fixShape}
-                    originX={baseOriginX}
-                    originY={baseOriginY}
-                    style={{ width: '100%', height: '100%' }}
-                  />
-                )
-              )}
+              {paperLayers(hover.hoverLayers, revealColor, false)}
             </div>
           </div>
         )}
       </div>
 
-      {/* Warp-reveal tooltip — short log fragments below the cursor, styled
-          as a readable tooltip. The pool follows orientation: fix at rest →
-          reveal shows errors; problem at rest → reveal shows recovery lines.
-          Sibling of the shader container so the tile masks never clip it. */}
-      {warpReveal && hover.warpErrorText && warpTip && warpTip.r > 8 && (() => {
+
+      {/* Warp-reveal tooltip — short log fragments below the cursor. The pool
+          follows orientation: fix at rest → errors; problem at rest → recovery
+          lines. Sibling of the shader container so the masks never clip it. */}
+      {hover.enabled && hover.warpErrorText && tip && tip.r > 8 && (() => {
         const snippets = initialState === 'problem' ? warpFixSnippets : warpErrorSnippets
-        const accent = hover.hoverLayers[0]?.color ?? hoverFixColor
+        const accent = activeTheme ? responseColor : hover.hoverLayers[0]?.color
         const cellW = Math.max(64, gridPitch * 4)
-        const idx = Math.floor(tileThreshold(Math.round(warpTip.px / cellW), Math.round(warpTip.py / cellW), 7) * snippets.length)
+        const idx = Math.floor(tileThreshold(Math.round(tip.px / cellW), Math.round(tip.py / cellW), 7) * snippets.length)
         const lineA = snippets[idx % snippets.length]
         const lineB = snippets[(idx + 3) % snippets.length]
         // Keep the tooltip fully inside the section (overflow-hidden would cut
-        // it): clamp horizontally to its estimated half-width and flip above
-        // the cursor when there is no room below.
+        // it): clamp horizontally and flip above the cursor near the bottom.
         const estW = Math.max(lineA.length, lineB.length) * 7.6 + 28
         const estH = 2 * 12.5 * 1.55 + 20
         const halfW = estW / 2 + 12
-        const left = Math.min(Math.max(warpTip.px, halfW), Math.max(halfW, containerSize.w - halfW))
-        const below = warpTip.py + warpTip.r + 16
-        const top = Math.max(8, below + estH > containerSize.h - 8
-          ? warpTip.py - warpTip.r - 16 - estH
-          : below)
+        const left = Math.round(Math.min(Math.max(tip.px, halfW), Math.max(halfW, containerSize.w - halfW)))
+        const below = tip.py + tip.r + 16
+        const top = Math.round(Math.max(8, below + estH > containerSize.h - 8 ? tip.py - tip.r - 16 - estH : below))
+
         return (
           <div
             /* z-40: above the copy block (z-10) and baseline guides (z-30) —
@@ -2663,7 +1501,7 @@ export default function DitherHero() {
               left,
               top,
               transform: 'translateX(-50%)',
-              opacity: Math.min(1, warpTip.r / Math.max(40, hover.radius * 0.7)),
+              opacity: Math.min(1, tip.r / Math.max(40, hover.radius * 0.7)),
               // Follow the active headline font so the tooltip always matches
               // the hero's voice, whatever face is picked in the panel.
               fontFamily: copy.headlineFont || 'var(--font-display, Satoshi, sans-serif)',
@@ -2730,12 +1568,6 @@ export default function DitherHero() {
 
       {/* Bottom content section */}
       <div ref={contentRef} className="relative z-10 mt-auto">
-        {edge.mode === 'fade' && !textUnderScene && (
-          <div
-            className="h-24 pointer-events-none"
-            style={{ background: `linear-gradient(to bottom, transparent, ${c.colorBack})` }}
-          />
-        )}
         <div style={{ backgroundColor: textUnderScene ? 'transparent' : c.colorBack }}>
           {/* Mobile spacing follows proximity: the copy block's OUTER padding
               (40px) is larger than any gap INSIDE it (12–16px), so the text

@@ -1,5 +1,5 @@
 ---
-sourcesHash: 1c918d91d451df10ef722dcbc26ae7d58eb98755ad70efb218ce7774e4553364
+sourcesHash: 6ae4b5c9419e953031271f635761c740aa8ae47afdd71424569ea9e7b54cb47b
 id: segmented
 description: >-
   Choose exactly one of a few mutually exclusive options that are all shown

@@ -56,6 +56,8 @@
   --color-lab-border-strong: rgb(255 255 255 / 0.2);
   --color-lab-focus: rgb(255 255 255 / 0.75);
   --color-lab-accent: #6EE7B7;
+  /* Destructive actions only (Reset, Clear, Remove). 7.7:1 on the panel. */
+  --color-lab-danger: #F87171;
   --text-lab-2xs: 10px;
   --text-lab-xs: 11px;
   --text-lab-sm: 12px;
@@ -397,4 +399,11 @@
        in the text colour; keep colour transitions, drop the outline one. */
     transition-property: color, background-color, border-color, opacity;
   }
+}
+
+/* Paper canvases render at a whole-number scale (see DitherHero paperScale);
+   on a 2× screen the browser scales them up. Nearest-neighbour keeps every
+   dither cell on whole device pixels instead of blurring its edges. */
+[data-pk] canvas {
+  image-rendering: pixelated;
 }
