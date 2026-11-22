@@ -44,9 +44,13 @@ export default function DitherBackgroundDemo() {
             </button>
             <button type="button" style={control} aria-pressed={reveal} onClick={() => setReveal(!reveal)}>Reveal {reveal ? 'on' : 'off'}</button>
           </div>
-          <p style={{ fontSize: 13, color: 'rgb(255 255 255 / 0.5)', fontVariantNumeric: 'tabular-nums' }}>
-            Page renders (dev only): <span ref={readout}>0</span>
-          </p>
+          {/* Production React never calls Profiler onRender, so the count
+              would sit at 0 for every public visitor. */}
+          {import.meta.env.DEV && (
+            <p style={{ fontSize: 13, color: 'rgb(255 255 255 / 0.5)', fontVariantNumeric: 'tabular-nums' }}>
+              Page renders (dev only): <span ref={readout}>0</span>
+            </p>
+          )}
         </div>
       </section>
       <section style={{ minHeight: '100svh', padding: 'clamp(24px, 6vw, 80px)' }}>
@@ -57,6 +61,7 @@ export default function DitherBackgroundDemo() {
 }
 
 const control: CSSProperties = {
-  font: 'inherit', fontSize: 14, color: '#fff', background: 'rgb(255 255 255 / 0.08)',
+  // fontSize 16: iOS zooms the page on focus of a smaller select.
+  font: 'inherit', fontSize: 16, color: '#fff', background: 'rgb(255 255 255 / 0.08)',
   border: '1px solid rgb(255 255 255 / 0.2)', borderRadius: 999, padding: '8px 14px', cursor: 'pointer',
 }

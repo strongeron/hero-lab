@@ -1,9 +1,8 @@
 import { useMemo, useRef, useEffect, useState } from 'react'
 import { Dithering } from '@paper-design/shaders-react'
-import { useDitherStore, resolveCopy, palettes, warpErrorSnippets, warpFixSnippets, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
+import { useDitherStore, resolveCopy, palettes, heroCtaColors, warpErrorSnippets, warpFixSnippets, type DitherPixelGridConfig, type SceneTemplateId } from './ditherStore'
 import { getThemeById } from '../../themes/terminalThemes'
 import { TileFieldRenderer, type TileFieldFrame } from './tileField'
-import { getAccessibleCtaPair } from '../../utils/colorContrast'
 import { useHeadlineFit } from './useHeadlineFit'
 
 function usePrefersReducedMotion() {
@@ -120,16 +119,60 @@ function fbmNoise(x: number, y: number, t: number, seed: number): number {
 
 interface TextRect { x: number; y: number; w: number; h: number }
 
-/** Viewport-space baseline of an element's LAST rendered text line —
- *  line-box top + half-leading + ~0.8em ascent. Null when nothing renders. */
-function lastLineBaseline(el: Element): number | null {
-  const fontSize = parseFloat(getComputedStyle(el).fontSize)
+/** Share of a font's content box above the baseline, from the font's own
+ *  metrics. A fixed 0.8em guess put every type pair's baseline in the same
+ *  place, so the guides did not move when the font changed. Cached per font;
+ *  the cache is cleared when a web font finishes loading (useFontsLoaded). */
+const ascentShareCache = new Map<string, number>()
+let metricsCtx: CanvasRenderingContext2D | null = null
+function ascentShare(cs: CSSStyleDeclaration): number {
+  const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+  const cached = ascentShareCache.get(font)
+  if (cached != null) return cached
+  metricsCtx ??= document.createElement('canvas').getContext('2d')
+  if (!metricsCtx) return 0.8
+  metricsCtx.font = font
+  const m = metricsCtx.measureText('Hg')
+  const share = m.fontBoundingBoxAscent / (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent) || 0.8
+  ascentShareCache.set(font, share)
+  return share
+}
+
+/** Viewport-space baseline of every rendered text line of an element. A text
+ *  range's client rect is the font's content box, so the baseline sits at its
+ *  top plus the ascent share of its height. */
+function lineBaselines(el: Element, minWidth = 4): number[] {
+  const cs = getComputedStyle(el)
+  const fontSize = parseFloat(cs.fontSize)
+  const share = ascentShare(cs)
   const range = document.createRange()
   range.selectNodeContents(el)
-  const rects = Array.from(range.getClientRects()).filter((r) => r.width > 4 && r.height > fontSize * 0.5)
-  if (!rects.length) return null
-  const r = rects[rects.length - 1]
-  return r.top + (r.height - fontSize) / 2 + fontSize * 0.8
+  return Array.from(range.getClientRects())
+    .filter((r) => r.width > minWidth && r.height > fontSize * 0.5)
+    .map((r) => r.top + r.height * share)
+}
+
+/** Baseline of an element's LAST rendered text line. Null when nothing renders. */
+function lastLineBaseline(el: Element): number | null {
+  return lineBaselines(el).at(-1) ?? null
+}
+
+/** Bumps when a web font finishes loading. Font swaps change line metrics
+ *  without always resizing the box, so ResizeObserver can miss them. */
+function useFontsLoaded(): number {
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const onDone = (e: FontFaceSetLoadEvent) => {
+      // The panel's tiles load about ten faces; react only to the hero's own.
+      const used = Array.from(document.querySelectorAll('section h1, section p, section a'), (el) => getComputedStyle(el).fontFamily).join(',')
+      if (!e.fontfaces.some((f) => used.includes(f.family.replace(/["']/g, '')))) return
+      ascentShareCache.clear()
+      setTick((t) => t + 1)
+    }
+    document.fonts.addEventListener('loadingdone', onDone)
+    return () => document.fonts.removeEventListener('loadingdone', onDone)
+  }, [])
+  return tick
 }
 
 /** Build a dither edge mask (Photoshop-dissolve style): a white→black gradient
@@ -227,8 +270,6 @@ function intersectMask(style: React.CSSProperties | undefined, url: string): Rea
   }
 }
 
-const DEFAULT_CTA_BG = '#1A8A70'
-const DEFAULT_CTA_BG_HOVER = '#22A080'
 
 /** Animation drift offsets — accumulated over time */
 interface AnimDrift {
@@ -444,15 +485,11 @@ export default function DitherHero() {
   const stackTablet = copy.tabletLayout === 'stack'
   const activeTheme = termThemeId ? getThemeById(termThemeId) : undefined
 
-  // APCA-safe CTA pair from terminal theme accent2.
-  // If needed, background is nudged to keep CTA text readable.
-  const ctaPair = activeTheme ? getAccessibleCtaPair(activeTheme.accent2, 60) : null
-  const CTA_BG = ctaPair?.backgroundHex ?? DEFAULT_CTA_BG
-  const CTA_BG_HOVER = activeTheme
-    ? `oklch(from ${CTA_BG} calc(l + 0.08) c h)`
-    : DEFAULT_CTA_BG_HOVER
-  const ctaTextHex = ctaPair?.textHex ?? '#FFFFFF'
-  const ctaTextColor = ctaTextHex
+  // CTA follows the palette (or the terminal theme); the header reads the same.
+  const cta = heroCtaColors(palette, termThemeId)
+  const CTA_BG = cta.bg
+  const CTA_BG_HOVER = cta.hover
+  const ctaTextColor = cta.text
   const headlineColor = activeTheme
     ? activeTheme.fg
     : (copy.headlineColorMode === 'white' ? '#FFFFFF' : (copy.layout === 'problem' ? palettes[palette].problem[0] : palettes[palette].fix[0]))
@@ -461,7 +498,7 @@ export default function DitherHero() {
     : (copy.responseColorMode === 'white' ? '#FFFFFF' : palettes[palette].fix[0])
   const sublineColor = activeTheme
     ? `oklch(from ${activeTheme.accent} calc(l + 0.15) calc(c * 0.6) h)`
-    : `color-mix(in oklch, ${DEFAULT_CTA_BG} 45%, white)`
+    : `color-mix(in oklch, ${CTA_BG} 45%, white)`
 
   // ── Renderer choice (see docs/architecture/2026-11-21-state-machines.md) ──
   //   grid off                    → Paper stack, warp reveals whole dither cells
@@ -699,13 +736,16 @@ export default function DitherHero() {
       copy.ctaFont || copy.headlineFont || 'var(--font-display, Satoshi, sans-serif)',
     )
 
+    // The header CTA and the mark's glow follow the hero CTA in every mode,
+    // not only under a terminal theme, so a palette change recolours them too.
+    target.style.setProperty('--color-t-cta-bg', CTA_BG)
+    target.style.setProperty('--color-t-cta-text', ctaTextColor)
+
     if (activeTheme) {
       target.style.setProperty('--color-t-bg-surface', activeTheme.surface)
       target.style.setProperty('--color-t-headline', activeTheme.fg)
       target.style.setProperty('--color-t-body', `oklch(from ${activeTheme.fg} l c h / 0.65)`)
       target.style.setProperty('--color-t-muted', activeTheme.comment)
-      target.style.setProperty('--color-t-cta-bg', CTA_BG)
-      target.style.setProperty('--color-t-cta-text', ctaTextHex)
       target.style.setProperty('--color-t-cta2-text', `oklch(from ${activeTheme.fg} l c h / 0.8)`)
       target.style.setProperty('--color-t-cta2-border', `oklch(from ${activeTheme.fg} l c h / 0.15)`)
       target.style.setProperty('--color-t-border', `oklch(from ${activeTheme.fg} l c h / 0.1)`)
@@ -715,7 +755,7 @@ export default function DitherHero() {
     return () => {
       for (const v of THEME_VARS) target.style.removeProperty(v)
     }
-  }, [c.colorBack, activeTheme, CTA_BG, ctaTextHex, copy.headlineFont, copy.ctaFont])
+  }, [c.colorBack, activeTheme, CTA_BG, ctaTextColor, copy.headlineFont, copy.ctaFont])
 
   // The Problem palette uses simplex/warp, whose motion reads much more slowly
   // than the Fix palette's swirl/wave at the same authored scene values. Keep
@@ -753,6 +793,7 @@ export default function DitherHero() {
   const lockResponseWrapRef = useRef<HTMLDivElement>(null)
   const lockCtaRef = useRef<HTMLAnchorElement>(null)
   useHeadlineFit(lockHeadlineRef, `${copyVariant}|${typePair}|${copy.headlineSize}`)
+  const fontsLoaded = useFontsLoaded()
   const [baselineNudge, setBaselineNudge] = useState({ response: 0, cta: 0, subGap: 0 })
   useEffect(() => {
     const content = contentRef.current
@@ -798,7 +839,7 @@ export default function DitherHero() {
     return () => ro.disconnect()
     // baselineNudge: transforms don't fire the ResizeObserver, so re-measure
     // the exclusion rects after the baseline lock shifts the right column.
-  }, [edge.mode, edge.textRectMode, copyVariant, typePair, layout, baselineNudge])
+  }, [edge.mode, edge.textRectMode, copyVariant, typePair, layout, baselineNudge, fontsLoaded])
 
   // Baseline lock (problem layout) — the right column snaps to the left one:
   // the response's last line shares the headline's last baseline, the CTA
@@ -883,11 +924,11 @@ export default function DitherHero() {
       twoCol.removeEventListener('change', measure)
     }
   }, [copy.layout, copy.responsePin, copyVariant, typePair, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
-    containerSize.w])
+    containerSize.w, fontsLoaded])
 
   // Baseline guides — debug overlay for alignment checks. One line per
   // rendered text line (headline, sub, response, CTAs), computed from the
-  // line box: top + half-leading + ~0.8em ascent approximates the baseline.
+  // line's content box and the font's own ascent (lineBaselines).
   const [baselineGuides, setBaselineGuides] = useState<number[]>([])
   useEffect(() => {
     if (!layout.showBaselines) return
@@ -898,13 +939,7 @@ export default function DitherHero() {
       const hostTop = host.getBoundingClientRect().top
       const lines: number[] = []
       content.querySelectorAll('h1, p, a').forEach((el) => {
-        const fontSize = parseFloat(getComputedStyle(el).fontSize)
-        const range = document.createRange()
-        range.selectNodeContents(el)
-        for (const r of range.getClientRects()) {
-          if (r.width < 8 || r.height < fontSize * 0.5) continue
-          lines.push(Math.round(r.top - hostTop + (r.height - fontSize) / 2 + fontSize * 0.8))
-        }
+        for (const y of lineBaselines(el, 8)) lines.push(Math.round(y - hostTop))
       })
       const unique = [...new Set(lines)].sort((a, b) => a - b)
       setBaselineGuides((prev) => (JSON.stringify(prev) === JSON.stringify(unique) ? prev : unique))
@@ -914,7 +949,7 @@ export default function DitherHero() {
     ro.observe(content)
     ro.observe(host)
     return () => ro.disconnect()
-  }, [layout.showBaselines, copyVariant, typePair, layout, baselineNudge])
+  }, [layout.showBaselines, copyVariant, typePair, layout, baselineNudge, fontsLoaded])
 
   // Layout guides — debug overlay for the frame every element should sit on.
   // Columns and left/right edges come from CSS (the overlay reuses the copy
@@ -956,7 +991,7 @@ export default function DitherHero() {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [layout.showGuides, copyVariant, typePair, layout])
+  }, [layout.showGuides, copyVariant, typePair, layout, fontsLoaded])
 
   const POINT_FLOW_CELLS = 6
 
@@ -1414,7 +1449,7 @@ export default function DitherHero() {
     : undefined
 
   return (
-    <section className="min-h-screen flex flex-col relative overflow-hidden" style={{ backgroundColor: c.colorBack }}>
+    <section className="min-h-svh flex flex-col relative overflow-hidden" style={{ backgroundColor: c.colorBack }}>
       <div ref={shaderContainerRef} className="absolute inset-0" style={containerStyle}>
         {pointCanvasMode && !tileFieldFailed && (
           <canvas
@@ -1668,8 +1703,8 @@ export default function DitherHero() {
                       textTransform: ctaTextTransform,
                       ...(copy.responsePin !== 'cta' && baselineNudge.cta !== 0 ? { transform: `translateY(${baselineNudge.cta}px)` } : {}),
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = CTA_BG_HOVER)}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = CTA_BG)}
+                    onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.style.backgroundColor = CTA_BG_HOVER }}
+                    onPointerLeave={(e) => { e.currentTarget.style.backgroundColor = CTA_BG }}
                   >
                     {copy.cta}
                   </a>
@@ -1708,8 +1743,8 @@ export default function DitherHero() {
                     href="#"
                     className="inline-flex items-center justify-center whitespace-nowrap px-7 py-3 text-[16px] xl:px-10 xl:py-4 xl:text-[18px] font-semibold tracking-wide transition-colors"
                     style={{ backgroundColor: CTA_BG, color: ctaTextColor, ...ctaStyle, textTransform: ctaTextTransform }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = CTA_BG_HOVER)}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = CTA_BG)}
+                    onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.style.backgroundColor = CTA_BG_HOVER }}
+                    onPointerLeave={(e) => { e.currentTarget.style.backgroundColor = CTA_BG }}
                   >
                     {copy.cta}
                   </a>

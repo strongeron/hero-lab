@@ -55,7 +55,7 @@ export default function BrandMark({
       onBlur={() => setRate(1)}
       aria-label={label}
       title={label}
-      className="block cursor-pointer rounded-md border-0 bg-transparent p-0 leading-none"
+      className="block cursor-pointer rounded-md border-0 bg-transparent p-0 leading-none lab-focus"
       {...hover}
     >
       {mark}

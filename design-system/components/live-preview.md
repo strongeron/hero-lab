@@ -1,5 +1,5 @@
 ---
-sourcesHash: bb37dbd2c0a5dd67955d6e7821d632a2052aa08d1c79a4e877b58363731396ce
+sourcesHash: 6e5c390d442266fb289b9b0ebf709424f59e00580cc07afb3132b9536dd36d9d
 id: live-preview
 description: >-
   Show what a setting does with a small live canvas next to or inside its
@@ -50,4 +50,4 @@ paused preview still follows the settings.
 ## Accessibility
 
 Decorative: `aria-hidden`, no pointer events, no selection. With
-`prefers-reduced-motion: reduce` every preview shows a still frame.
+`prefers-reduced-motion: reduce` every preview shows a still frame, and the loop follows a live change of that setting.

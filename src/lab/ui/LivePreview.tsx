@@ -17,14 +17,21 @@ interface Entry {
 const entries = new Set<Entry>()
 let raf = 0
 let last = 0
-const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+const motionQuery = typeof matchMedia !== 'undefined' ? matchMedia('(prefers-reduced-motion: reduce)') : null
+let reduced = motionQuery?.matches ?? false
+// Follow the OS setting live: turning reduced motion on stops the loop at the
+// next frame, turning it off restarts it without a reload.
+motionQuery?.addEventListener('change', (e) => {
+  reduced = e.matches
+  wake()
+})
 
 /** Previews redraw at 30 fps at most: plenty for a thumbnail, and it leaves
  *  the frame to the hero on 60 and 120 Hz screens. */
 const FRAME_MS = 1000 / 30
 function tick(now: number) {
   let any = false
-  for (const e of entries) if (e.visible && e.rate !== 0) { any = true; break }
+  if (!reduced) for (const e of entries) if (e.visible && e.rate !== 0) { any = true; break }
   if (!any) { raf = 0; last = 0; return }
   raf = requestAnimationFrame(tick)
   if (last && now - last < FRAME_MS - 1) return
@@ -90,9 +97,9 @@ export default function LivePreview({ draw, rate = 1, className = '' }: {
   useEffect(() => {
     const entry = entryRef.current
     if (!entry) return
-    entry.rate = reduced ? 0 : rate
+    entry.rate = rate
     entry.draw()
-    if (entry.rate) wake()
+    if (entry.rate && !reduced) wake()
   })
 
   return <canvas ref={ref} aria-hidden className={`block pointer-events-none select-none [image-rendering:pixelated] ${className}`} />

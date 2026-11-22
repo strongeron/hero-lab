@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { getThemeById } from "../../themes/terminalThemes";
+import { getAccessibleCtaPair } from "../../utils/colorContrast";
 
 /* ─── Types ─── */
 
@@ -1293,10 +1294,12 @@ export interface Palette {
   back: string;
   problem: Trio;
   fix: Trio;
+  /** CTA fill when it should not be the reveal colour fix[0]. */
+  cta?: string;
 }
 export const palettes: Record<PaletteId, Palette> = {
   signal: { label: "Signal", hint: "pink → teal", back: "#0A1714",
-    problem: ["#E6307A", "#FF6B2B", "#FF3366"], fix: ["#2DD4A8", "#3ECF8E", "#1A8A70"] },
+    problem: ["#E6307A", "#FF6B2B", "#FF3366"], fix: ["#2DD4A8", "#3ECF8E", "#1A8A70"], cta: "#1A8A70" },
   ember: { label: "Ember", hint: "orange → blue", back: "#0B0F1A",
     problem: ["#FF7A1A", "#FFB020", "#E8432E"], fix: ["#3BA4FF", "#6BC6FF", "#1F5FD1"] },
   ultra: { label: "Ultra", hint: "violet → lime", back: "#0E0A16",
@@ -1312,6 +1315,21 @@ export const palettes: Record<PaletteId, Palette> = {
     problem: ["#FF4F6D", "#FF9F1C", "#FFE066"], fix: ["#2DD4A8", "#4F8BFF", "#B37BFF"] },
 };
 export const paletteIds = Object.keys(palettes) as PaletteId[];
+
+/** CTA colours for the hero and its header. A terminal theme brings its own
+ *  accent; otherwise the CTA takes the palette's reveal colour, so the buttons
+ *  match the response line and the hover reveal instead of a fixed teal.
+ *  APCA nudges the fill until the label reads (Lc 60). */
+export function heroCtaColors(paletteId: PaletteId, terminalThemeId?: string | null) {
+  const theme = terminalThemeId ? getThemeById(terminalThemeId) : undefined;
+  const p = palettes[paletteId];
+  const pair = getAccessibleCtaPair(theme ? theme.accent2 : (p.cta ?? p.fix[0]), 60);
+  return {
+    bg: pair.backgroundHex,
+    text: pair.textHex,
+    hover: `oklch(from ${pair.backgroundHex} calc(l + 0.08) c h)`,
+  };
+}
 
 /** A state's authored layers (shapes, opacities) in a palette's colours. */
 function paletteLayers(palette: PaletteId, which: InitialStateId): DitherAlphaLayer[] {
@@ -1555,10 +1573,12 @@ export const heroTemplates: HeroTemplate[] = [
 /** The Speed control's stops (animation.speed; 0 = paused). Design Panel and
  *  Layers use the same four. */
 export const speedStops = [
-  { value: 0, label: "Still" },
-  { value: 0.5, label: "Calm" },
-  { value: 1, label: "Live" },
-  { value: 2, label: "Wild" },
+  { value: 0, label: "Pause" },
+  { value: 0.5, label: "Slow" },
+  { value: 1, label: "Normal" },
+  { value: 2, label: "Fast" },
+  // Full Bleed's noise field reads calm even at 2×, so it needs a faster stop.
+  { value: 4, label: "Rapid" },
 ] as const;
 /** The stop for the current animation, or null for an off-stop speed. */
 export function speedStop(a: Pick<DitherAnimationConfig, "playing" | "speed">) {

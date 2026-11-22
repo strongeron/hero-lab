@@ -128,7 +128,7 @@ at 1:1. Scene scan, drift and colour cycling are not drawn. Each preview caps at
 2026-11-22, shared picks: `pickTile` (`src/lab/ui/pickTile.ts`) is the one class
 string for a pickable preview tile in the Design Panel and Layers (padding at the
 call site). `speedStops` / `speedStop` in `ditherStore.ts` are the one list of
-Speed stops (Still, Calm, Live, Wild). Layers restores the Design Panel look on
+Speed stops (Pause, Slow, Normal, Fast, Rapid). Layers restores the Design Panel look on
 exit with `snapshotDitherState` / `restoreDitherState`.
 
 2026-11-22, text inspector removed: click-to-inspect typography overrides are
@@ -143,7 +143,7 @@ drawn by `src/lab/layerSketch.ts` (`stepLook`, `drawStep`) on top of
 `panelSketch.drawField`. Thumbnails zoom in (up to 3×) so one tile is at least
 4 CSS px; all steps of a template share the zoom. The template picker uses the
 Design Panel's "Start from" pick tiles. Layers speaks the Panel's words: Speed is
-the same `Segmented` (Still / Calm / Live / Wild on `animation.speed`), and steps
+the same `Segmented` (Pause / Slow / Normal / Fast / Rapid on `animation.speed`), and steps
 are named Tile grid, Snapped colour, Point sizes, Full edge and Hover · warp, with
 the Panel's grain, gap and warp-feel names in their values. Open: the pick-tile
 class string exists in both views; the Panel still says "pieces" for tiles.

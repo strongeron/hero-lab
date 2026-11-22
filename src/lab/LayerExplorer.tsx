@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   useDitherStore,
   setShaderConfig,
@@ -239,7 +239,8 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
+  // Layout effect: measure before first paint (no jump from the fallback scale).
+  useLayoutEffect(() => {
     const el = wrapRef.current
     if (!el) return
     const apply = () => setAvailW(el.clientWidth)
@@ -278,7 +279,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   const topBtn = `text-lab-xs font-medium px-3 py-1.5 rounded-lg border border-lab-border text-lab-fg-muted hover:text-lab-fg hover:border-lab-border-strong bg-lab-fill ${pressable}`
 
   return (
-    <div className="h-screen flex flex-col bg-lab-canvas">
+    <div className="h-dvh flex flex-col bg-lab-canvas">
       <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-lab-border bg-lab-toolbar backdrop-blur-xl">
         <LabToolbarTitle
           onHome={onHome}

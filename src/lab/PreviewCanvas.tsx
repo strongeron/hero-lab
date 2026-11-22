@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getTabSourceId } from '../heroes/dither/ditherStore'
 import LabToolbarTitle from './LabToolbarTitle'
 import Segmented from './ui/Segmented'
@@ -24,7 +24,9 @@ export default function PreviewCanvas({ onHome }: { onHome?: () => void }) {
   const [availWidth, setAvailWidth] = useState(0)
   const [zoom, setZoom] = useState<ZoomMode>('fit')
 
-  useEffect(() => {
+  // Layout effect: measure before first paint, so frames do not jump from
+  // the fallback scale (same fix as TemplateGallery).
+  useLayoutEffect(() => {
     const el = wrapRef.current
     if (!el) return
     const apply = () => setAvailWidth(el.clientWidth)
@@ -54,7 +56,7 @@ export default function PreviewCanvas({ onHome }: { onHome?: () => void }) {
   return (
     // Column layout: the toolbar lives OUTSIDE the scroll container so it stays
     // pinned no matter how far the canvas is panned or zoomed.
-    <div className="h-screen flex flex-col bg-lab-canvas">
+    <div className="h-dvh flex flex-col bg-lab-canvas">
       {/* Pinned canvas toolbar */}
       <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-lab-border bg-lab-toolbar backdrop-blur-xl">
         <LabToolbarTitle

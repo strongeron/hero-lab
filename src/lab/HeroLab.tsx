@@ -49,7 +49,7 @@ const PANEL_OPEN_KEY = 'design-panel:open'
 function ActiveHero() {
   const Hero = activeHero.component
   return (
-    <div className="min-h-screen">
+    <div className="min-h-svh">
       <Hero />
     </div>
   )
@@ -340,7 +340,7 @@ export default function HeroLab() {
   // toggles. The store mirrors the main window via initDitherSync above.
   if (isPreviewFrame) {
     return (
-      <div data-palette="glass" className="min-h-screen" style={themedVars}>
+      <div data-palette="glass" className="min-h-svh" style={themedVars}>
         <LabHeader headerBg={heroState.headerBg} rightOffset={0} button={heroState.button} />
         <ActiveHero />
       </div>
@@ -355,7 +355,7 @@ export default function HeroLab() {
         </div>
       ) : viewMode === 'layers' ? (
         <div style={{ marginRight: panelOffset }}>
-          <Suspense fallback={null}><LayerExplorer onHome={() => setViewMode('templates')} /></Suspense>
+          <Suspense fallback={<div className="h-dvh bg-lab-canvas" />}><LayerExplorer onHome={() => setViewMode('templates')} /></Suspense>
         </div>
       ) : viewMode === 'breakpoints' ? (
         <div style={{ marginRight: panelOffset }}>
@@ -364,7 +364,7 @@ export default function HeroLab() {
       ) : (
         <div
           data-palette="glass"
-          className="min-h-screen"
+          className="min-h-svh"
           style={{ ...themedVars, marginRight: panelOffset }}
         >
           <LabHeader headerBg={heroState.headerBg} rightOffset={panelOffset} button={heroState.button} />
@@ -375,7 +375,9 @@ export default function HeroLab() {
         </div>
       )}
 
-      {showPanel && <Suspense fallback={null}><DesignPanel onClose={() => setPanelOpen(false)} /></Suspense>}
+      {/* Sized fallback: the panel column paints at once instead of an empty
+          320px gap while its chunk loads. */}
+      {showPanel && <Suspense fallback={<aside aria-label="Design Panel" aria-busy="true" className="fixed top-0 right-0 bottom-0 z-[1000] w-full sm:w-80 border-l bg-lab-panel border-lab-border" />}><DesignPanel onClose={() => setPanelOpen(false)} /></Suspense>}
 
       <HeroSwitcher bottom={chromeBottom} />
 
@@ -395,7 +397,7 @@ export default function HeroLab() {
           roughly 440–1000px and the panel starts at 1040px, so viewport-centring
           does not put it under the panel. */}
       <div style={{ bottom: chromeBottom }} className="fixed left-0 right-0 z-[1002] flex justify-center pointer-events-none px-2">
-        <div className={`pointer-events-auto flex items-center pr-1 rounded-full border backdrop-blur-xl bg-lab-surface border-lab-border shadow-lab-float max-w-full overflow-x-auto`}>
+        <div className={`pointer-events-auto flex items-center pr-1 rounded-full border bg-lab-surface border-lab-border shadow-lab-float max-w-full overflow-x-auto`}>
           <Segmented shape="pill" label="View" options={VIEW_OPTIONS} value={viewMode} onChange={setViewMode} />
           <span aria-hidden="true" className="w-px h-4 ml-0.5 mr-1.5 bg-lab-border-strong shrink-0" />
           {/* Layers hides the panel on purpose (the stack is the control

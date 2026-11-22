@@ -72,11 +72,17 @@ function useSampled() {
   return s
 }
 
+const RATING_WORD: Record<Rating, string> = { good: 'good', 'needs-improvement': 'needs improvement', poor: 'poor' }
+
 function Cell({ label, value, rating, title }: { label: string; value: string; rating?: Rating; title?: string }) {
   return (
     <div className="flex items-baseline gap-1.5 shrink-0" title={title}>
       <dt className="text-lab-fg-subtle">{label}</dt>
-      <dd className={`m-0 font-semibold tabular-nums ${rating ? tone[rating] : 'text-lab-fg'}`}>{value}</dd>
+      <dd className={`m-0 font-semibold tabular-nums ${rating ? tone[rating] : 'text-lab-fg'}`}>
+        {value}
+        {/* The colour carries the rating; this word carries it for screen readers. */}
+        {rating && <span className="sr-only"> {RATING_WORD[rating]}</span>}
+      </dd>
     </div>
   )
 }
@@ -113,7 +119,7 @@ export default function PerfStrip({ rightOffset, inIframeView }: { rightOffset: 
   return (
     <section
       aria-label="Performance, this tab"
-      className="fixed bottom-0 left-0 z-[1001] border-t border-lab-border bg-lab-toolbar backdrop-blur-xl text-lab-xs text-lab-fg"
+      className="fixed bottom-0 left-0 z-[1001] border-t border-lab-border bg-lab-toolbar text-lab-xs text-lab-fg"
       style={{ right: rightOffset, height: PERF_STRIP_HEIGHT }}
     >
       <div className="h-full flex items-center gap-3 px-3 overflow-x-auto whitespace-nowrap">

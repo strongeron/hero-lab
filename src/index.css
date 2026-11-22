@@ -97,8 +97,11 @@
 
 /* ─── Base (Tailwind v4 preflight handles reset) ─── */
 @layer base {
+  /* No double-tap zoom on repeated taps (Segmented, Shuffle, +/-). */
+  button, a, input, select, [role="button"] {
+    touch-action: manipulation;
+  }
   html {
-    scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -278,12 +281,17 @@
   --ill-filter: saturate(0) brightness(1.2);
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
 /* ── Lab range input (SliderRow, Design Panel) ── */
 input.lab-range {
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
-  height: 20px;
+  /* 24px: the DESIGN.md minimum hit area; the 14px thumb stays centred. */
+  height: 24px;
   cursor: pointer;
 }
 
@@ -305,9 +313,12 @@ input.lab-range::-webkit-slider-thumb {
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
-input.lab-range::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+/* Gated: on touch a :hover scale sticks after the tap. */
+@media (hover: hover) and (pointer: fine) {
+  input.lab-range::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  }
 }
 
 input.lab-range::-moz-range-track {

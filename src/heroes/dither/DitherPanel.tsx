@@ -59,7 +59,7 @@ const GAP_LABELS = { none: 'No gap', tight: 'Tight', open: 'Open' }
 
 const hint = 'text-lab-xs leading-snug text-lab-fg-subtle'
 const action =
-  'min-h-6 shrink-0 px-2 rounded-md border border-lab-border bg-lab-fill text-lab-xs font-medium text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover aria-pressed:bg-lab-fill-selected aria-pressed:text-lab-fg cursor-pointer transition-[color,background-color,border-color,transform] active:scale-[0.96] lab-focus'
+  'min-h-6 shrink-0 px-2 rounded-md border border-lab-border bg-lab-fill text-lab-xs font-medium text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover aria-pressed:bg-lab-fill-selected aria-pressed:text-lab-fg cursor-pointer transition-[color,background-color,border-color,scale] motion-safe:active:scale-[0.96] lab-focus'
 /** A pickable tile: palette, template, shape, type pair, copy. */
 const card = `${pickTile} p-1.5`
 
@@ -114,6 +114,7 @@ export default function DitherPanel() {
   const a = state.animation
   const h = state.hover
   const [copied, setCopied] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
   const [showWhy, setShowWhy] = useState(false)
   const [layer, setLayer] = useState(0)
 
@@ -143,14 +144,21 @@ export default function DitherPanel() {
   const pairShown = typePairs[state.typePair ?? 'editorial']
   const copyFace = resolveCopy(state.copyVariant, null).headlineFont
 
-  function copyConfig() {
+  async function copyConfig() {
     const { activeTemplate, initialState, activeScene, palette, typePair, shader, edge, hover, pixelGrid, animation, layout, button, copyVariant } = state
-    navigator.clipboard.writeText(JSON.stringify(
-      { _ditherConfig: 3, activeTemplate, initialState, activeScene, palette, typePair, copyVariant, shader, edge, hover, pixelGrid, animation, layout, button },
-      null, 2,
-    ))
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      // navigator.clipboard is undefined on a non-secure origin; the optional
+      // call then throws into the catch like a refused write.
+      await navigator.clipboard.writeText(JSON.stringify(
+        { _ditherConfig: 3, activeTemplate, initialState, activeScene, palette, typePair, copyVariant, shader, edge, hover, pixelGrid, animation, layout, button },
+        null, 2,
+      ))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      setCopyFailed(true)
+      setTimeout(() => setCopyFailed(false), 1500)
+    }
   }
 
   function shuffle() {
@@ -177,13 +185,13 @@ export default function DitherPanel() {
               <button type="button" onClick={() => setShowWhy(!showWhy)} aria-pressed={showWhy} title="Show why each section is safe" className={action}>Why</button>
               <button type="button" onClick={shuffle} title="A random mix of the presets" className={action}>Shuffle</button>
               <button type="button" onClick={copyConfig} className={action} aria-live="polite">
-                <Stable labels={['Copy', 'Copied']} show={copied ? 1 : 0} />
+                <Stable labels={['Copy', 'Copied', 'Failed']} show={copied ? 1 : copyFailed ? 2 : 0} />
               </button>
               <button
                 type="button"
                 onClick={() => applyHeroTemplate(state.activeTemplate ?? heroTemplates[0].id)}
                 title="Back to the template as authored"
-                className="min-h-6 px-1.5 rounded-md bg-transparent border-0 text-lab-xs font-medium text-lab-danger hover:text-lab-fg cursor-pointer transition-[color,background-color,border-color,transform] active:scale-[0.96] lab-focus"
+                className="min-h-6 px-1.5 rounded-md bg-transparent border-0 text-lab-xs font-medium text-lab-danger hover:text-lab-fg cursor-pointer transition-[color,background-color,border-color,scale] motion-safe:active:scale-[0.96] lab-focus"
               >
                 Reset
               </button>
@@ -261,48 +269,47 @@ export default function DitherPanel() {
           )}
         </Group>
 
-        <Group title="Shape & speed" value={speed === 0 ? 'paused' : `${speedStop(a)?.label ?? 'Custom'} · ${a.speed}×`} showWhy={showWhy}
-          why="Previews use the hero's own shape maths, tile size and scale, scaled down to the panel. Layers stack: a layer on top can hide the one below, as in the hero.">
-          {gpuPath ? (
-            <p className={hint}>
-              This template draws point sizes from its own noise, so layer shapes do not change it. Start from Problem or Fine Grain to use shapes.
-            </p>
-          ) : (
-            <>
-              <div className="space-y-1">
-                <LivePreview className="w-full h-20 rounded-md border border-lab-border" rate={shapeRate} draw={(ctx, time, W, H, dpr) => {
-                  // The whole hero width, top first: what the hero shows, all layers.
-                  const zoom = W / dpr / HERO.w
-                  drawHero(ctx, W, H, dpr, { ...heroSketch, layers: c.alphaLayers, t: time, zoom, cy: HERO.h / 2 - H / dpr / zoom / 2 })
-                }} />
-                <p className={hint}>The hero, all layers. Tiles below: the picked layer alone.</p>
-              </div>
-              <div role="group" aria-label="Layer" className="grid grid-cols-3 gap-1.5">
-                {c.alphaLayers.map((l, i) => (
-                  <button key={i} type="button" aria-pressed={layer === i} onClick={() => setLayer(i)} className={`${card} flex min-h-7 items-center gap-1.5 px-1.5 py-1`}>
-                    <i className="block size-3 shrink-0 rounded-[3px]" style={{ background: l.color }} />
-                    <span className="truncate text-lab-xs"><span className="text-lab-fg-subtle">{i + 1}</span> {l.shape}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-4 gap-1.5">
-                {SHAPES.map((s) => (
-                  <button key={s} type="button" aria-pressed={c.alphaLayers[layer]?.shape === s} onClick={() => setAlphaLayer(layer, { shape: s })} className={`${card} grid gap-1 p-1`}>
-                    <LivePreview className="w-full aspect-[8/5] rounded-sm" rate={shapeRate} draw={(ctx, time, W, H, dpr) => {
-                      const l = c.alphaLayers[layer]
-                      drawHero(ctx, W, H, dpr, { ...heroSketch, layers: [{ color: l?.color ?? '#fff', shape: s, opacity: 1 }], t: time, zoom: W / dpr / HERO.w })
-                    }} />
-                    <span className="truncate px-0.5 text-lab-xs">{s}</span>
-                  </button>
-                ))}
-              </div>
-              <SliderRow label="Shape size" value={c.scale} min={0.1} max={2} step={0.05} suffix="×" onChange={(v) => setShaderConfig({ scale: v })} />
-            </>
-          )}
+        {/* Shapes change nothing on a template that draws its own point sizes
+            (gpuPath), so the group only shows where a shape pick is visible. */}
+        {!gpuPath && (
+          <Group title="Shape" showWhy={showWhy}
+            why="Previews use the hero's own shape maths, tile size and scale, scaled down to the panel. Layers stack: a layer on top can hide the one below, as in the hero.">
+            <div className="space-y-1">
+              <LivePreview className="w-full h-20 rounded-md border border-lab-border" rate={shapeRate} draw={(ctx, time, W, H, dpr) => {
+                // The whole hero width, top first: what the hero shows, all layers.
+                const zoom = W / dpr / HERO.w
+                drawHero(ctx, W, H, dpr, { ...heroSketch, layers: c.alphaLayers, t: time, zoom, cy: HERO.h / 2 - H / dpr / zoom / 2 })
+              }} />
+              <p className={hint}>The hero, all layers. Tiles below: the picked layer alone.</p>
+            </div>
+            <div role="group" aria-label="Layer" className="grid grid-cols-3 gap-1.5">
+              {c.alphaLayers.map((l, i) => (
+                <button key={i} type="button" aria-pressed={layer === i} onClick={() => setLayer(i)} className={`${card} flex min-h-7 items-center gap-1.5 px-1.5 py-1`}>
+                  <i className="block size-3 shrink-0 rounded-[3px]" style={{ background: l.color }} />
+                  <span className="truncate text-lab-xs"><span className="text-lab-fg-subtle">{i + 1}</span> {l.shape}</span>
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              {SHAPES.map((s) => (
+                <button key={s} type="button" aria-pressed={c.alphaLayers[layer]?.shape === s} onClick={() => setAlphaLayer(layer, { shape: s })} className={`${card} grid gap-1 p-1`}>
+                  <LivePreview className="w-full aspect-[8/5] rounded-sm" rate={shapeRate} draw={(ctx, time, W, H, dpr) => {
+                    const l = c.alphaLayers[layer]
+                    drawHero(ctx, W, H, dpr, { ...heroSketch, layers: [{ color: l?.color ?? '#fff', shape: s, opacity: 1 }], t: time, zoom: W / dpr / HERO.w })
+                  }} />
+                  <span className="truncate px-0.5 text-lab-xs">{s}</span>
+                </button>
+              ))}
+            </div>
+            <SliderRow label="Shape size" value={c.scale} min={0.1} max={2} step={0.05} suffix="×" onChange={(v) => setShaderConfig({ scale: v })} />
+          </Group>
+        )}
+
+        <Group title="Speed" value={speed === 0 ? 'paused' : `${a.speed}×`} showWhy={showWhy}
+          why="Speed scales every loop in the hero: shape motion, scan and drift. The previews move at the same pace.">
           <Segmented size="xs" stretch label="Speed" value={speed}
             onChange={(v) => setAnimationConfig(v === 0 ? { playing: false } : { playing: true, speed: v })}
             options={speedStops.map((s) => ({ value: s.value, label: s.label }))} />
-          <p className={hint}>Speed scales every loop in the hero: shape motion, scan and drift. The previews move at the hero's shape pace.</p>
         </Group>
 
         <Group title="Hover · warp" showWhy={showWhy}
@@ -340,12 +347,18 @@ export default function DitherPanel() {
 
         <Group title="Copy" showWhy={showWhy}
           why="Each copy set brings its own headline, response and sub, sized for the grid.">
-          <div role="group" aria-label="Copy" className="grid grid-cols-4 gap-1.5">
-            {copyVariantIds.map((id) => (
-              <button key={id} type="button" aria-pressed={state.copyVariant === id} onClick={() => setCopyVariant(id)} className={`${action} truncate px-1`}>
-                {copyVariants[id].label}
-              </button>
-            ))}
+          <div role="group" aria-label="Copy" className="grid grid-cols-2 gap-1.5">
+            {copyVariantIds.map((id) => {
+              const v = copyVariants[id]
+              // Each card reads its headline in the copy's own face, so the
+              // pick shows the words and the voice, not a cut-off name.
+              return (
+                <button key={id} type="button" aria-pressed={state.copyVariant === id} onClick={() => setCopyVariant(id)} className={`${card} grid content-start gap-1 text-left`}>
+                  <span className="truncate text-lab-xs text-lab-fg-subtle">{v.label}</span>
+                  <span className="line-clamp-2 text-lab-md leading-tight text-lab-fg text-pretty" style={{ fontFamily: v.headlineFont, fontWeight: v.headlineWeight }}>{v.headline}</span>
+                </button>
+              )
+            })}
           </div>
         </Group>
 

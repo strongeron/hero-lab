@@ -16,7 +16,7 @@ export default function Toggle({ label, on, onChange, inline = false, children }
       onClick={() => onChange(!on)}
       aria-pressed={on}
       aria-label={inline || children == null ? label : undefined}
-      className={`min-h-6 min-w-9 shrink-0 px-2 rounded-md border text-lab-xs font-medium cursor-pointer transition-[color,background-color,border-color,transform] active:scale-[0.96] lab-focus ${
+      className={`min-h-6 min-w-9 shrink-0 px-2 rounded-md border text-lab-xs font-medium cursor-pointer transition-[color,background-color,border-color,scale] motion-safe:active:scale-[0.96] lab-focus ${
         on
           ? 'border-lab-accent/40 bg-lab-accent/15 text-lab-accent'
           : 'border-lab-border bg-lab-fill text-lab-fg-subtle hover:text-lab-fg-muted hover:bg-lab-fill-hover'

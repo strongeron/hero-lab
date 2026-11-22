@@ -18,11 +18,13 @@ export default function LabToolbarTitle({ view, strap, onHome }: {
   // canvas down the page. The strap is context, not navigation, so it is the
   // first thing to go when space is short.
   return (
-    <span className="text-lab-sm font-semibold text-lab-fg flex items-center gap-2 min-w-0 whitespace-nowrap">
+    // h1: the view's own title, so Canvas, Breakpoints and Layers each have a
+    // top-level heading for screen-reader navigation.
+    <h1 className="m-0 text-lab-sm font-semibold text-lab-fg flex items-center gap-2 min-w-0 whitespace-nowrap">
       <BrandMark size={20} onClick={onHome} label={onHome ? 'Hero Lab — go to Canvas' : undefined} />
       Hero Lab
       <span className="font-normal text-lab-fg-muted">{view}</span>
       <span className="hidden lg:inline font-normal text-lab-fg-subtle truncate">{strap}</span>
-    </span>
+    </h1>
   )
 }

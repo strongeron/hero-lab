@@ -71,7 +71,7 @@ export default function TemplateGallery() {
   const rowHeight = Math.max(...DEVICES.map((d) => d.height)) * scale
 
   return (
-    <div className="h-screen flex flex-col bg-lab-canvas">
+    <div className="h-dvh flex flex-col bg-lab-canvas">
       {/* Pinned toolbar */}
       <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-lab-border bg-lab-toolbar backdrop-blur-xl">
         <LabToolbarTitle

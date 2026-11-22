@@ -24,7 +24,7 @@ export default function DesignPanel({ onClose }: { onClose: () => void }) {
     <aside
       aria-label="Design Panel"
       data-design-panel
-      className="fixed top-0 right-0 bottom-0 z-[1000] w-full sm:w-80 border-l backdrop-blur-2xl bg-lab-panel border-lab-border flex flex-col overflow-hidden"
+      className="fixed top-0 right-0 bottom-0 z-[1000] w-full sm:w-80 border-l bg-lab-panel border-lab-border flex flex-col overflow-hidden"
     >
       <div className="flex items-center justify-between px-4 py-3 border-b border-lab-border shrink-0">
         <h2 className="m-0 text-lab-sm font-semibold text-lab-fg flex items-center gap-2">
@@ -43,7 +43,10 @@ export default function DesignPanel({ onClose }: { onClose: () => void }) {
           </svg>
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto min-h-0">
+      {/* overscroll-contain: the page behind a full-width phone panel does not
+          scroll along. max-sm:pb-24 clears the view bar and perf strip, which
+          cover the panel's bottom on phones. */}
+      <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 max-sm:pb-24">
         <DitherPanel />
       </div>
     </aside>

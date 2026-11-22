@@ -1,5 +1,5 @@
 ---
-sourcesHash: eebd7d449ecdff0d0353af778578b517b38820b0b7646f5869d6f7ce64e5834a
+sourcesHash: fbc9d7736d53de2f101a72044a2d56c651f4191c2dfc2c501f5a23af0a5c7543
 id: lab-toolbar-title
 description: >-
   Identify the current lab view at the start of its toolbar: the Hero Lab mark,

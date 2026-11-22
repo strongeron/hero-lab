@@ -1,5 +1,5 @@
 ---
-sourcesHash: e4391f806327d8bb2be1036a9b1c7ecf6b3af3d0eef49083866a9024b801fff2
+sourcesHash: 45c8b6951bb31af5ecac49d254be5bbc70da067a61a76050438c9dbec54201cd
 id: toggle
 description: >-
   Turn one independent setting on or off, such as play/pause, uppercase
