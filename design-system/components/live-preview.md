@@ -18,11 +18,14 @@ sources:
   shows its result, not only a name.
 - As a strip above a `Segmented` or `SliderRow` to show the current value at
   real size.
+- As a thumbnail at the end of a Layers step row, showing the hero after that
+  step (`src/lab/layerSketch.ts` `drawStep`, built on `drawField`).
 
 ## When not to use
 
 - For the hero itself or anything that must match the shader exactly: previews
-  are 2D sketches (`src/heroes/dither/panelSketch.ts`), not the renderer.
+  are 2D sketches (`src/heroes/dither/panelSketch.ts`,
+  `src/lab/layerSketch.ts`), not the renderer.
 - As a control: the canvas is decorative (`aria-hidden`, `pointer-events-none`);
   the surrounding button carries the label and the state.
 
