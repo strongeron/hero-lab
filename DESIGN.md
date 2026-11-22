@@ -133,3 +133,10 @@ are named Tile grid, Snapped colour, Point sizes, Full edge and Hover · warp, w
 the Panel's grain, gap and warp-feel names in their values. Open: the pick-tile
 class string exists in both views; the Panel still says "pieces" for tiles.
 
+2026-11-22, perf strip ratings: green / amber / red mean good / needs improvement /
+poor. LCP, INP, CLS, FCP and TTFB use the web.dev field thresholds through
+`web-vitals` (`m.rating`); these are not Lighthouse lab scores, which use other
+curves and TBT instead of INP. Frame cells use the 60 Hz budget, so 120 Hz screens
+stay green; blocked time and the WebGL count are lab rules. Each cell's `title`
+names its bands and source.
+
