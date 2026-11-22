@@ -1,5 +1,5 @@
 ---
-sourcesHash: d26ada8f876e323f62e33339cdb8f492ae3b0ad5d33fef077f3a8d5ffd6e033f
+sourcesHash: eebd7d449ecdff0d0353af778578b517b38820b0b7646f5869d6f7ce64e5834a
 id: lab-toolbar-title
 description: >-
   Identify the current lab view at the start of its toolbar: the Hero Lab mark,
@@ -14,7 +14,7 @@ sources:
 
 ## When to use
 
-- First element of every lab view toolbar (Templates, Breakpoints, Layers).
+- First element of every lab view toolbar (Canvas, Breakpoints, Layers).
 
 ## When not to use
 
@@ -26,7 +26,7 @@ sources:
 | --- | --- |
 | `view` | View name, e.g. "Layers" |
 | `strap` | One-line explanation; hidden below `lg` and truncated, never wrapped |
-| `onHome` | Go to Templates; omit on Templates itself |
+| `onHome` | Go to Canvas; omit on Canvas itself |
 
 ## Behaviour and states
 
@@ -35,5 +35,5 @@ short. The row never wraps.
 
 ## Accessibility
 
-The mark is a button named "Hero Lab — go to Templates" when `onHome` is set,
+The mark is a button named "Hero Lab — go to Canvas" when `onHome` is set,
 otherwise decorative. View name text is `lab-fg-muted`, strap `lab-fg-subtle`.

@@ -8,7 +8,7 @@ const GAP = 32
 const PAD = 40
 const BOARD_GAP = 56
 
-/** Templates canvas — one artboard (3 breakpoint frames) per template, all
+/** Canvas view — one artboard (3 breakpoint frames) per template, all
  *  visible at once. Frames are pinned to their template via ?template=<id>:
  *  they render the canonical look until their artboard is clicked, which loads
  *  the template into the Design Panel and switches just that artboard to live
@@ -75,7 +75,7 @@ export default function TemplateGallery() {
       {/* Pinned toolbar */}
       <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-lab-border bg-lab-toolbar backdrop-blur-xl">
         <LabToolbarTitle
-          view="Templates"
+          view="Canvas"
           strap="baked snapshots — select an artboard to load the live animation & edit in the Design Panel"
         />
         <Segmented

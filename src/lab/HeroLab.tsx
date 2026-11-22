@@ -12,7 +12,7 @@ import Segmented from './ui/Segmented'
 
 // Split out of the first chunk (slow-connection audit, fix 3): the Design Panel
 // (with DitherPanel, about 90 KB raw) and the Layers view are not needed to
-// paint the hero. Templates and Breakpoints stay in the main chunk: Templates is
+// paint the hero. Canvas and Breakpoints stay in the main chunk: Canvas is
 // the first-visit view, and a lazy chunk there would add a round trip.
 const DesignPanel = lazy(() => import('./DesignPanel'))
 const LayerExplorer = lazy(() => import('./LayerExplorer'))
@@ -23,7 +23,7 @@ const preset = getContentPreset(params.get('preset'))
 /** True when this window is a breakpoint-preview iframe: bare hero, no lab
  *  chrome, store mirrored from the main window. */
 const isPreviewFrame = params.get('preview') === '1'
-/** Template a preview frame is pinned to (Templates gallery artboards). */
+/** Template a preview frame is pinned to (Canvas view artboards). */
 const previewTemplate = params.get('template')
 /** Independent config pins for a preview frame (docs real-preview gallery):
  *  ?preview=1&scene=<id>&grid=0|1&tile=color|points&state=problem|fix.
@@ -221,7 +221,7 @@ type ViewMode = 'live' | 'breakpoints' | 'templates' | 'layers'
 const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
   { value: 'live', label: 'Live' },
   { value: 'breakpoints', label: 'Breakpoints' },
-  { value: 'templates', label: 'Templates' },
+  { value: 'templates', label: 'Canvas' },
   { value: 'layers', label: 'Layers' },
 ]
 /** The Design toggle matches a `Segmented shape="pill"` option. It is a
@@ -241,7 +241,7 @@ export default function HeroLab() {
   // Read on first render, not in the effect: initialising to false gives a
   // phone one frame with the 320px desktop offset applied.
   const [isNarrow, setIsNarrow] = useState(() => window.matchMedia('(max-width: 639px)').matches)
-  // Templates is the starter page: a first-time visitor lands on the gallery of
+  // Canvas is the starter page: a first-time visitor lands on the gallery of
   // artboards, which shows what the lab is (many looks, three breakpoints each)
   // rather than dropping them into one hero with no context for it. A returning
   // visitor keeps whatever view they last used.
@@ -250,7 +250,7 @@ export default function HeroLab() {
       const saved = localStorage.getItem('hero-lab-view-mode')
       if (saved === 'breakpoints' || saved === 'templates' || saved === 'layers' || saved === 'live') return saved
     } catch { /* storage blocked: fall through to the default */ }
-    // Templates loads 3 live iframes and the poster grid (about 0.8 MB more
+    // Canvas loads 3 live iframes and the poster grid (about 0.8 MB more
     // than Live). With Save-Data or a slow connection, start on Live instead.
     return prefersLessData() ? 'live' : 'templates'
   })

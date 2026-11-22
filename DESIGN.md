@@ -3,7 +3,7 @@
 Hero Lab has two kinds of interface. The **hero** is the product being designed:
 the dither background, headline and CTA that a visitor of the demo site sees. The
 **lab UI** is the tool around it: the bottom view bar, view toolbars, the Design
-Panel, Layers, Templates, Breakpoints and the perf strip. This file governs the lab
+Panel, Layers, Canvas, Breakpoints and the perf strip. This file governs the lab
 UI. The hero keeps its own palette tokens (`--color-t-*`, `[data-palette]` in
 `src/index.css`) and is out of scope here.
 
@@ -47,7 +47,7 @@ used settings behind a disclosure over adding more rows.
 
 | Token | Role |
 | --- | --- |
-| `lab-canvas` | Page background of lab views (Templates, Breakpoints, Layers) |
+| `lab-canvas` | Page background of lab views (Canvas, Breakpoints, Layers) |
 | `lab-artboard` | Black behind each artboard, before the hero paints |
 | `lab-toolbar` | Sticky view toolbar, translucent over the canvas |
 | `lab-surface` | Floating chrome: bottom view bar, popovers |
@@ -61,7 +61,7 @@ used settings behind a disclosure over adding more rows.
 | `lab-good` / `lab-warn` / `lab-poor` | Measured status only (perf strip ratings) |
 | `text-lab-2xs` … `text-lab-md` | 10 / 11 / 12 / 13 px |
 | `shadow-lab-float` | Floating chrome and chips: bottom view bar, toolbar pill, hover chip |
-| `shadow-lab-raised` | Artboards on the canvas (Templates, Breakpoints, Layers) |
+| `shadow-lab-raised` | Artboards on the canvas (Canvas, Breakpoints, Layers) |
 
 - Themes: the lab UI has one dark theme. Hero palettes do not apply to it.
 

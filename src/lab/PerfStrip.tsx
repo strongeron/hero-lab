@@ -98,7 +98,7 @@ const vitalTitle = ({ name, fmt, thresholds: [good, poor], note }: (typeof VITAL
   `${name}: green ≤ ${fmt(good)}, amber ≤ ${fmt(poor)}, red > ${fmt(poor)}. ${note} Source: web.dev field thresholds (good / needs improvement / poor). Lighthouse lab scores use other curves and TBT instead of INP.`
 
 /** Live performance strip, docked at the bottom of the viewport. Measures the
- *  TOP document only — Breakpoints and Templates render their previews in
+ *  TOP document only — Breakpoints and Canvas render their previews in
  *  iframes, whose own frames, tasks and contexts are not counted here. */
 export default function PerfStrip({ rightOffset, inIframeView }: { rightOffset: number; inIframeView: boolean }) {
   const frame = useFrameStats()

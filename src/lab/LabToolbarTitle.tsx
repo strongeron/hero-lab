@@ -1,7 +1,7 @@
 import BrandMark from '../components/BrandMark'
 
-/** The title block shared by every lab view's toolbar (Templates, Breakpoints,
- *  Layers). Templates was the reference; the other two had drifted — no mark,
+/** The title block shared by every lab view's toolbar (Canvas, Breakpoints,
+ *  Layers). Canvas was the reference; the other two had drifted — no mark,
  *  `items-baseline` instead of `items-center`, and straps that wrapped instead
  *  of truncating. One component so they cannot drift again.
  *
@@ -10,7 +10,7 @@ import BrandMark from '../components/BrandMark'
 export default function LabToolbarTitle({ view, strap, onHome }: {
   view: string
   strap: string
-  /** Go to the lab's main page (Templates). Omitted on Templates itself. */
+  /** Go to the lab's main page (Canvas). Omitted on Canvas itself. */
   onHome?: () => void
 }) {
   // `min-w-0` + `nowrap` so the strap truncates rather than wrapping: without
@@ -19,7 +19,7 @@ export default function LabToolbarTitle({ view, strap, onHome }: {
   // first thing to go when space is short.
   return (
     <span className="text-lab-sm font-semibold text-lab-fg flex items-center gap-2 min-w-0 whitespace-nowrap">
-      <BrandMark size={20} onClick={onHome} label={onHome ? 'Hero Lab — go to Templates' : undefined} />
+      <BrandMark size={20} onClick={onHome} label={onHome ? 'Hero Lab — go to Canvas' : undefined} />
       Hero Lab
       <span className="font-normal text-lab-fg-muted">{view}</span>
       <span className="hidden lg:inline font-normal text-lab-fg-subtle truncate">{strap}</span>
