@@ -233,3 +233,9 @@ tint. The response line and the CTA share one accent, `CTA_BG` from
 `heroCtaColors`, so the line reads as the button's lead-in. Every palette's
 `CTA_BG` is ≥ 4.29:1 on its background; the response is large text (≥ 28px, needs
 3:1). Only `responseColorMode: 'white'` (no template uses it) opts out.
+
+2026-11-22, warp band on gridded Paper: on the 'mask' hover path (Problem), the
+warp answers only inside the tile band above the copy (`hoverBandRef`); below it
+the warp shrinks as on leave, and the cover and reveal layers are clipped to the
+band (`bandClip`). Grid-off templates (Fine Grain, 'cells' path) keep the reveal
+over the copy on purpose; the GPU path draws its own warp.

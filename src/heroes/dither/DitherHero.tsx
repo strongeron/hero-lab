@@ -1100,6 +1100,8 @@ export default function DitherHero() {
   const hoverPath: 'gpu' | 'mask' | 'cells' = pointCanvasMode ? 'gpu' : gridOn ? 'mask' : 'cells'
   const hoverPathRef = useRef(hoverPath)
   hoverPathRef.current = hoverPath
+  /** Lowest y (container px) the warp answers to. Infinity = everywhere. */
+  const hoverBandRef = useRef(Infinity)
   const [tip, setTip] = useState<Tip | null>(null)
   const hoverAnim = useRef({ radius: 0, px: 0, py: 0, hovering: false, rafId: 0, cw: 0, ch: 0 })
   const radiusRef = useRef(hover.radius)
@@ -1160,6 +1162,13 @@ export default function DitherHero() {
       a.py = e.clientY - rect.top
       a.cw = rect.width
       a.ch = rect.height
+      // Below the field band (gridded Problem): no warp over the copy. The
+      // warp shrinks where it is, as on leave, and grows again on re-entry.
+      if (a.py > hoverBandRef.current) {
+        a.hovering = false
+        startLoop()
+        return
+      }
       a.hovering = true
       if (hoverReleaseTimer.current) {
         clearTimeout(hoverReleaseTimer.current)
@@ -1456,6 +1465,14 @@ export default function DitherHero() {
   // A terminal theme reveals one themed colour instead of the other state's layers.
   const revealColor = (color: string) => (activeTheme ? responseColor : color)
   const textUnderScene = edge.mode === 'full'
+  // Gridded Paper (Problem): the warp is a tile effect, so it stays in the
+  // tile band above the copy, both for the pointer and as a clip at the band
+  // edge. Grid-off (Fine Grain) keeps its reveal over the copy on purpose.
+  const bandOnly = hoverPath === 'mask' && !textUnderScene && contentTop != null
+  hoverBandRef.current = bandOnly ? contentTop! : Infinity
+  const bandClip: React.CSSProperties | undefined = bandOnly
+    ? { clipPath: `inset(0 0 calc(100% - ${contentTop}px) 0)` }
+    : undefined
   const textReadabilityStyle: React.CSSProperties | undefined = textUnderScene
     ? { textShadow: `0 2px 28px ${c.colorBack}, 0 1px 6px ${c.colorBack}, 0 0 1px ${c.colorBack}` }
     : undefined
@@ -1489,13 +1506,15 @@ export default function DitherHero() {
 
       {/* Hover cover — hides the resting tiles under the cursor ('mask' path) */}
       {hover.enabled && hoverPath === 'mask' && (
-        <div ref={coverRef} className="absolute inset-0 z-[6] pointer-events-none" style={{ visibility: 'hidden', backgroundColor: c.colorBack }} aria-hidden="true" />
+        <div className="absolute inset-0 z-[6] pointer-events-none" style={bandClip} aria-hidden="true">
+          <div ref={coverRef} className="absolute inset-0" style={{ visibility: 'hidden', backgroundColor: c.colorBack }} />
+        </div>
       )}
 
       {/* Reveal — the other state's layers, mounted on first hover. Outside the
           resting mask, so it is not cut by the dissolve band. */}
       {hover.enabled && hoverActive && !pointCanvasMode && (
-        <div key={`hover-gl${glEpoch}`} className="absolute inset-0 z-[6] pointer-events-none" aria-hidden="true">
+        <div key={`hover-gl${glEpoch}`} className="absolute inset-0 z-[6] pointer-events-none" style={bandClip} aria-hidden="true">
           <div
             ref={fixLayerRef}
             className="absolute inset-0"
