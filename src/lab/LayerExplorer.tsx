@@ -25,6 +25,8 @@ import {
   type DitherState,
   type DitherAnimationConfig,
   type SceneTemplateId,
+  snapshotDitherState,
+  restoreDitherState,
 } from '../heroes/dither/ditherStore'
 import LabToolbarTitle from './LabToolbarTitle'
 import Segmented from './ui/Segmented'
@@ -223,12 +225,18 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
     })
   }
   // On mount: take apart the selected template (Full Bleed if none).
+  // On exit: the Design Panel look from before the visit comes back, unless
+  // another template was picked here; then that template opens as authored.
   const restoreId = useRef<string | null>(null)
   useEffect(() => {
-    explore(s.activeTemplate ?? heroTemplates[0].id)
+    const entry = snapshotDitherState()
+    const entryId = s.activeTemplate ?? heroTemplates[0].id
+    explore(entryId)
     return () => {
-      setStableColorField(false)
-      if (restoreId.current) applyHeroTemplate(restoreId.current)
+      if (restoreId.current && restoreId.current !== entryId) {
+        setStableColorField(false)
+        applyHeroTemplate(restoreId.current)
+      } else restoreDitherState(entry)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

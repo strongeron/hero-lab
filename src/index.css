@@ -60,6 +60,10 @@
   --color-lab-accent: #6EE7B7;
   /* Destructive actions only (Reset, Clear, Remove). 7.7:1 on the panel. */
   --color-lab-danger: #F87171;
+  /* Measured status only (perf strip): good / needs improvement / poor. */
+  --color-lab-good: #34D399;
+  --color-lab-warn: #FCD34D;
+  --color-lab-poor: #FB7185;
   --text-lab-2xs: 10px;
   --text-lab-xs: 11px;
   --text-lab-sm: 12px;

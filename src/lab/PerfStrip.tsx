@@ -7,13 +7,10 @@ export const PERF_STRIP_HEIGHT = 32
 const WINDOW_MS = 2000
 
 type Rating = 'good' | 'needs-improvement' | 'poor'
-// Scoped exception to lab-* tokens (DESIGN.md, 2026-11-21): each colour has one
-// fixed meaning here, good / needs improvement / poor, and lab-accent and
-// lab-danger are reserved for "on" and destructive actions.
 const tone: Record<Rating, string> = {
-  good: 'text-emerald-400',
-  'needs-improvement': 'text-amber-300',
-  poor: 'text-rose-400',
+  good: 'text-lab-good',
+  'needs-improvement': 'text-lab-warn',
+  poor: 'text-lab-poor',
 }
 /** Same rule as web-vitals: good up to `good`, poor only above `poor`. */
 const rate = (v: number, good: number, poor: number): Rating =>

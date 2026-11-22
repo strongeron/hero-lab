@@ -1552,6 +1552,18 @@ export const heroTemplates: HeroTemplate[] = [
   },
 ];
 
+/** A copy of the whole state, to put back later with restoreDitherState. */
+export function snapshotDitherState(): DitherState {
+  return structuredClone(state);
+}
+
+/** Put back a state taken with snapshotDitherState (Layers uses it to return
+ *  the Design Panel look it took apart). */
+export function restoreDitherState(snap: DitherState) {
+  state = structuredClone(snap);
+  emit();
+}
+
 export function applyHeroTemplate(id: string) {
   const tmpl = heroTemplates.find((t) => t.id === id);
   if (!tmpl) return;

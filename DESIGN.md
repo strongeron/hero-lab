@@ -58,6 +58,7 @@ used settings behind a disclosure over adding more rows.
 | `lab-focus` | Focus ring colour |
 | `lab-accent` | "Editing" / "on" meaning only |
 | `lab-danger` | Destructive actions only (Reset, Clear, Remove) |
+| `lab-good` / `lab-warn` / `lab-poor` | Measured status only (perf strip ratings) |
 | `text-lab-2xs` … `text-lab-md` | 10 / 11 / 12 / 13 px |
 | `shadow-lab-float` | Floating chrome and chips: bottom view bar, toolbar pill, hover chip |
 | `shadow-lab-raised` | Artboards on the canvas (Templates, Breakpoints, Layers) |
@@ -94,8 +95,10 @@ then align the lab chrome and the Design Panel on it. No Storybook in this repo.
 2026-11-21, panel cleanup: the Design Panel keeps only colour, size, speed, shape
 and warp settings (the state map is in
 `docs/architecture/2026-11-21-state-machines.md`). Added `Toggle` and
-`lab-danger`. Scoped exceptions kept: the Layers verdict badges and the perf strip
-ratings use Tailwind palette colours because each colour carries one fixed meaning.
+`lab-danger`. Scoped exception kept: the Layers verdict badges use Tailwind palette
+colours because each colour carries one fixed meaning. (2026-11-22: the perf strip
+ratings moved to `lab-good`, `lab-warn`, `lab-poor`, tokens for measured status
+only.)
 
 2026-11-22, opinionated panel: the Design Panel offers curated presets instead of
 free values. Palette pairs (`palettes`), whole-pixel grain and gap stops
