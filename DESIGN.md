@@ -195,3 +195,15 @@ the new `subSize` / `ctaSize` copy fields at 15–17px and 14–16px (sans copie
 17/20px and 16/18px). `broke-fixed` and the Terminal pair cap at 3.875rem with
 -0.04em tracking. A type pair drops `subSize`/`ctaSize`, since its body face is
 proportional. `html` sets `font-synthesis: none`.
+
+2026-11-22, palette strips: each Palette pick draws the current look in its own
+colours. Layer shapes move at the hero's pace (`rate = 0.35 × Speed`, still when
+paused), and tiles follow the grid: dots for Point sizes, the grid's corner
+radius otherwise, and the grid's gap share (`swatchTile` in `DitherPanel.tsx`).
+
+2026-11-22, shape lift: Paper centres object shapes (ripple, swirl, sphere) on
+the canvas centre, which banded layouts hide behind the copy panel, so a picked
+ripple showed only its edge. `shapeLift` in `DitherHero.tsx` moves every Paper
+layer up to the middle of the visible band (header inset to copy top); `edge`
+mode `full` keeps the centre. Panel previews pass the same lift to `drawHero`
+(`lift`, fixed at 24% of the height as a stand-in for the measured band).

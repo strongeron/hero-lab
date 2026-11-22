@@ -140,7 +140,20 @@ export default function DitherPanel() {
   const tile = pg.enabled
     ? { pitch, gap: pg.gap, radius: a.tileDisplay === 'points' ? pitch / 2 : pg.radius }
     : { pitch: c.size, gap: 0, radius: 0 }
-  const heroSketch = { back: c.colorBack, scale: c.scale, rotation: c.rotation, spread: c.alphaSpread, heroW: HERO.w, heroH: HERO.h, ...tile }
+  /** Palette strips wear the hero's tile look, scaled down: dots for Point
+   *  sizes, the grid's corner radius otherwise, and the grid's gap share. */
+  const swatchPitch = pg.enabled ? Math.round(Math.min(8, Math.max(4, pitch / 4))) : 3
+  const swatchTile = {
+    pitch: swatchPitch,
+    gap: pg.enabled ? Math.round((swatchPitch * pg.gap) / pitch) : 0,
+    round: !pg.enabled ? 0 : a.tileDisplay === 'points' ? 1 : Math.min(1, (2 * pg.radius) / pitch),
+  }
+  // The hero lifts centred shapes to the middle of its visible band (see
+  // shapeLift in DitherHero). ponytail: a fixed 24% of the height stands in
+  // for the measured band (header to copy top, ~0.26 of 900px on desktop);
+  // pass the hero's measured value if the copy block moves a lot.
+  const lift = state.edge.mode === 'full' ? 0 : HERO.h * 0.24
+  const heroSketch = { lift, back: c.colorBack, scale: c.scale, rotation: c.rotation, spread: c.alphaSpread, heroW: HERO.w, heroH: HERO.h, ...tile }
   const pairShown = typePairs[state.typePair ?? 'editorial']
   const copyFace = resolveCopy(state.copyVariant, null).headlineFont
 
@@ -231,13 +244,14 @@ export default function DitherPanel() {
               const p = palettes[id]
               return (
                 <button key={id} type="button" aria-pressed={state.palette === id} onClick={() => setPalette(id)} className={`${card} grid gap-1 p-1`}>
-                  {/* Calm on purpose: a still pattern in large soft tiles, and one
-                      slow reveal gliding across, so six swatches do not compete. */}
-                  <LivePreview className="w-full h-9 rounded-sm" rate={0.35} draw={(ctx, time, W, H, dpr) => {
+                  {/* The picked look in this palette's colours: the layer shapes
+                      move at the hero's pace (still while paused), tiles follow
+                      the grid, and one reveal glides across in the hover colours. */}
+                  <LivePreview className="w-full h-9 rounded-sm" rate={0.35 * tempo} draw={(ctx, time, W, H, dpr) => {
                     drawField(ctx, W, H, {
-                      back: p.back, t: 1.3, pitch: 6 * dpr, gap: dpr, round: 0.35, zoom: 0.9,
+                      back: p.back, t: 1.3 + time, pitch: swatchTile.pitch * dpr, gap: swatchTile.gap * dpr, round: swatchTile.round, zoom: 0.9,
                       layers: recolor(c.alphaLayers, p[state.initialState]),
-                      warp: { x: W * (0.5 + 0.4 * Math.sin(time)), y: H / 2, r: H * 0.75, layers: recolor(h.hoverLayers, p[otherState]), rotate: 0, round: 0.35, jitter: 0 },
+                      warp: { x: W * (0.5 + 0.4 * Math.sin(time)), y: H / 2, r: H * 0.75, layers: recolor(h.hoverLayers, p[otherState]), rotate: 0, round: swatchTile.round, jitter: 0 },
                     })
                   }} />
                   <span className="flex min-w-0 items-baseline justify-between gap-1 px-0.5">

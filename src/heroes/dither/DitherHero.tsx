@@ -1367,6 +1367,16 @@ export default function DitherHero() {
     return () => { cancelAnimationFrame(raf); renderer.dispose() }
   }, [pointCanvasMode, anim.playing, glEpoch])
 
+  // ── Shape lift ── Paper centres object shapes (ripple, swirl, sphere) on the
+  // canvas centre, which a banded layout hides behind the copy panel. Shift
+  // every layer up so that centre sits mid-band, between the header inset and
+  // the copy's top. Paper adds u_offsetY to the object UV before scale and
+  // rotation, in units of max(W, H) for fit cover, so the shift is
+  // (f − 0.5) × H / max(W, H) for a band centre f (share of H from the top).
+  const shapeLift = contentTop != null && edge.mode !== 'full' && containerSize.h > 0
+    ? (((edge.topInset || 0) + contentTop) / 2 / containerSize.h - 0.5) * containerSize.h / Math.max(containerSize.w, containerSize.h)
+    : 0
+
   // ── Paper uniforms from refs ── written straight to each mount by the drift
   // loop, never from a render. data-sx/sy/fx/fy carry each layer's spread.
   pushPaperUniformsRef.current = () => {
@@ -1384,7 +1394,7 @@ export default function DitherHero() {
       const fx = Number(el.dataset.fx || 0), fy = Number(el.dataset.fy || 0)
       mount.setUniforms({
         u_offsetX: offX + fx,
-        u_offsetY: offY + fy,
+        u_offsetY: offY + fy + shapeLift,
         u_rotation: rot,
         u_scale: scale,
         u_originX: 0.5 + d.waveOriginX + sx,
@@ -1430,7 +1440,7 @@ export default function DitherHero() {
             originX={0.5 + drift.waveOriginX + spread * 0.8}
             originY={0.5 + drift.waveOriginY + spread * 0.6}
             offsetX={effectiveOffsetX + spread * 2}
-            offsetY={effectiveOffsetY + spread * 1.5}
+            offsetY={effectiveOffsetY + spread * 1.5 + shapeLift}
             style={{ width: '100%', height: '100%' }}
           />
         </div>

@@ -247,6 +247,9 @@ export interface HeroSketch {
   radius: number
   /** Draw only whole tiles, centred: no tile is cut at the edge. */
   whole?: boolean
+  /** Shape centre above the hero centre, in hero CSS px (the hero's
+   *  shapeLift: centred shapes sit mid-band, not behind the copy). */
+  lift?: number
 }
 
 /** Draw the hero as Paper composes it: one dither cell per tile, Bayer 8×8,
@@ -275,7 +278,7 @@ export function drawHero(ctx: CanvasRenderingContext2D, W: number, H: number, dp
         const l = o.layers[k]
         if (l.opacity <= 0) continue
         const sp = o.spread * k
-        if (paperShape(l.shape, hx - sp * 2 * M, hy + sp * 1.5 * M, o.t, o.heroW, o.heroH, o.scale, o.rotation) >= thr) mask |= 1 << k
+        if (paperShape(l.shape, hx - sp * 2 * M, hy - (o.lift ?? 0) + sp * 1.5 * M, o.t, o.heroW, o.heroH, o.scale, o.rotation) >= thr) mask |= 1 << k
       }
       if (!mask) continue
       let a = groups.get(mask)
