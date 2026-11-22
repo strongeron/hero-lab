@@ -1224,6 +1224,14 @@ export function setStableColorField(on: boolean) {
   emit();
 }
 
+/** Layers-explorer only: set scene-motion keys (speeds) WITHOUT detaching
+ *  from the active scene, so a speed preset keeps the scene selected. */
+export function setSceneMotion(shader: Partial<DitherShaderConfig>, animation: Partial<DitherAnimationConfig>) {
+  state.shader = { ...state.shader, ...shader };
+  state.animation = { ...state.animation, ...animation };
+  emit();
+}
+
 /** Motion-only patches for a scene — shared by the scene buttons and by hero
  *  templates that bake a scene in. */
 function sceneMotionPatches(id: SceneTemplateId) {
