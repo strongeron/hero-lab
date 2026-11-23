@@ -63,7 +63,7 @@ export default function TemplateGallery({ actions }: { actions?: ReactNode }) {
   // WebP at full bake size plus a half-size copy (slow-connection audit, fix 4):
   // the artboards render at well under bake size, so the browser picks the
   // half copy at Fit zoom and the full one at 100% / on 2x screens.
-  const POSTER_VERSION = 4
+  const POSTER_VERSION = 5
   const posterSrc = (templateId: string, deviceId: string, half = false) =>
     `${import.meta.env.BASE_URL}posters/${templateId}-${deviceId}${half ? '-half' : ''}.webp?v=${POSTER_VERSION}`
   /** Bake width per device: desktop is baked at 1x, tablet and mobile at 2x. */

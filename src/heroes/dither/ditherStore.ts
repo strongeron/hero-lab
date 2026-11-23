@@ -114,10 +114,10 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     // Fine Grain artboard its own typography instead of mutating Broke/Fixed.
     "fine-grain": {
       label: "Fine Grain",
-      headline: "Something broke. You should already know what.",
-      sub: "Errors, performance, and logs — one place. Five-minute install.",
+      headline: "A request just failed. The trace is already\u00A0here.",
+      sub: "Stack traces, slow queries and timelines, side by side. One line to\u00A0install.",
       response: "Caught everything. Start at line 42.",
-      cta: "Start free in 5 minutes",
+      cta: "Try it free",
       headlineColorMode: "white",
       // Fine art, fine strokes: this scene is a smooth, high-detail continuous
       // field, not a discrete lattice. A serif's modulated stroke — thick stems
@@ -148,10 +148,10 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     // top Full Bleed artboard its own typography instead of mutating Problem.
     "full-bleed": {
       label: "Full Bleed",
-      headline: "Something broke. You should already know what.",
-      sub: "Errors, performance, and logs — one place. Five-minute install.",
+      headline: "A request just failed. The trace is already\u00A0here.",
+      sub: "Stack traces, slow queries and timelines, side by side. One line to\u00A0install.",
       response: "Caught everything. Start at line\u00A042.",
-      cta: "Start free in 5 minutes",
+      cta: "Try it free",
       headlineColorMode: "white",
       // Round art, round letterforms: the point renderer draws circular dots,
       // so the headline uses a geometric sans whose bowls are true circles.
@@ -173,9 +173,9 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     provocateur: {
       label: "Provocateur",
       headline: "Every error tells a\u00A0story. Most tools miss the\u00A0plot.",
-      sub: "Errors, performance, and logs in one place. Five-minute install. No credit card.",
+      sub: "Full stack traces, request timelines and the query that set it off. One line to\u00A0install.",
       response: "We read every line.",
-      cta: "Start free in 5 minutes",
+      cta: "Try it free",
       headlineColorMode: "white",
       headlineWeight: 500,
       headlineSize: "clamp(3rem, 5vw + 1rem, 5.5rem)",
@@ -187,10 +187,10 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     },
     value: {
       label: "Value",
-      headline: "One tool. Every\u00A0signal.",
-      sub: "Errors, performance, and logs — one place, one bill. Set up in five minutes.",
-      response: "Your CFO will thank\u00A0you.",
-      cta: "Start free in 5 minutes",
+      headline: "Fewer tabs. Clearer\u00A0answers.",
+      sub: "Traces, latency and exceptions together, at a price that fits on one\u00A0line.",
+      response: "Your budget will\u00A0notice.",
+      cta: "Try it free",
       headlineColorMode: "white",
       headlineFont: "'Bricolage Grotesque', sans-serif",
       headlineWeight: 500,
@@ -202,10 +202,10 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     },
     "ship-it": {
       label: "Ship It",
-      headline: "Ship it. We're watching.",
-      sub: "Every deploy tracked. Every error caught. Every slowdown flagged — before your users notice. Five minutes to\u00A0install.",
-      response: "Know what broke before anyone else\u00A0does.",
-      cta: "Start free in 5 minutes",
+      headline: "Ship on Friday. Sleep\u00A0anyway.",
+      sub: "Every deploy gets a marker. New exceptions and slow endpoints link back to the commit that shipped\u00A0them.",
+      response: "Regressions point at their\u00A0deploy.",
+      cta: "Try it free",
       headlineColorMode: "white",
       headlineFont: "'Space Grotesk', sans-serif",
       headlineWeight: 500,
@@ -217,12 +217,12 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     },
     ai: {
       label: "AI",
-      headline: "Your AI built the app. Who's watching it\u00A0run?",
-      // Focused: concrete signals, then the AI-native benefit that ties back to
-      // the headline's "who's watching it run". No em dash.
-      sub: "Errors, performance, and logs in one place. Ask what happened in plain language, no dashboard required.",
-      response: "We speak AI\u00A0too.",
-      cta: "Start free in 5 minutes",
+      headline: "Prompted in a minute. Running for\u00A0months.",
+      // Focused: one concrete question and what comes back, tying to the
+      // headline's "running for months". No em dash.
+      sub: "Ask why a request failed and get the trace, the slow query and the line that\u00A0threw.",
+      response: "Ask it like a\u00A0teammate.",
+      cta: "Try it free",
       headlineColorMode: "white",
       // Square art, monospace grid: the 96px tile field is hard squares on a
       // fixed lattice, and a monospace face is the type equivalent \u2014 every
@@ -254,7 +254,7 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
       responseSize: "28px",
       responseFontStyle: "normal",
       responseWeight: 400,
-      // Group the tagline tight above the CTA so "We speak AI too." reads as a
+      // Group the tagline tight above the CTA so "Ask it like a teammate." reads as a
       // lead-in to the button instead of floating up to the headline baseline.
       responsePin: "cta",
       // Monospace is wide: in a 7/12 tablet column this headline fragments
@@ -264,9 +264,9 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     speed: {
       label: "Speed",
       headline: "Errors fall. We catch.",
-      sub: "Every exception, every slowdown, every log line — one place. Five-minute install. No credit card.",
+      sub: "Every exception and slow request, grouped and ranked by how many people it hits. One line to\u00A0install.",
       response: "See everything. Fix it\u00A0fast.",
-      cta: "Start free in 5 minutes",
+      cta: "Try it free",
       headlineColorMode: "white",
       headlineFont: "'Cabinet Grotesk', sans-serif",
       headlineWeight: 500,
@@ -278,10 +278,10 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     },
     "broke-fixed": {
       label: "Broke / Fixed",
-      headline: "Something broke. You should already know what.",
-      sub: "Errors, performance, and logs — one place. Five-minute install.",
+      headline: "A request just failed. The trace is already\u00A0here.",
+      sub: "Stack traces, slow queries and timelines, side by side. One line to\u00A0install.",
       response: "Caught everything. Start at line\u00A042.",
-      cta: "Start free in 5 minutes",
+      cta: "Try it free",
       headlineColorMode: "white",
       // Geist Mono over JetBrains: same terminal voice, but circular bowls and
       // round dots that echo the point-field geometry instead of fighting it.
@@ -578,7 +578,7 @@ export interface DitherState {
  *  other becomes the hover reveal. */
 export type InitialStateId = "problem" | "fix";
 
-/** Pink/error layers — "something broke". Distinct shapes per layer. */
+/** Pink/error layers — the problem state. Distinct shapes per layer. */
 export const problemLayers: DitherAlphaLayer[] = [
   { color: "#E6307A", opacity: 0.9, shape: "simplex" },
   { color: "#FF6B2B", opacity: 0.7, shape: "warp" },
@@ -1611,7 +1611,7 @@ export const heroTemplates: HeroTemplate[] = [
     desc: "Square 24px error tiles with open gaps, pink problem state at rest; hover reveals the green fix. AI-native copy in JetBrains Mono.",
     swatch: ["#E6307A", "#FF6B2B", "#FF3366"],
     initialState: "problem",
-    // AI-native headline baked in: "Your AI built the app. Who's watching it run?"
+    // AI headline baked in: "Your AI wrote the page. Who's art-directing it?"
     copyVariant: "ai",
     // Match the reveal layer's detailed sampling. The global 0.21 scale makes
     // Error Sweep read as a few broad, almost-static regions; 0.81 exposes the

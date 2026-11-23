@@ -414,8 +414,8 @@ function buildRevealMask(
   ctx.setTransform(dpr, 0, 0, dpr, -box.x * dpr, -box.y * dpr)
   ctx.clearRect(box.x, box.y, box.w, box.h)
   ctx.fillStyle = '#000'
-  const maxSz = g.piece * Math.max(0, Math.min(1, w.scale))
-  const targetRound = g.radius + Math.max(0, Math.min(1, w.round)) * (g.piece / 2 - g.radius)
+  // Round is absolute, like the GPU field: 0 = square, 1 = circle.
+  const round = Math.max(0, Math.min(1, w.round))
   const rot = w.rotate * Math.PI / 180
   let drew = false
   for (let row = rowLo; row <= rowHi; row++) {
@@ -425,7 +425,7 @@ function buildRevealMask(
       if (Math.hypot(tcx - px, tcy - py) > rr) continue
       const sz = snapPiece(warpTileSize(g.piece, w.scale, w.spread, col, row), pitch, dpr)
       if (sz <= 0) continue
-      const rad = clampTileRadius(maxSz > 0 ? g.radius + (targetRound - g.radius) * (sz / maxSz) : g.radius, sz)
+      const rad = clampTileRadius(round * sz / 2, sz)
       ctx.save()
       ctx.translate(tcx, tcy)
       if (rot) ctx.rotate(rot)

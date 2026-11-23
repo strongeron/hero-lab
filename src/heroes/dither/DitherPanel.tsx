@@ -120,24 +120,49 @@ function headline(ctx: CanvasRenderingContext2D, W: number, H: number) {
   ctx.globalAlpha = 1
 }
 
-/** A palette swatch's copy accents, as the hero paints them: title and sub
- *  bars on top in the title colour, the response line and the CTA pill at
- *  the bottom in the palette's accent. */
-function paletteAccents(ctx: CanvasRenderingContext2D, W: number, H: number, dpr: number, title: string, cta: { bg: string; text: string }) {
+/** A palette swatch's copy, laid out like the picked Layout and coloured as
+ *  the hero paints it.
+ *  - Split: title and sub bars top left in the title colour; the response
+ *    line and the CTA pill at the bottom in the palette's accent.
+ *  - Centered: a centred title, sub and CTA pill (the hero has no response
+ *    line there), each cleared to the background like the clearance mask. */
+function paletteAccents(ctx: CanvasRenderingContext2D, W: number, H: number, dpr: number,
+  o: { title: string; cta: { bg: string; text: string }; back: string; centered: boolean }) {
   const u = Math.max(2, Math.round(2 * dpr)), x = Math.round(5 * dpr)
-  ctx.fillStyle = title
+  const ph = Math.round(9 * dpr), pw = Math.round(W * 0.22), r = Math.round(2 * dpr)
+  const pill = (px: number, py: number) => {
+    ctx.fillStyle = o.cta.bg
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, r); ctx.fill()
+    ctx.fillStyle = o.cta.text
+    ctx.fillRect(px + Math.round(pw * 0.2), py + Math.round((ph - u) / 2), Math.round(pw * 0.6), u)
+  }
+  if (o.centered) {
+    const pad = Math.round(2 * dpr)
+    const bars: [number, number, number, number][] = [
+      [W * 0.5, 6 * dpr, u + dpr, 1], [W * 0.34, 13 * dpr, u, 0.7],
+    ]
+    const py = Math.round(H * 0.5 + 2 * dpr)
+    ctx.fillStyle = o.back
+    for (const [w, y, hgt] of bars) ctx.fillRect(Math.round((W - w) / 2) - pad, Math.round(y) - pad, Math.round(w) + 2 * pad, Math.round(hgt) + 2 * pad)
+    ctx.fillRect(Math.round((W - pw) / 2) - pad, py - pad, pw + 2 * pad, ph + 2 * pad)
+    ctx.fillStyle = o.title
+    for (const [w, y, hgt, alpha] of bars) {
+      ctx.globalAlpha = alpha
+      ctx.fillRect(Math.round((W - w) / 2), Math.round(y), Math.round(w), Math.round(hgt))
+    }
+    ctx.globalAlpha = 1
+    pill(Math.round((W - pw) / 2), py)
+    return
+  }
+  ctx.fillStyle = o.title
   ctx.fillRect(x, Math.round(5 * dpr), Math.round(W * 0.42), u + Math.round(dpr))
   ctx.globalAlpha = 0.7
   ctx.fillRect(x, Math.round(11 * dpr), Math.round(W * 0.28), u)
   ctx.globalAlpha = 1
-  const ph = Math.round(9 * dpr), pw = Math.round(W * 0.22), py = H - ph - Math.round(4 * dpr)
-  ctx.fillStyle = cta.bg
+  const py = H - ph - Math.round(4 * dpr)
+  ctx.fillStyle = o.cta.bg
   ctx.fillRect(x, py + Math.round((ph - u) / 2), Math.round(W * 0.3), u)
-  ctx.beginPath()
-  ctx.roundRect(W - pw - x, py, pw, ph, Math.round(2 * dpr))
-  ctx.fill()
-  ctx.fillStyle = cta.text
-  ctx.fillRect(W - pw - x + Math.round(pw * 0.2), py + Math.round((ph - u) / 2), Math.round(pw * 0.6), u)
+  pill(W - pw - x, py)
 }
 
 const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length)]
@@ -198,6 +223,7 @@ export default function DitherPanel() {
   // shapeLift in DitherHero). ponytail: a fixed 24% of the height stands in
   // for the measured band (header to copy top, ~0.26 of 900px on desktop);
   // pass the hero's measured value if the copy block moves a lot.
+  const centered = state.composition.mode === 'centered'
   const lift = state.edge.mode === 'full' || state.composition.mode === 'centered' ? 0 : HERO.h * 0.24
   const heroSketch = { lift, back: c.colorBack, scale: c.scale, rotation: c.rotation, spread: c.alphaSpread, heroW: HERO.w, heroH: HERO.h, ...tile }
   /** Layout previews: the field at preview pitch `pp` (device px), point
@@ -369,7 +395,7 @@ export default function DitherPanel() {
                   <LivePreview className="w-full h-12 rounded-sm" rate={pointMode ? tempo : 0.35 * tempo} draw={(ctx, time, W, H, dpr) => {
                     if (pointMode) {
                       drawPointField(ctx, W, H, { back: p.back, layers: recolor(c.alphaLayers, p[state.initialState]), pitch: swatchTile.pitch * dpr, gap: swatchTile.gap * dpr, ...pointField(time) })
-                      paletteAccents(ctx, W, H, dpr, title, cta)
+                      paletteAccents(ctx, W, H, dpr, { title, cta, back: p.back, centered })
                       return
                     }
                     drawField(ctx, W, H, {
@@ -377,7 +403,7 @@ export default function DitherPanel() {
                       layers: recolor(c.alphaLayers, p[state.initialState]),
                       warp: { x: W * (0.5 + 0.4 * Math.sin(time)), y: H / 2, r: H * 0.75, layers: recolor(h.hoverLayers, p[otherState]), rotate: 0, round: swatchTile.round, jitter: 0 },
                     })
-                    paletteAccents(ctx, W, H, dpr, title, cta)
+                    paletteAccents(ctx, W, H, dpr, { title, cta, back: p.back, centered })
                   }} />
                   <span className="flex min-w-0 items-baseline justify-between gap-1 px-0.5">
                     <span className="truncate text-lab-xs font-medium">{p.label}</span>

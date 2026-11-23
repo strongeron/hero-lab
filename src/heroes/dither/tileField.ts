@@ -247,9 +247,10 @@ void main() {
       float u = pow(tileHash(ci, 1337), 1. / (1. + sp * 1.25));
       sz = minSz + (maxSz - minSz) * u;
     }
-    float targetRound = baseRound + clamp(u_wRound, 0., 1.) * (u_basePiece * .5 - baseRound);
-    float desired = maxSz > 0. ? baseRound + (targetRound - baseRound) * (sz / maxSz) : baseRound;
-    o_warp = vec4(sz / u_pitch, clampR(desired, sz) / u_pitch, 1., 0.);
+    // Round is absolute (0 = square, 1 = circle), not added to the resting
+    // radius: on a round-dot field (Full Bleed) an added round is a no-op, so
+    // Crisp/Soft/Twist looked the same. Now the reveal's shape is the feel's.
+    o_warp = vec4(sz / u_pitch, clampR(clamp(u_wRound, 0., 1.) * sz * .5, sz) / u_pitch, 1., 0.);
   } else {
     o_warp = vec4(u_basePiece / u_pitch, clampR(baseRound, u_basePiece) / u_pitch, 0., 0.);
   }
