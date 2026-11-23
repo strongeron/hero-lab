@@ -54,7 +54,7 @@ import SectionLabel from '../../lab/ui/SectionLabel'
 import Toggle from '../../lab/ui/Toggle'
 import LivePreview from '../../lab/ui/LivePreview'
 import { pickTile } from '../../lab/ui/pickTile'
-import { boundingRect, centredCopyLines, drawClearance, drawCopyBars, drawField, drawHero, drawPointField, previewWarp, type SketchLayer } from './panelSketch'
+import { boundingRect, bridgeTextRects, centredCopyLines, drawClearance, drawCopyBars, drawField, drawHero, drawPointField, previewWarp, type SketchLayer } from './panelSketch'
 
 /* The Design Panel offers curated choices only: every option keeps the resting
    state and the hover intact. Renderer, edge, scene and hover mode belong to
@@ -342,7 +342,10 @@ export default function DitherPanel() {
               </button>
             ))}
           </div>
-          {state.composition.mode === 'centered' && (
+        </Group>
+
+        {state.composition.mode === 'centered' && (
+          <Group title="Clearance" value={`${clearanceStops.find((x) => x.value === state.edge.fullPadding)?.label ?? `${state.edge.fullPadding}px`} · ${state.edge.textRectMode === 'lines' ? 'one shape' : 'one block'}`}>
             <>
               {/* The 'full' edge that shapes Centered, at a 2× crop of the
                   hero's middle: tiles, clearance and rim to one scale. */}
@@ -352,7 +355,7 @@ export default function DitherPanel() {
                 const u = pp / heroPitch
                 const o = layoutField(ctx, W, H, time, pp)
                 const lines = centredCopyLines(W, H)
-                drawClearance(ctx, W, H, state.edge.textRectMode === 'lines' ? lines : [boundingRect(lines)], {
+                drawClearance(ctx, W, H, state.edge.textRectMode === 'lines' ? bridgeTextRects(lines) : [boundingRect(lines)], {
                   back: c.colorBack, pitch: pp, ...o,
                   pad: state.edge.fullPadding * u,
                   rim: Math.max(1, Math.round(state.edge.dissolveDepth)) * pp,
@@ -370,11 +373,11 @@ export default function DitherPanel() {
                   options={rimMotionStops.map((x) => ({ value: x.value, label: x.label }))} />
               )}
               <Segmented size="xs" stretch label="Clear round" value={state.edge.textRectMode} onChange={(textRectMode) => setEdgeConfig({ textRectMode })}
-                options={[{ value: 'lines', label: 'Each line' }, { value: 'box', label: 'Each block' }]} />
+                options={[{ value: 'lines', label: 'Hug lines' }, { value: 'box', label: 'One block' }]} />
               {pointMode && <p className={hint}>Centered raises Size contrast (Grid) so dots swing between specks and full pieces.</p>}
             </>
-          )}
-        </Group>
+          </Group>
+        )}
 
         <Group title="At rest" value={`hover reveals ${otherState}`}>
           <Segmented size="xs" stretch label="State at rest" value={state.initialState} onChange={setInitialState}
@@ -551,10 +554,20 @@ export default function DitherPanel() {
             options={[{ value: 0, label: 'Square' }, { value: 12, label: 'Rounded' }, { value: 999, label: 'Pill' }]} />
         </Group>
 
+        {state.composition.mode !== 'centered' && (
+          <Group title="CTA aligns to sub">
+            <Segmented size="xs" stretch label="CTA aligns to sub"
+              value={state.layout.ctaAlign}
+              onChange={(v) => setLayoutConfig({ ctaAlign: v })}
+              options={[{ value: 'first', label: 'First line' }, { value: 'middle', label: 'Middle' }, { value: 'last', label: 'Last line' }]} />
+          </Group>
+        )}
+
         <Group title="Guides">
           <div className="flex gap-3">
             <Toggle inline label="Layout guides" on={state.layout.showGuides} onChange={(on) => setLayoutConfig({ showGuides: on })}>Layout</Toggle>
             <Toggle inline label="Baseline guides" on={state.layout.showBaselines} onChange={(on) => setLayoutConfig({ showBaselines: on })}>Baselines</Toggle>
+            <Toggle inline label="Box guides" on={state.layout.showBoxes} onChange={(on) => setLayoutConfig({ showBoxes: on })}>Boxes</Toggle>
           </div>
         </Group>
       </div>

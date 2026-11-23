@@ -195,3 +195,42 @@ export function getContrastValues(bgHex: string): { lcWhite: number; lcDark: num
     lcDark: apcaLc(DARK_RGB, bg),
   }
 }
+
+/** Parse '#RGB', '#RRGGBB' or a computed 'rgb(r, g, b)' / 'rgba(...)' colour. */
+function cssToRgb(css: string): Rgb | null {
+  const m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i.exec(css.trim())
+  if (m) return [Number(m[1]), Number(m[2]), Number(m[3])]
+  return hexToRgb(css)
+}
+
+/** APCA Lc (absolute) of text on a background. 0 when a colour does not parse. */
+export function textLc(textCss: string, bgCss: string): number {
+  const t = cssToRgb(textCss)
+  const b = cssToRgb(bgCss)
+  return t && b ? Math.round(absLc(t, b) * 10) / 10 : 0
+}
+
+/** APCA minimum Lc for a line of text, from its size and weight (the APCA
+ *  "bronze" lookup, simplified): 75 for body, 60 for large or bold, 45 for
+ *  display. A thin weight (< 400) moves the text one step stricter. */
+export function requiredLc(fontSizePx: number, fontWeight: number): number {
+  const display = fontSizePx >= 36 || (fontSizePx >= 28 && fontWeight >= 600)
+  const large = fontSizePx >= 24 || (fontSizePx >= 16 && fontWeight >= 700)
+  let need = display ? 45 : large ? 60 : 75
+  if (fontWeight < 400 && need < 75) need += 15
+  return need
+}
+
+/** Lift text toward white (dark backgrounds) or black (light ones) until it
+ *  reaches minLc on bg. Keeps the hue's character: the smallest mix wins. */
+export function ensureTextLc(textHex: string, bgHex: string, minLc: number): string {
+  const t = hexToRgb(textHex)
+  const b = hexToRgb(bgHex)
+  if (!t || !b || absLc(t, b) >= minLc) return textHex
+  const target: Rgb = rgbToY(...b) < 0.18 ? [255, 255, 255] : [0, 0, 0]
+  for (let i = 1; i <= 20; i++) {
+    const c = mixRgb(t, target, i / 20)
+    if (absLc(c, b) >= minLc) return rgbToHex(c)
+  }
+  return rgbToHex(target)
+}

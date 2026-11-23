@@ -497,6 +497,12 @@ export interface DitherLayoutConfig {
   /** Debug overlay: column grid plus the left/right/top/bottom content edges
    *  (header row and copy block), to check every element sits on one frame. */
   showGuides: boolean;
+  /** Debug overlay: outline every copy box (headline, sub, response, CTA)
+   *  with its name and size. Each box carries data-guide for agents. */
+  showBoxes: boolean;
+  /** Split layout: which line of the sub the CTA lines up with. 'first' and
+   *  'last' share a baseline; 'middle' centres the button on the sub's lines. */
+  ctaAlign: 'first' | 'middle' | 'last';
 }
 
 /** Where the copy sits. 'split': headline left, response + CTA right, at the
@@ -679,6 +685,8 @@ export const defaultLayoutConfig: DitherLayoutConfig = {
   gutter: 55,
   showBaselines: false,
   showGuides: false,
+  showBoxes: false,
+  ctaAlign: 'first',
 };
 
 export const defaultAnimationConfig: DitherAnimationConfig = {
@@ -1714,7 +1722,7 @@ export function applyHeroTemplate(id: string) {
     ...base,
     // Debug overlays are a view setting, not part of a template's look: keep
     // them on while the user flips between templates to compare alignment.
-    layout: { ...base.layout, showBaselines: state.layout.showBaselines, showGuides: state.layout.showGuides },
+    layout: { ...base.layout, showBaselines: state.layout.showBaselines, showGuides: state.layout.showGuides, showBoxes: state.layout.showBoxes },
     shader: {
       ...base.shader,
       ...tmpl.shader,

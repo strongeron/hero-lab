@@ -41,10 +41,11 @@ export function applyDitherUrlParams(params: URLSearchParams): void {
   }
   const copy = params.get('copy')
   if (copy && (copyVariantIds as readonly string[]).includes(copy)) setCopyVariant(copy as CopyVariantId)
-  // ?guides=1 / ?baselines=1 turn on the alignment overlays (handy for
+  // ?guides=1 / ?baselines=1 / ?boxes=1 turn on the alignment overlays (handy for
   // headless screenshots of a pinned preview frame).
   if (params.get('guides') === '1') setLayoutConfig({ showGuides: true })
   if (params.get('baselines') === '1') setLayoutConfig({ showBaselines: true })
+  if (params.get('boxes') === '1') setLayoutConfig({ showBoxes: true })
   const theme = params.get('theme')
   if (theme) setTerminalTheme(theme)
   // State last, so a scene switch cannot clobber the layer swap.

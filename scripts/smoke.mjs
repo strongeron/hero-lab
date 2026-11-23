@@ -166,6 +166,19 @@ async function js(expression, timeout = 30000) {
   }
   return r.result.value
 }
+/** HSL hue distance in degrees between two 'rgb(r, g, b)' strings. */
+function hueDistance(a, b) {
+  const hue = (css) => {
+    const [r, g, bl] = css.match(/[\d.]+/g).slice(0, 3).map((n) => Number(n) / 255)
+    const max = Math.max(r, g, bl), min = Math.min(r, g, bl), d = max - min
+    if (!d) return 0
+    const h = max === r ? ((g - bl) / d) % 6 : max === g ? (bl - r) / d + 2 : (r - g) / d + 4
+    return (h * 60 + 360) % 360
+  }
+  const d = Math.abs(hue(a) - hue(b))
+  return Math.min(d, 360 - d)
+}
+
 const store = (body) => js(`(async () => { const S = window.__smokeStore; ${body} })()`)
 
 async function frames(n = 2) {
@@ -696,7 +709,7 @@ async function main() {
   })()`)
   const rgbOf = (hex) => `rgb(${hexRgb(hex).join(', ')})`
 
-  await check(`colour: in every palette the response line = CTA fill and sub = h1 (${split?.id})`, async () => {
+  await check(`colour: in every palette the response line shares the CTA hue and sub = h1 (${split?.id})`, async () => {
     await store(`S.applyHeroTemplate(${JSON.stringify(split.id)})`)
     await sleep(800)
     const bad = []
@@ -705,7 +718,11 @@ async function main() {
       await sleep(1200) // the CTA's colour transition
       const c = await readColours()
       const want = rgbOf(await store(`return S.heroCtaColors(${JSON.stringify(id)}).bg`))
-      if (c.resp !== c.ctaBg) bad.push(`${id}: response ${c.resp} ≠ CTA ${c.ctaBg}`)
+      // The response is the CTA fill lifted toward white until it reaches
+      // APCA Lc 75 (contrast is checked by the a11y checks), so it keeps the
+      // fill's hue, not its exact value.
+      const dh = hueDistance(c.resp, c.ctaBg)
+      if (dh > 6) bad.push(`${id}: response ${c.resp} hue is ${dh.toFixed(0)}° from CTA ${c.ctaBg}`)
       if (c.ctaBg !== want) bad.push(`${id}: CTA ${c.ctaBg} ≠ heroCtaColors ${want}`)
       if (c.sub !== c.h1) bad.push(`${id}: sub ${c.sub} ≠ h1 ${c.h1}`)
     }
@@ -725,6 +742,43 @@ async function main() {
     }
     assert(!bad.length, bad.join('; '))
     return `${t.palettes.length} palettes`
+  })
+
+  // ── Accessibility: APCA contrast of every copy line ──
+  // window.__heroA11y() reports one check per copy element (headline, sub,
+  // response, CTA): its text colour on what sits behind it, against the APCA
+  // minimum for its size and weight. Agents can call the same function.
+  await check('a11y: every template × palette passes APCA contrast', async () => {
+    const bad = []
+    let n = 0
+    for (const tpl of t.templates) {
+      for (const id of t.palettes) {
+        await store(`S.applyHeroTemplate(${JSON.stringify(tpl.id)}); S.setPalette(${JSON.stringify(id)})`)
+        await sleep(250)
+        const rows = await js(`window.__heroA11y ? window.__heroA11y() : null`)
+        assert(rows, 'window.__heroA11y is missing')
+        for (const r of rows) {
+          n++
+          if (!r.pass) bad.push(`${tpl.id}/${id} ${r.name}: Lc ${r.lc} < ${r.need} (${r.size}px/${r.weight})`)
+        }
+      }
+    }
+    assert(!bad.length, bad.join('; '))
+    return `${n} lines checked`
+  })
+
+  await check('a11y: every copy variant passes APCA contrast (Problem)', async () => {
+    const ids = await store(`return S.copyVariantIds`)
+    assert(ids?.length, 'no copy variants exported')
+    const bad = []
+    for (const id of ids) {
+      await store(`S.applyHeroTemplate('problem'); S.setCopyVariant(${JSON.stringify(id)})`)
+      await sleep(300)
+      const rows = await js(`window.__heroA11y()`)
+      for (const r of rows) if (!r.pass) bad.push(`${id} ${r.name}: Lc ${r.lc} < ${r.need} (${r.size}px/${r.weight})`)
+    }
+    assert(!bad.length, bad.join('; '))
+    return `${ids.length} copy variants`
   })
 
   // ── Problem hover band ──
@@ -806,7 +860,8 @@ async function main() {
     await clickButton('Centered', scope)
     await sleep(400)
     assert((await store(`return S.getDitherState().composition.mode`)) === 'centered', 'store is not Centered')
-    const groups = await js(`[...(${scope}).querySelectorAll('[role=group]')].map((g) => g.getAttribute('aria-label'))`)
+    // Centered's edge controls live in their own Clearance section under Layout.
+    const groups = await js(`[...document.querySelectorAll('aside[data-design-panel] section')].filter((s) => ['Layout', 'Clearance'].includes(s.querySelector('h4')?.textContent.trim())).flatMap((s) => [...s.querySelectorAll('[role=group]')].map((g) => g.getAttribute('aria-label')))`)
     for (const want of ['Clearance', 'Rim', 'Rim motion', 'Clear round']) assert(groups.includes(want), `no ${want} control (${groups.join(', ')})`)
     await clickButton('Hug 4px', `document.querySelector('aside[data-design-panel] [role=group][aria-label=Clearance]')`)
     await sleep(200)

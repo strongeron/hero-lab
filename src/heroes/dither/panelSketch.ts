@@ -425,6 +425,37 @@ export function centredCopyLines(W: number, H: number): SketchRect[] {
 }
 
 /** One bounding box round all `rects` ('box' text rects). */
+/** Join stacked text rects into one stepped shape. Between two rects that
+ *  sit one above the other and overlap horizontally, add a bridge rect over
+ *  the vertical gap, as wide as their overlap. The clearance then reads as one
+ *  block that hugs each line, not a pad per line with field showing between.
+ *  Side-by-side columns (Split) do not overlap, so they stay apart. */
+export const BRIDGE_MAX_GAP = 96
+export function bridgeTextRects<R extends SketchRect>(rects: R[]): SketchRect[] {
+  const sorted = [...rects].sort((a, b) => a.y - b.y)
+  const bridges: SketchRect[] = []
+  for (let i = 0; i < sorted.length; i++) {
+    const a = sorted[i]
+    // The nearest rect below a that overlaps it horizontally.
+    let best: SketchRect | null = null
+    for (let j = i + 1; j < sorted.length; j++) {
+      const b = sorted[j]
+      if (b.y < a.y + a.h) continue
+      const left = Math.max(a.x, b.x)
+      const right = Math.min(a.x + a.w, b.x + b.w)
+      if (right - left < 8) continue
+      if (!best || b.y < best.y) best = b
+    }
+    if (!best) continue
+    const gap = best.y - (a.y + a.h)
+    if (gap <= 0 || gap > BRIDGE_MAX_GAP) continue
+    const left = Math.max(a.x, best.x)
+    const right = Math.min(a.x + a.w, best.x + best.w)
+    bridges.push({ x: left, y: a.y + a.h, w: right - left, h: gap })
+  }
+  return bridges.length ? [...rects, ...bridges] : rects
+}
+
 export function boundingRect(rects: SketchRect[]): SketchRect {
   const x = Math.min(...rects.map((r) => r.x)), y = Math.min(...rects.map((r) => r.y))
   return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y }

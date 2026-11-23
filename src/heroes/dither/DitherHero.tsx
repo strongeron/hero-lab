@@ -5,6 +5,8 @@ import { getThemeById } from '../../themes/terminalThemes'
 import { TileFieldRenderer, type TileFieldFrame } from './tileField'
 import { useHeadlineFit } from './useHeadlineFit'
 import { morphShape, roamPose } from './roam'
+import { bridgeTextRects } from './panelSketch'
+import { ensureTextLc, requiredLc, textLc } from '../../utils/colorContrast'
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
@@ -156,6 +158,22 @@ function lineBaselines(el: Element, minWidth = 4): number[] {
 /** Baseline of an element's LAST rendered text line. Null when nothing renders. */
 function lastLineBaseline(el: Element): number | null {
   return lineBaselines(el).at(-1) ?? null
+}
+
+/** APCA check of one copy element: its text colour on what sits behind it
+ *  (the button's own fill for the CTA, the hero background for the rest). */
+interface ContrastCheck { name: string; color: string; bg: string; size: number; weight: number; lc: number; need: number; pass: boolean }
+function checkContrast(name: string, el: Element, heroBack: string): ContrastCheck {
+  const cs = getComputedStyle(el)
+  const own = cs.backgroundColor
+  const bg = own && own !== 'rgba(0, 0, 0, 0)' && own !== 'transparent' ? own : heroBack
+  const size = parseFloat(cs.fontSize)
+  const weight = Number(cs.fontWeight) || 400
+  const lc = textLc(cs.color, bg)
+  // A button label is short, non-body text: APCA puts its floor at Lc 60,
+  // the same threshold heroCtaColors solves the CTA pair for.
+  const need = name === 'cta' ? Math.min(60, requiredLc(size, weight)) : requiredLc(size, weight)
+  return { name, color: cs.color, bg, size, weight, lc, need, pass: lc >= need }
 }
 
 /** Bumps when a web font finishes loading. Font swaps change line metrics
@@ -547,13 +565,17 @@ export default function DitherHero() {
   const CTA_BG = cta.bg
   const CTA_BG_HOVER = cta.hover
   const ctaTextColor = cta.text
-  const headlineColor = activeTheme
+  // Lifted to APCA Lc 75 on the background so the sub (same colour, body
+  // size) passes too; a pale palette colour already passes and is unchanged.
+  const headlineColor = ensureTextLc(activeTheme
     ? activeTheme.fg
-    : (copy.headlineColorMode === 'white' ? '#FFFFFF' : palettes[palette].problem[0])
+    : (copy.headlineColorMode === 'white' ? '#FFFFFF' : palettes[palette].problem[0]), c.colorBack, 75)
   // One accent per theme: the response line and the CTA share CTA_BG, so the
   // line reads as the button's lead-in. Every palette's CTA_BG is ≥ 4.29:1 on
   // its background, and the response is large text (≥ 28px, needs 3:1).
-  const responseColor = copy.responseColorMode === 'white' && !activeTheme ? '#FFFFFF' : CTA_BG
+  // The accent is lifted toward white until it reaches APCA Lc 75 on the
+  // background: a thin mono response at 20px read as dim green at Lc ~50.
+  const responseColor = copy.responseColorMode === 'white' && !activeTheme ? '#FFFFFF' : ensureTextLc(CTA_BG, c.colorBack, 75)
   // The sub is the title's colour, never a tint of the accent.
   const sublineColor = headlineColor
 
@@ -890,7 +912,8 @@ export default function DitherHero() {
           rects.push({ x: r.left - hostRect.left, y: r.top - hostRect.top, w: r.width, h: r.height })
         }
       })
-      setTextRects((prev) => (JSON.stringify(prev) === JSON.stringify(rects) ? prev : rects))
+      const joined = bridgeTextRects(rects)
+      setTextRects((prev) => (JSON.stringify(prev) === JSON.stringify(joined) ? prev : joined))
     }
     measure()
     const ro = new ResizeObserver(measure)
@@ -904,13 +927,13 @@ export default function DitherHero() {
 
   // Baseline lock (problem layout) — the right column snaps to the left one:
   // the response's last line shares the headline's last baseline, the CTA
-  // label shares the sub's last baseline. Nudges accumulate incrementally
+  // label shares the sub's first baseline. Nudges accumulate incrementally
   // (target minus current, measured post-transform) so the lock converges and
   // then holds across font, size, and copy changes.
   useEffect(() => {
     if (centered) return
     // Generous bound: at wide viewports the CTA's natural distance from the
-    // sub's last baseline can exceed 50px — a tight clamp saturates just
+    // sub's first baseline can exceed 50px — a tight clamp saturates just
     // short of the target and the lock visibly misses.
     const clampNudge = (v: number) => Math.max(-200, Math.min(200, Math.round(v * 2) / 2))
     // The lock aligns the right column to the left one — it only makes sense
@@ -932,13 +955,28 @@ export default function DitherHero() {
         const hB = h1El && lastLineBaseline(h1El)
         const rB = respP && lastLineBaseline(respP)
         if (hB != null && rB != null && Math.abs(hB - rB) > 0.5) response = clampNudge(response + (hB - rB))
-        const sB = subEl && lastLineBaseline(subEl)
-        // The CTA label sits on the sub's last baseline, so the button text
-        // and the sub read as one line of type across the two columns.
-        const cB = ctaEl && lastLineBaseline(ctaEl)
+        // The CTA lines up with the sub across the two columns (ctaAlign):
+        // 'first' / 'last' share that line's baseline with the button label;
+        // 'middle' centres the button box on the sub's lines, so a one-line
+        // or multi-line sub reads as one row with the button.
+        const ctaAlign = layout.ctaAlign
+        let sB: number | null = null
+        let cB: number | null = null
+        if (subEl && ctaEl) {
+          if (ctaAlign === 'middle') {
+            const r = subEl.getBoundingClientRect()
+            const c = ctaEl.getBoundingClientRect()
+            sB = (r.top + r.bottom) / 2
+            cB = (c.top + c.bottom) / 2
+          } else {
+            const lines = lineBaselines(subEl)
+            sB = (ctaAlign === 'last' ? lines.at(-1) : lines[0]) ?? null
+            cB = lastLineBaseline(ctaEl)
+          }
+        }
         if (sB != null && cB != null && Math.abs(sB - cB) > 0.5) cta = clampNudge(cta + (sB - cB))
         // Both locks pull the response and the CTA toward each other. When the
-        // headline's last baseline and the sub's last baseline sit closer than
+        // headline's last baseline and the sub's first baseline sit closer than
         // the response + CTA stack needs (a one-line sub), they collide. Open
         // the headline→sub gap by the overlap instead of breaking either lock:
         // the headline rises, the response follows it, and both baselines hold.
@@ -985,7 +1023,7 @@ export default function DitherHero() {
       twoCol.removeEventListener('change', measure)
     }
   }, [centered, copy.responsePin, copyVariant, typePair, stackTablet, layout.headlineCols, layout.responseCols, layout.gutter,
-    containerSize.w, fontsLoaded])
+    layout.ctaAlign, containerSize.w, fontsLoaded])
 
   // Baseline guides — debug overlay for alignment checks. One line per
   // rendered text line (headline, sub, response, CTAs), computed from the
@@ -1053,6 +1091,59 @@ export default function DitherHero() {
       window.removeEventListener('resize', measure)
     }
   }, [layout.showGuides, copyVariant, typePair, layout, fontsLoaded])
+
+  // Box guides — debug overlay that outlines each copy box (headline, sub,
+  // response, CTA) with its name and size. Every box and line overlay carries
+  // data-guide so an agent can read the same frame from the DOM.
+  const [boxGuides, setBoxGuides] = useState<{ name: string; x: number; y: number; w: number; h: number; check?: ContrastCheck }[]>([])
+  useEffect(() => {
+    if (!layout.showBoxes) return
+    const host = shaderContainerRef.current
+    const content = contentRef.current
+    if (!host || !content) return
+    const measure = () => {
+      const hostRect = host.getBoundingClientRect()
+      const boxes: { name: string; el: Element | null | undefined }[] = [
+        { name: 'copy', el: copyBoxRef.current },
+        { name: 'headline', el: content.querySelector('h1') },
+        { name: 'sub', el: lockSubRef.current ?? content.querySelector('h1 ~ p') },
+        { name: 'response', el: lockResponseWrapRef.current?.querySelector('p') },
+        { name: 'cta', el: lockCtaRef.current ?? content.querySelector('a') },
+      ]
+      const next = boxes.flatMap(({ name, el }) => {
+        if (!el) return []
+        const r = el.getBoundingClientRect()
+        if (r.width === 0 || r.height === 0) return []
+        const check = name === 'copy' ? undefined : checkContrast(name, el, c.colorBack)
+        return [{ name, x: Math.round(r.left - hostRect.left), y: Math.round(r.top - hostRect.top), w: Math.round(r.width), h: Math.round(r.height), check }]
+      })
+      setBoxGuides((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(content)
+    ro.observe(host)
+    return () => ro.disconnect()
+  }, [layout.showBoxes, copyVariant, typePair, layout, baselineNudge, fontsLoaded, centered, c.colorBack, palette, termThemeId])
+
+  // Contrast report for agents and the smoke check: window.__heroA11y()
+  // returns one APCA check per copy element of the hero as it renders now.
+  useEffect(() => {
+    const report = () => {
+      const content = contentRef.current
+      if (!content) return []
+      const els: [string, Element | null | undefined][] = [
+        ['headline', content.querySelector('h1')],
+        ['sub', lockSubRef.current ?? content.querySelector('h1 ~ p')],
+        ['response', lockResponseWrapRef.current?.querySelector('p')],
+        ['cta', lockCtaRef.current ?? content.querySelector('a')],
+      ]
+      return els.flatMap(([name, el]) => (el ? [checkContrast(name, el, c.colorBack)] : []))
+    }
+    const w = window as unknown as { __heroA11y?: () => ContrastCheck[] }
+    w.__heroA11y = report
+    return () => { if (w.__heroA11y === report) delete w.__heroA11y }
+  }, [c.colorBack])
 
   const POINT_FLOW_CELLS = 6
 
@@ -1773,6 +1864,8 @@ export default function DitherHero() {
             <div
               key={y}
               className="absolute left-0 right-0"
+              data-guide="baseline"
+              data-y={y}
               style={{ top: y, height: 1, background: 'rgba(255, 45, 150, 0.6)' }}
             />
           ))}
@@ -1799,8 +1892,32 @@ export default function DitherHero() {
             </div>
           </div>
           {edgeGuides.map((g) => (
-            <div key={g.label} className="absolute left-0 right-0" style={{ top: g.y, height: 1, background: 'rgba(255, 184, 0, 0.8)' }}>
+            <div key={g.label} data-guide="edge" data-label={g.label} data-y={g.y} className="absolute left-0 right-0" style={{ top: g.y, height: 1, background: 'rgba(255, 184, 0, 0.8)' }}>
               <span className="absolute right-1 -top-[14px] text-[10px] leading-none font-mono" style={{ color: 'rgba(255, 184, 0, 0.95)' }}>{g.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Box guides — a lime outline round each copy box, labelled with its
+          name and size, so a person and an agent check the same frame. */}
+      {layout.showBoxes && boxGuides.length > 0 && (
+        <div className="absolute inset-0 z-[46] pointer-events-none" aria-hidden="true">
+          {boxGuides.map((b) => (
+            <div
+              key={b.name}
+              data-guide="box"
+              data-name={b.name}
+              data-rect={`${b.x},${b.y},${b.w},${b.h}`}
+              data-lc={b.check?.lc}
+              data-need={b.check?.need}
+              data-pass={b.check ? String(b.check.pass) : undefined}
+              className="absolute"
+              style={{ left: b.x, top: b.y, width: b.w, height: b.h, boxShadow: `inset 0 0 0 1px ${b.check && !b.check.pass ? 'rgba(255, 70, 70, 0.95)' : b.name === 'copy' ? 'rgba(160, 255, 60, 0.45)' : 'rgba(160, 255, 60, 0.9)'}` }}
+            >
+              <span className="absolute left-0 -top-[13px] text-[10px] leading-none font-mono whitespace-nowrap" style={{ color: b.check && !b.check.pass ? 'rgba(255, 90, 90, 1)' : 'rgba(160, 255, 60, 0.95)' }}>
+                {b.name} {b.w}×{b.h}{b.check ? ` · Lc ${Math.round(b.check.lc)}/${b.check.need} ${b.check.pass ? 'pass' : 'FAIL'}` : ''}
+              </span>
             </div>
           ))}
         </div>

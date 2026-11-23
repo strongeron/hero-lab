@@ -179,7 +179,7 @@ export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
     },
     {
       id: 'edge', name: 'Full edge', verdict: 'core', vlabel: 'Core',
-      value: `fills the hero · ${t.edge.fullPadding}px clearance around each ${t.edge.textRectMode === 'lines' ? 'line' : 'block'}`,
+      value: `fills the hero · ${t.edge.fullPadding}px clearance as ${t.edge.textRectMode === 'lines' ? 'one shape that hugs each line' : 'one block'}`,
       used: textFlow,
       on: s.edge.mode === t.edge.mode,
       set: (on) => {
