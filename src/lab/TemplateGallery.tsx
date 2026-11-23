@@ -1,26 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState , type ReactNode } from 'react'
 import { useDitherStore, applyHeroTemplate, heroTemplates, getTabSourceId } from '../heroes/dither/ditherStore'
 import LabToolbarTitle from './LabToolbarTitle'
 import { DEVICES } from './PreviewCanvas'
+import Segmented from './ui/Segmented'
 
 const GAP = 32
 const PAD = 40
 const BOARD_GAP = 56
 
-/** Templates canvas — one artboard (3 breakpoint frames) per template, all
+/** Canvas view — one artboard (3 breakpoint frames) per template, all
  *  visible at once. Frames are pinned to their template via ?template=<id>:
  *  they render the canonical look until their artboard is clicked, which loads
  *  the template into the Design Panel and switches just that artboard to live
  *  sync. Other artboards snap back to canonical. */
 type ZoomMode = 'fit' | 0.75 | 1
 
-export default function TemplateGallery() {
+/** `actions`: toolbar buttons from the lab shell (the Design toggle). */
+export default function TemplateGallery({ actions }: { actions?: ReactNode }) {
   const state = useDitherStore()
   const wrapRef = useRef<HTMLDivElement>(null)
   const [availWidth, setAvailWidth] = useState(0)
   const [zoom, setZoom] = useState<ZoomMode>('fit')
 
-  useEffect(() => {
+  // Layout effect: measure before the first paint, so the artboards do not
+  // paint at the 0.3 fallback scale and then jump (CLS 0.078 on Slow 4G).
+  useLayoutEffect(() => {
     const el = wrapRef.current
     if (!el) return
     const apply = () => setAvailWidth(el.clientWidth)
@@ -56,36 +60,37 @@ export default function TemplateGallery() {
   // Bump when posters are re-baked. Without this the browser keeps serving the
   // cached image and the gallery silently shows the previous bake — the artboard
   // looks stale (old fonts, old state) while the file on disk is already right.
-  const POSTER_VERSION = 3
-  const posterSrc = (templateId: string, deviceId: string) =>
-    `${import.meta.env.BASE_URL}posters/${templateId}-${deviceId}.jpeg?v=${POSTER_VERSION}`
+  // WebP at full bake size plus a half-size copy (slow-connection audit, fix 4):
+  // the artboards render at well under bake size, so the browser picks the
+  // half copy at Fit zoom and the full one at 100% / on 2x screens.
+  const POSTER_VERSION = 5
+  const posterSrc = (templateId: string, deviceId: string, half = false) =>
+    `${import.meta.env.BASE_URL}posters/${templateId}-${deviceId}${half ? '-half' : ''}.webp?v=${POSTER_VERSION}`
+  /** Bake width per device: desktop is baked at 1x, tablet and mobile at 2x. */
+  const bakeWidth = (d: (typeof DEVICES)[number]) => (d.id === 'desktop' ? d.width : d.width * 2)
 
   const rowHeight = Math.max(...DEVICES.map((d) => d.height)) * scale
 
   return (
-    <div className="h-screen flex flex-col bg-[#0b0c14]">
+    <div className="h-dvh flex flex-col bg-lab-canvas">
       {/* Pinned toolbar */}
-      <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
+      <div className="shrink-0 z-10 h-lab-bar flex items-center justify-between px-6 border-b border-lab-border bg-lab-toolbar">
         <LabToolbarTitle
-          view="Templates"
-          strap="baked snapshots — select an artboard to load the live animation & edit in the Design Panel"
+          view="Canvas"
         />
-        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-white/[0.04] border border-white/8">
-          {([['fit', `Fit ${Math.round(fitScale * 100)}%`], [0.75, '75%'], [1, '100%']] as const).map(
-            ([mode, label]) => (
-              <button
-                key={String(mode)}
-                onClick={() => setZoom(mode)}
-                className={`text-[11px] font-medium px-2.5 py-1 rounded-md cursor-pointer border-0 transition-colors ${
-                  zoom === mode
-                    ? 'bg-white/12 text-white/90'
-                    : 'bg-transparent text-white/40 hover:text-white/70'
-                }`}
-              >
-                {label}
-              </button>
-            ),
-          )}
+        <div className="flex items-center gap-2">
+        <Segmented
+          size="xs"
+          label="Zoom"
+          value={zoom}
+          onChange={setZoom}
+          options={[
+            { value: 'fit', label: `Fit ${Math.round(fitScale * 100)}%` },
+            { value: 0.75, label: '75%' },
+            { value: 1, label: '100%' },
+          ]}
+        />
+        {actions}
         </div>
       </div>
 
@@ -97,15 +102,15 @@ export default function TemplateGallery() {
             return (
               <div key={t.id}>
                 <div className="flex items-baseline gap-3 mb-2.5">
-                  <span className={`text-[13px] font-semibold ${active ? 'text-emerald-300/90' : 'text-white/80'}`}>
+                  <span className={`text-lab-md font-semibold ${active ? 'text-lab-accent' : 'text-lab-fg'}`}>
                     {t.name}
                   </span>
                   {active && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-400/15 text-emerald-300/80 border border-emerald-400/25">
+                    <span className="text-lab-2xs font-semibold px-2 py-0.5 rounded-full bg-lab-accent/15 text-lab-accent border border-lab-accent/25">
                       Editing
                     </span>
                   )}
-                  <span className="text-[11px] text-white/30">{t.desc}</span>
+                  <span className="text-lab-xs text-lab-fg-subtle">{t.desc}</span>
                 </div>
 
                 <div
@@ -118,7 +123,7 @@ export default function TemplateGallery() {
                     {DEVICES.map((d) => (
                       <div key={d.id} className="shrink-0">
                         <div
-                          className="rounded-xl border border-white/10 overflow-hidden bg-black shadow-[0_16px_48px_rgba(0,0,0,0.5)]"
+                          className="rounded-xl border border-lab-border overflow-hidden bg-lab-artboard shadow-lab-raised"
                           style={{ width: d.width * scale, height: d.height * scale }}
                         >
                           {active ? (
@@ -143,8 +148,13 @@ export default function TemplateGallery() {
                             // Clicking (overlay below) mounts the live hero.
                             <img
                               src={posterSrc(t.id, d.id)}
+                              srcSet={`${posterSrc(t.id, d.id, true)} ${bakeWidth(d) / 2}w, ${posterSrc(t.id, d.id)} ${bakeWidth(d)}w`}
+                              sizes={`${Math.ceil(d.width * scale)}px`}
+                              width={bakeWidth(d)}
+                              height={Math.round((bakeWidth(d) * d.height) / d.width)}
                               alt={`${t.name} — ${d.label} preview`}
                               loading="lazy"
+                              decoding="async"
                               draggable={false}
                               style={{ width: d.width * scale, height: d.height * scale, objectFit: 'cover', objectPosition: 'top', display: 'block' }}
                             />
@@ -160,9 +170,9 @@ export default function TemplateGallery() {
                     <button
                       onClick={() => applyHeroTemplate(t.id)}
                       aria-label={`Edit ${t.name} in the Design Panel`}
-                      className="absolute inset-0 z-10 rounded-2xl cursor-pointer bg-transparent border-0 group"
+                      className="absolute inset-0 z-10 rounded-2xl cursor-pointer bg-transparent border-0 group lab-focus"
                     >
-                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-semibold px-3 py-1.5 rounded-full bg-[rgba(11,12,20,0.9)] border border-white/15 text-white/85 shadow-[0_8px_24px_rgba(0,0,0,0.5)] whitespace-nowrap">
+                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity text-lab-xs font-semibold px-3 py-1.5 rounded-full bg-lab-toolbar border border-lab-border-strong text-lab-fg shadow-lab-float whitespace-nowrap">
                         Edit in Design Panel
                       </span>
                     </button>

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B · Single pass</title>
+<style id="base"></style>
+<style>
+  canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .modes { position: fixed; left: 10px; top: 10px; z-index: 10; display: flex; gap: 6px; font: 12px ui-monospace, monospace; }
+  .modes a { color: #d8efe6; background: rgb(0 0 0 / .72); padding: 6px 9px; border-radius: 6px; text-decoration: none; }
+  .modes a[aria-current] { background: #2DD4A8; color: #062019; }
+</style>
+</head>
+<body>
+<!--
+  B — one WebGL2 context, one fragment shader, one draw per frame.
+  ?mode=color (default): the three Paper dither layers + screen blend +
+  rounded tile mask + hover reveal, all in-shader.
+  ?mode=points: GPU port of the lab's 2D point-size canvas (fbm dot sizes,
+  colour interpolation, whole-tile text clearance), with the same reveal.
+  Uniforms are written from one rAF loop — no React, no CSS masks, no
+  canvas → blob → mask-image round trip.
+-->
+<nav class="modes" id="modes"></nav>
+<div class="hero" id="hero"><canvas id="gl"></canvas></div>
+<script type="module">
+import { SCENE, BASE_CSS, COPY_HTML, hexToVec, makeHud, backingSize, textLineRects, frozenT, fakeMouse, params } from './common.js'
+import { FRAG, VERT } from './single-pass.js'
+
+document.getElementById('base').textContent = BASE_CSS
+const hero = document.getElementById('hero')
+hero.insertAdjacentHTML('beforeend', COPY_HTML)
+const mode = params.get('mode') === 'points' ? 1 : 0
+const useGrid = params.get('grid') !== '0'
+const nav = document.getElementById('modes')
+for (const [m, label] of [['color', 'Color/alpha'], ['points', 'Point sizes']]) {
+  const a = document.createElement('a')
+  const q = new URLSearchParams(location.search); q.set('mode', m)
+  a.href = '?' + q; a.textContent = label
+  if ((m === 'points') === (mode === 1)) a.setAttribute('aria-current', 'page')
+  nav.append(a)
+}
+
+const canvas = document.getElementById('gl')
+const gl = canvas.getContext('webgl2', { antialias: false, premultipliedAlpha: true })
+let draws = 0
+function compile(type, src) {
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s)
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s))
+  return s
+}
+const prog = gl.createProgram()
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT))
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG))
+gl.linkProgram(prog)
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog))
+gl.useProgram(prog)
+gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
+gl.enableVertexAttribArray(0)
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+const U = new Proxy({}, { get: (c, k) => (k in c ? c[k] : (c[k] = gl.getUniformLocation(prog, k))) })
+
+// Static uniforms — set once.
+gl.uniform1i(U.u_mode, mode)
+gl.uniform1i(U.u_grid, useGrid ? 1 : 0)
+gl.uniform1i(U.u_fadeFix, params.get('fadefix') === '1' ? 1 : 0)
+gl.uniform3fv(U.u_colorBack, hexToVec(SCENE.colorBack))
+gl.uniform3fv(U['u_problem[0]'], SCENE.problem.flatMap((l) => hexToVec(l.color)))
+gl.uniform3fv(U['u_fix[0]'], SCENE.fix.flatMap((l) => hexToVec(l.color)))
+gl.uniform1fv(U['u_shapeP[0]'], SCENE.problem.map((l) => l.shape))
+gl.uniform1fv(U['u_shapeF[0]'], SCENE.fix.map((l) => l.shape))
+gl.uniform1f(U.u_spread, SCENE.alphaSpread)
+gl.uniform1f(U.u_pxSize, SCENE.pxSize)
+gl.uniform1f(U.u_type, SCENE.type)
+gl.uniform1f(U.u_scale, SCENE.scale)
+gl.uniform1f(U.u_rotation, SCENE.rotation)
+gl.uniform1f(U.u_fit, SCENE.fit)
+const G = mode === 1 ? SCENE.gridPoints : SCENE.grid
+gl.uniform1f(U.u_pitch, G.pitch)
+gl.uniform1f(U.u_gap, G.gap)
+gl.uniform1f(U.u_radius, G.radius)
+gl.uniform1f(U.u_pad, 8)
+gl.uniform1f(U.u_rim, G.pitch * 2)
+
+// Resize: Paper's sizing for Color/alpha; native DPR (≤2) for points, like the lab's 2D canvas.
+function resize() {
+  const w = hero.clientWidth, h = hero.clientHeight
+  const b = mode === 0 ? backingSize(w, h) : backingSize(w, h, Infinity, Math.min(2, devicePixelRatio))
+  if (mode === 1) { b.w = Math.round(w * Math.min(2, devicePixelRatio)); b.h = Math.round(h * Math.min(2, devicePixelRatio)); b.renderScale = b.w / w }
+  canvas.width = b.w; canvas.height = b.h
+  gl.viewport(0, 0, b.w, b.h)
+  gl.uniform2f(U.u_resolution, b.w, b.h)
+  gl.uniform1f(U.u_pixelRatio, b.renderScale)
+  const rects = mode === 1 ? textLineRects(hero).slice(0, 16) : []
+  gl.uniform1i(U.u_nRects, rects.length)
+  if (rects.length) gl.uniform4fv(U['u_rects[0]'], rects.flatMap((r) => [r.x, r.y, r.w, r.h]))
+}
+new ResizeObserver(resize).observe(hero)
+resize()
+canvas.addEventListener('webglcontextlost', (e) => e.preventDefault())
+
+const mouse = { x: -1e4, y: -1e4, r: 0, target: 0 }
+hero.addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.target = SCENE.hoverRadius })
+hero.addEventListener('pointerleave', () => { mouse.target = 0 })
+if (fakeMouse) Object.assign(mouse, { x: fakeMouse.x, y: fakeMouse.y, r: SCENE.hoverRadius, target: SCENE.hoverRadius })
+
+// Pause when off screen (one IntersectionObserver for the whole field).
+let visible = true, running = false
+const kick = () => { if (!running && visible && !document.hidden) { running = true; requestAnimationFrame(frame) } }
+new IntersectionObserver(([e]) => { visible = e.isIntersecting; kick() }).observe(canvas)
+
+const stats = makeHud(`B · single pass (${mode ? 'points' : 'color'})`, () => ({ contexts: 1, draws }))
+let start = null
+function frame(now) {
+  if (!visible || document.hidden) { running = false; return }
+  const t0 = performance.now()
+  start ??= now
+  const s = (now - start) / 1000
+  stats.frames++
+  const paperT = frozenT ?? s * SCENE.speed
+  const k = now * 0.00015 * Math.PI * 2
+  const ops = frozenT != null ? SCENE.problem.map((l) => l.opacity) : SCENE.problem.map((l, i) => l.opacity * (1 + 0.25 * Math.sin(k + i * 2.1)))
+  const drift = frozenT != null ? [0, 0] : [Math.sin(now * 0.00035) * 0.05, Math.cos(now * 0.0005) * 0.05]
+  if (frozenT == null) mouse.r += (mouse.target - mouse.r) * 0.18
+  gl.uniform1f(U.u_time, paperT)
+  gl.uniform1f(U.u_tileT, frozenT ?? s * 0.06)
+  gl.uniform1fv(U['u_opacity[0]'], ops)
+  gl.uniform2f(U.u_drift, drift[0], drift[1])
+  gl.uniform3f(U.u_mouse, mouse.x, mouse.y, mouse.r)
+  gl.drawArrays(gl.TRIANGLES, 0, 3)
+  draws++
+  stats.jsMs += performance.now() - t0
+  requestAnimationFrame(frame)
+}
+document.addEventListener('visibilitychange', kick)
+kick()
+</script>
+</body>
+</html>

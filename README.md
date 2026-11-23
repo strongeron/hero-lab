@@ -67,7 +67,6 @@ look you meant, with no flash of the default.
 | `template` | `full-bleed`, `problem`, `fine-grain` |
 | `state` | `problem` or `fix` — which state rests on top |
 | `scene` | motion preset: `orbit`, `radar-scan`, `error-sweep`, … |
-| `logo` | pins the generative logo to one formation, e.g. `?logo=8f3a` |
 
 ## The logo rolls itself
 
@@ -92,6 +91,13 @@ npm install @paper-design/shaders-react
 
 Their [shader playground](https://shaders.paper.design) is the better starting point for
 exploring the rest of the library.
+
+## Use it in your own project
+
+[`src/components/DitherBackground`](src/components/DitherBackground/README.md) is the hero's
+dither field as one copyable React component: colour layers, scene motion, pixel grid, dot
+renderer and hover reveal, with no lab store and no fonts. Copy one file, install
+`@paper-design/shaders-react`, done. See it alone at `/hero-lab/dither-background.html`.
 
 ## Under the hood
 

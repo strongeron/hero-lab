@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { getThemeById } from "../../themes/terminalThemes";
+import { getAccessibleCtaPair } from "../../utils/colorContrast";
 
 /* ─── Types ─── */
 
@@ -12,7 +13,6 @@ export type DitheringShape =
   | "swirl"
   | "sphere";
 export type DitheringType = "random" | "2x2" | "4x4" | "8x8";
-export type ShaderFit = "none" | "contain" | "cover";
 
 export interface DitherAlphaLayer {
   color: string;
@@ -21,22 +21,16 @@ export interface DitherAlphaLayer {
 }
 
 export type HeaderBgMode = "transparent" | "solid";
-/** How the shader meets the text section */
-/** 'full' fills the whole hero with scene shapes and carves whole-tile
- *  exclusion zones around the text/CTA blocks with a dissolve rim. */
-export type EdgeMode = "fade" | "sharp" | "overlap" | "ripple" | "dissolve" | "full";
+/** How the scene meets the copy block. 'dissolve' drops tiles out in a band at
+ *  Position; 'full' fills the whole hero and carves whole-tile clearance around
+ *  each text block with a dissolve rim (GPU tile field only). */
+export type EdgeMode = "dissolve" | "full";
 
 /* ─── Copy Variations ─── */
 
-/**
- * 'problem' — Pink headline declares the problem (left), italic response + sub + CTA (right)
- * 'solution' — Teal headline IS the solution (left), sub + CTA (right), no italic response
- */
-export type CopyLayout = "problem" | "solution";
 export type DitherCopyColorMode = "current" | "white";
 
 export interface DitherCopy {
-  layout: CopyLayout;
   headline: string;
   sub: string | null;
   response: string | null;
@@ -51,6 +45,11 @@ export interface DitherCopy {
   headlineTracking?: string;
   /** CSS line-height override for headline */
   headlineLeading?: string;
+  /** Sub font-size override (default 17px, 20px from md). Monospace sets it
+   *  smaller: its wide advance makes the same px read ~15% larger. */
+  subSize?: string;
+  /** CTA font-size override (default 16px, 18px from xl). */
+  ctaSize?: string;
   /** Headline text color mode */
   headlineColorMode?: DitherCopyColorMode;
   /** CSS font-family override for response text (omit = use DesignPanel font pair) */
@@ -107,8 +106,7 @@ export type CopyVariantId =
   | "ship-it"
   | "ai"
   | "speed"
-  | "broke-fixed"
-  | "wtf";
+  | "broke-fixed";
 
 export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }> =
   {
@@ -116,21 +114,25 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     // Fine Grain artboard its own typography instead of mutating Broke/Fixed.
     "fine-grain": {
       label: "Fine Grain",
-      layout: "problem",
-      headline: "Something broke. You should already know what.",
-      sub: "Errors, performance, and logs — one place. Five-minute install.",
+      headline: "A request just failed. The trace is already\u00A0here.",
+      sub: "Stack traces, slow queries and timelines, side by side. One line to\u00A0install.",
       response: "Caught everything. Start at line 42.",
-      cta: "Start free in 5 minutes",
+      cta: "Try it free",
       headlineColorMode: "white",
       // Fine art, fine strokes: this scene is a smooth, high-detail continuous
       // field, not a discrete lattice. A serif's modulated stroke — thick stems
       // against hairline joins — echoes that fine grain, and gives the gallery
       // a third typographic voice instead of a third monospace.
       headlineFont: "'Instrument Serif', serif",
-      // The wordmark keeps the serif (it reads elegant at 18px), but CTAs fall
-      // back to the body sans: Instrument Serif ships a 400 weight only, so on a
-      // filled 16px pill it reads fragile where a primary action needs presence.
-      ctaFont: "var(--font-sans, Inter, sans-serif)",
+      // Body and CTA run in Instrument Sans, the serif's own companion family:
+      // same foundry, matched x-height and proportions, so the condensed serif
+      // headline and the sans sub read as one system. Before, the sub fell back
+      // to Inter and the CTA to the panel's body face (DM Sans): two unrelated
+      // sans under one serif. The wordmark keeps the serif (it reads elegant at
+      // 18px); CTAs stay sans because Instrument Serif ships a 400 weight only,
+      // which reads fragile on a filled 16px pill.
+      subFont: "'Instrument Sans', sans-serif",
+      ctaFont: "'Instrument Sans', sans-serif",
       headlineWeight: 400,
       headlineLeading: "1.02",
       headlineTracking: "-0.01em",
@@ -146,11 +148,10 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     // top Full Bleed artboard its own typography instead of mutating Problem.
     "full-bleed": {
       label: "Full Bleed",
-      layout: "problem",
-      headline: "Something broke. You should already know what.",
-      sub: "Errors, performance, and logs — one place. Five-minute install.",
+      headline: "A request just failed. The trace is already\u00A0here.",
+      sub: "Stack traces, slow queries and timelines, side by side. One line to\u00A0install.",
       response: "Caught everything. Start at line\u00A042.",
-      cta: "Start free in 5 minutes",
+      cta: "Try it free",
       headlineColorMode: "white",
       // Round art, round letterforms: the point renderer draws circular dots,
       // so the headline uses a geometric sans whose bowls are true circles.
@@ -171,11 +172,10 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     },
     provocateur: {
       label: "Provocateur",
-      layout: "problem",
       headline: "Every error tells a\u00A0story. Most tools miss the\u00A0plot.",
-      sub: "Errors, performance, and logs in one place. Five-minute install. No credit card.",
+      sub: "Full stack traces, request timelines and the query that set it off. One line to\u00A0install.",
       response: "We read every line.",
-      cta: "Start free in 5 minutes",
+      cta: "Try it free",
       headlineColorMode: "white",
       headlineWeight: 500,
       headlineSize: "clamp(3rem, 5vw + 1rem, 5.5rem)",
@@ -187,11 +187,10 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     },
     value: {
       label: "Value",
-      layout: "problem",
-      headline: "One tool. Every\u00A0signal.",
-      sub: "Errors, performance, and logs — one place, one bill. Set up in five minutes.",
-      response: "Your CFO will thank\u00A0you.",
-      cta: "Start free in 5 minutes",
+      headline: "Fewer tabs. Clearer\u00A0answers.",
+      sub: "Traces, latency and exceptions together, at a price that fits on one\u00A0line.",
+      response: "Your budget will\u00A0notice.",
+      cta: "Try it free",
       headlineColorMode: "white",
       headlineFont: "'Bricolage Grotesque', sans-serif",
       headlineWeight: 500,
@@ -203,11 +202,10 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     },
     "ship-it": {
       label: "Ship It",
-      layout: "problem",
-      headline: "Ship it. We're watching.",
-      sub: "Every deploy tracked. Every error caught. Every slowdown flagged — before your users notice. Five minutes to\u00A0install.",
-      response: "Know what broke before anyone else\u00A0does.",
-      cta: "Start free in 5 minutes",
+      headline: "Ship on Friday. Sleep\u00A0anyway.",
+      sub: "Every deploy gets a marker. New exceptions and slow endpoints link back to the commit that shipped\u00A0them.",
+      response: "Regressions point at their\u00A0deploy.",
+      cta: "Try it free",
       headlineColorMode: "white",
       headlineFont: "'Space Grotesk', sans-serif",
       headlineWeight: 500,
@@ -219,13 +217,12 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     },
     ai: {
       label: "AI",
-      layout: "problem",
-      headline: "Your AI built the app. Who's watching it\u00A0run?",
-      // Focused: concrete signals, then the AI-native benefit that ties back to
-      // the headline's "who's watching it run". No em dash.
-      sub: "Errors, performance, and logs in one place. Ask what happened in plain language, no dashboard required.",
-      response: "We speak AI\u00A0too.",
-      cta: "Start free in 5 minutes",
+      headline: "Prompted in a minute. Running for\u00A0months.",
+      // Focused: one concrete question and what comes back, tying to the
+      // headline's "running for months". No em dash.
+      sub: "Ask why a request failed and get the trace, the slow query and the line that\u00A0threw.",
+      response: "Ask it like a\u00A0teammate.",
+      cta: "Try it free",
       headlineColorMode: "white",
       // Square art, monospace grid: the 96px tile field is hard squares on a
       // fixed lattice, and a monospace face is the type equivalent \u2014 every
@@ -246,12 +243,18 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
       // -0.05em (from the -0.03em default) tightens the words into solid blocks
       // without breaking the even monospace rhythm or colliding glyphs.
       headlineTracking: "-0.05em",
-      headlineSize: "clamp(3rem, 5vw + 1rem, 5.5rem)",
+      // Mono scale, ~0.85× the sans copies: a fixed advance makes JetBrains
+      // Mono read about 15% larger than a proportional face at the same px,
+      // and its sub ran 20px, louder than a sans sub. Sub, response and CTA
+      // follow the same step so the whole block keeps its proportions.
+      headlineSize: "clamp(2.5rem, 4vw + 1rem, 4.5rem)",
+      subSize: "clamp(15px, 0.4vw + 13px, 17px)",
+      ctaSize: "clamp(14px, 0.3vw + 12.5px, 16px)",
       responseFontMode: "headline",
-      responseSize: "36px",
+      responseSize: "28px",
       responseFontStyle: "normal",
       responseWeight: 400,
-      // Group the tagline tight above the CTA so "We speak AI too." reads as a
+      // Group the tagline tight above the CTA so "Ask it like a teammate." reads as a
       // lead-in to the button instead of floating up to the headline baseline.
       responsePin: "cta",
       // Monospace is wide: in a 7/12 tablet column this headline fragments
@@ -260,11 +263,10 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     },
     speed: {
       label: "Speed",
-      layout: "problem",
       headline: "Errors fall. We catch.",
-      sub: "Every exception, every slowdown, every log line — one place. Five-minute install. No credit card.",
+      sub: "Every exception and slow request, grouped and ranked by how many people it hits. One line to\u00A0install.",
       response: "See everything. Fix it\u00A0fast.",
-      cta: "Start free in 5 minutes",
+      cta: "Try it free",
       headlineColorMode: "white",
       headlineFont: "'Cabinet Grotesk', sans-serif",
       headlineWeight: 500,
@@ -276,45 +278,29 @@ export const copyVariants: Record<CopyVariantId, DitherCopy & { label: string }>
     },
     "broke-fixed": {
       label: "Broke / Fixed",
-      layout: "problem",
-      headline: "Something broke. You should already know what.",
-      sub: "Errors, performance, and logs — one place. Five-minute install.",
+      headline: "A request just failed. The trace is already\u00A0here.",
+      sub: "Stack traces, slow queries and timelines, side by side. One line to\u00A0install.",
       response: "Caught everything. Start at line\u00A042.",
-      cta: "Start free in 5 minutes",
+      cta: "Try it free",
       headlineColorMode: "white",
       // Geist Mono over JetBrains: same terminal voice, but circular bowls and
       // round dots that echo the point-field geometry instead of fighting it.
       headlineFont: "'Geist Mono', monospace",
       headlineWeight: 500,
-      headlineSize: "clamp(2.8rem, 4vw + 1rem, 4.5rem)",
+      // Mono scale (see "ai"): ~0.85× the sans size, same tight tracking.
+      headlineSize: "clamp(2.375rem, 3.4vw + 1rem, 3.875rem)",
+      headlineLeading: "1.08",
+      headlineTracking: "-0.04em",
       responseFontMode: "headline",
-      responseSize: "36px",
-      responseFontStyle: "normal",
-      responseWeight: 400,
-    },
-    wtf: {
-      label: "WTF",
-      layout: "problem",
-      headline: "WTF",
-      sub: null,
-      response: "We know why.",
-      cta: "Link your app",
-      headlineColorMode: "white",
-      headlineFont: "'Roboto Slab', serif",
-      headlineWeight: 800,
-      headlineSize: "clamp(80px, 12vw, 160px)",
-      headlineLeading: "1",
-      headlineTracking: "-0.02em",
-      responseFontMode: "headline",
-      responseSize: "36px",
+      responseSize: "30px",
       responseFontStyle: "normal",
       responseWeight: 400,
     },
   };
 
-// 'wtf' stays defined (URL params / old configs keep working) but is no longer
-// offered in the panel.
 export const copyVariantIds: CopyVariantId[] = [
+  "fine-grain",
+  "full-bleed",
   "provocateur",
   "value",
   "ship-it",
@@ -323,73 +309,43 @@ export const copyVariantIds: CopyVariantId[] = [
   "broke-fixed",
 ];
 
+/** The resting scene: a stack of screen-blended colour layers over `colorBack`.
+ *  Paper renders it without a pixel grid; the GPU tile field samples it with one. */
 export interface DitherShaderConfig {
-  /* Dithering-specific */
   colorBack: string;
-  colorFront: string;
-  shape: DitheringShape;
-  type: DitheringType;
-  size: number;
-  /** When true, shader bg becomes transparent — dots float over section bg */
-  transparentBg: boolean;
-  /** Alpha mode: stacked color layers with per-layer opacity and shape */
+  /** Stacked colour layers, each with its own opacity and dither shape */
   alphaLayers: DitherAlphaLayer[];
-  /** Speed of color cycling across alpha layers (0 = static) */
+  /** Paper dither matrix (no pixel grid only) */
+  type: DitheringType;
+  /** Paper dither cell size in CSS px (no pixel grid only). Rendered as a whole
+   *  number of pixels. */
+  size: number;
+  /** Speed of colour cycling across the layers (0 = static) */
   colorCycleSpeed: number;
-  /** Offset between alpha layers — higher = more separation between color blobs */
+  /** Offset between layers — higher = more separation between colour blobs */
   alphaSpread: number;
-  /* Motion */
+  /** Paper time speed (scenes set it) */
   speed: number;
-  frame: number;
-  /* Sizing */
-  fit: ShaderFit;
   scale: number;
   rotation: number;
-  offsetX: number;
-  offsetY: number;
-  originX: number;
-  originY: number;
-  worldWidth: number;
-  worldHeight: number;
 }
 
 export interface DitherEdgeConfig {
   mode: EdgeMode;
   /** Where shader coverage ends (% of viewport height, 30–90) */
   position: number;
-  /** Ripple amplitude in vh — how tall the waves are */
-  rippleAmplitude: number;
-  /** Number of ripple waves across the width */
-  rippleFrequency: number;
-  /** Animation speed for ripple edge (0 = static) */
-  rippleSpeed: number;
-  /** Build the ripple edge from the pixel-grid tiles (a blocky tile-wave) so the
-   *  edge is made of dots like the rest of the scene, instead of a smooth wave.
-   *  Only takes effect when the pixel grid is on. */
-  ripplePixelate: boolean;
   /** 'dissolve' mode: how many tile rows the random drop-out band spans. */
   dissolveDepth: number;
   /** 'dissolve' mode: PRNG seed — change it to reshuffle which tiles drop out. */
   dissolveSeed: number;
-  /** 'ripple' mode: dissolve the wave edge with the dither (Photoshop-style)
-   *  instead of a hard clip — the wave fades out as scattered tiles. */
-  rippleDither: boolean;
-  /** Let the scene show through the text block (transparent text bg). Works with
-   *  Dissolve or Overlap — Position sets where tiles meet the copy. */
-  textBlend: boolean;
-  /** Extend shader tiles below Position into the copy area (px). Text stays put. */
+  /** Extend the dissolve band below Position into the copy area (px). */
   shaderExtend: number;
-  /** Perlin noise strength in the dissolve band (0 = static, 1 = lively). */
+  /** Noise strength in the dissolve band and the Full rim (0 = static, 1 = lively). */
   textBlendMotion: number;
-  /** Perlin noise animation speed (Hz). */
+  /** Noise animation speed (Hz). */
   textBlendSpeed: number;
-  /** Scene-behind-text: clear space (px) kept between shapes and every text
-   *  block — a tile whose padded box would touch text is dropped whole
-   *  (never cut). Applies in any edge mode when textBlend is on. */
-  textPadding: number;
-  /** What the clearance traces: 'lines' hugs each rendered text line (organic
-   *  ragged edge, shapes fill beside short lines); 'box' clears the whole
-   *  element rectangle (calmer, blocky negative space). Also used by 'full'. */
+  /** 'full' mode — what the clearance traces: 'lines' hugs each rendered text
+   *  line; 'box' clears the whole element rectangle. */
   textRectMode: "lines" | "box";
   /** 'full' mode: clear distance (px) kept between shapes and text blocks. */
   fullPadding: number;
@@ -398,120 +354,48 @@ export interface DitherEdgeConfig {
   topInset: number;
 }
 
-/** How the pixel grid animates — shader color/alpha vs proportional point sizes. */
-export type TileDisplayMode = "color" | "size" | "points";
+/** How the pixel grid draws the scene: snapped colour per tile, or point sizes. */
+export type TileDisplayMode = "color" | "points";
 
-export type HoverMode = "reveal" | "recolor" | "warp" | "overlay";
-/** 'circle' = smooth radial fade; 'square' = whole-tile rect clip; 'pixel-circle'
- *  = hard-edged circle whose radius snaps to the tile grid, so the strict
- *  rectangular cells stay crisp right up to the circular boundary (no soft fade). */
-export type HoverShape = "circle" | "square" | "pixel-circle";
-/** 'instant' = fixed radius follows cursor; 'dwell' = grows over time, full takeover */
-export type HoverTrigger = "instant" | "dwell";
+/** The hover: warp reveal inside a pixel circle of whole tiles. Tiles under the
+ *  cursor rotate, round and resize and show the other state's layers. */
+/** What drives the warp: the pointer, a roaming blob, or both (pointer wins). */
+export type WarpMode = "hover" | "roam" | "both";
 
 export interface DitherHoverConfig {
   enabled: boolean;
-  /** 'reveal' = separate shape+color layer under mask; 'recolor' = the SAME base
-   *  pattern recolored under the cursor (the existing tiles change color) */
-  mode: HoverMode;
-  /** Recolor only WHOLE pixel-grid tiles the cursor overlaps (snap the recolor
-   *  region to the tile grid) instead of cutting partial tiles at the edge.
-   *  Only applies in recolor mode when the pixel grid is on. */
-  wholeTiles: boolean;
-  /** How the hover activates */
-  trigger: HoverTrigger;
-  /** Mask shape for the hover effect */
-  hoverShape: HoverShape;
-  /** Color revealed on hover — the "fix" state (reveal mode) or recolor tint */
-  fixColor: string;
-  /** Overlay mode: flat color opacity over the hover region (0–1). */
-  overlayOpacity: number;
-  /** Overlay mode: blend mode for the color wash. */
-  overlayBlend: "normal" | "screen" | "multiply" | "overlay" | "soft-light";
-  /** Shape for the hover reveal layer (reveal mode only) */
-  fixShape: DitheringShape;
-  /** Per-layer config for the hover reveal (reveal + alpha mode). Mirrors base
-   *  alphaLayers so the hover state is as art-directable as the initial state. */
+  /** Hover = pointer only; Roam = one blob drifts by itself; Both = Roam, the pointer takes over. */
+  mode: WarpMode;
+  /** The other state's layers, revealed under the cursor */
   hoverLayers: DitherAlphaLayer[];
-  /** Base radius (half-width) of the hover effect in px */
+  /** Radius of the pixel circle in px (snaps to whole tile rings) */
   radius: number;
-  /** Vertical radius (half-height) — when set, square shape becomes rectangular. Undefined = same as radius */
-  radiusY?: number;
-  /** How much the base layer origin follows the mouse (0–1) */
-  mouseInfluence: number;
-  /** When true, radius scales with mouse velocity */
-  dynamicSize: boolean;
-  /** Show full hover layer without mask — for previewing and tuning */
-  preview: boolean;
-  /** Dwell mode: radius growth speed in px/sec (higher = faster takeover) */
-  dwellSpeed: number;
-  /** Dwell mode: fade-back speed multiplier when mouse leaves (1 = same as grow, 2 = 2x faster) */
-  dwellFadeBack: number;
-  /* ── Warp mode: cursor-directional transform of the REAL base tiles ── */
-  /** Max extra rotation (deg) applied to tiles at the cursor, easing to 0 at reach. */
+  /** Rotation (deg) of warped tiles. */
   warpRotate: number;
-  /** Corner-rounding (0–1) of tiles at the cursor, easing to square at reach. */
+  /** Corner rounding (0–1) of warped tiles. */
   warpRound: number;
-  /** How much far tiles shrink below their resting size (0 = stay base, 1 = vanish). */
-  warpShrink: number;
-  /** Warped tile size toward full cell (0 = resting piece, 1 = full pitch). */
+  /** Warped tile size toward the full piece (0–1). */
   warpScale: number;
-  /** Recolor reach as a fraction of the warp radius (0 = no recolor, 1 = full).
-   *  The recolored core follows whole warped tiles — no smooth circle. */
-  warpRecolor: number;
-  /** When true, tints warped tiles with fixColor (same pattern as base scene). */
-  warpRecolorEnabled: boolean;
-  /** Solid color overlay on warped tiles (when scene reveal is off). */
-  warpOverlayEnabled: boolean;
-  /** Warped tiles reveal the alternate state's scene (hover layers) instead of
-   *  a tint — the problem peeks through the fix (or vice versa). */
-  warpRevealEnabled: boolean;
-  /** Short error strings surface below the cursor while warp-revealing. */
-  warpErrorText: boolean;
-  /** Random big→small range for warped tiles (0 = uniform max, 1 = down to tiny). */
+  /** Random big→small range for warped tiles (0 = uniform, 1.5 = down to tiny). */
   warpJitter: number;
-  /* ── Per-layer overrides (undefined = inherit from base shader) ── */
-  fixType?: DitheringType;
-  fixSize?: number;
-  fixSpeed?: number;
-  fixScale?: number;
-  fixRotation?: number;
-  fixOffsetX?: number;
-  fixOffsetY?: number;
+  /** Short log strings surface below the cursor while revealing. */
+  warpErrorText: boolean;
 }
 
-export interface DitherMultiColorConfig {
-  enabled: boolean;
-  /** Additional error colors (stacked layers with organic masks) */
-  colors: string[];
-  /** Offset between layers — how much each layer shifts */
-  layerSpread: number;
-  /** Blend mode for color layers */
-  blend: "normal" | "screen" | "multiply" | "overlay";
-}
-
-/** Pixel-grid mask — overlays the whole shader stack with a repeating grid of
- *  rounded tiles so the dither shows only through the tiles, with empty gaps
- *  between them (the "LED panel" / mosaic look). Independent of shader pixel size. */
+/** Pixel grid — the scene shows only through a lattice of rounded tiles.
+ *  Pitch = cell / divisions, a whole number of px. */
 export interface DitherPixelGridConfig {
   enabled: boolean;
-  /** Master tile size in px. The tile is divided into `divisions` equal pieces;
-   *  every piece, gap and dot derives from this so the grid stays aligned. */
+  /** Master tile size in px, divided into `divisions` equal pieces per axis. */
   cell: number;
-  /** How many equal pieces each tile is divided into, per axis (1 = whole tile).
-   *  piece pitch = cell / divisions, so pieces always tile the master exactly. */
   divisions: number;
-  /** Gap in px between pieces (the empty grout that reveals the background) */
+  /** Gap in px between pieces */
   gap: number;
   /** Corner radius of each piece in px (0 = sharp squares) */
   radius: number;
-  /** Lock the dither grid to the tiles — zeroes rotation/spread and sizes the
-   *  dither dots to one-per-tile so cuts land cleanly between shapes (no noise). */
+  /** One stable colour sample per tile (GPU tile field). Off = Paper dither
+   *  flows freely under a CSS tile mask. */
   snap: boolean;
-  /** Phase nudge X in px (0..pitch) — slide the tile grid onto the dither dots */
-  alignX: number;
-  /** Phase nudge Y in px (0..pitch) */
-  alignY: number;
 }
 
 export type SceneTemplateId =
@@ -546,10 +430,9 @@ export type LoopBreakMode = "none" | "rotate" | "drift" | "orbit" | "wander";
 
 export interface DitherAnimationConfig {
   playing: boolean;
-  /** Custom FPS (0 = use shader's built-in speed) */
-  fps: number;
-  /** Frame advance per tick when using custom FPS */
-  frameStep: number;
+  /** Motion speed multiplier for every loop (1 = as authored). The panel's
+   *  Speed control; scenes and templates never set it. */
+  speed: number;
   /** Vertical drift — positive = falling (units/sec) */
   driftY: number;
   /** Horizontal drift (units/sec) */
@@ -576,18 +459,12 @@ export interface DitherAnimationConfig {
   waveSpeed: number;
   /** Wave direction in degrees — 0 = horizontal, 90 = vertical */
   waveAngle: number;
-  /* ── Tile breathing (animates the pixel-grid gap) ── */
-  /** Gap pulse amplitude in px — the gap opens/closes so tiles breathe (0 = off) */
-  gapPulse: number;
-  /** Gap pulse speed (Hz) */
-  gapPulseSpeed: number;
   /* ── Loop break — non-looping motion layered on top of the scene ── */
   /** How to break the repeating feel (rotate / drift / orbit / wander / none) */
   loopBreak: LoopBreakMode;
   /** Loop-break intensity (0 = off, 1 = strong) */
   loopBreakAmount: number;
   /* ── Tile size animation (pixel grid) ── */
-  /** 'color' = animate dither color/alpha; 'size' = mask shader pieces; 'points' = draw proportional points directly. */
   tileDisplay: TileDisplayMode;
   /** Size spread — 0 = uniform max piece, 1 = down to tiny (gaps preserved). */
   tileSizeSpread: number;
@@ -595,6 +472,9 @@ export interface DitherAnimationConfig {
   tileSizeSpeed: number;
   /** Perlin noise spatial scale for tile sizes. */
   tileSizeNoise: number;
+  /** Point sizes only: 0 = authored sizes, 1 = dots swing between specks and
+   *  full pieces, with the travelling wave weighted up so the pulse reads. */
+  tileSizeContrast: number;
 }
 
 /** CTA / button styling shared by header and hero buttons. */
@@ -614,62 +494,69 @@ export interface DitherLayoutConfig {
   gutter: number;
   /** Debug overlay: draw baselines of every text/button line to check alignment. */
   showBaselines: boolean;
+  /** Debug overlay: column grid plus the left/right/top/bottom content edges
+   *  (header row and copy block), to check every element sits on one frame. */
+  showGuides: boolean;
+  /** Debug overlay: outline every copy box (headline, sub, response, CTA)
+   *  with its name and size. Each box carries data-guide for agents. */
+  showBoxes: boolean;
+  /** Split layout: which line of the sub the CTA lines up with. 'first' and
+   *  'last' share a baseline; 'middle' centres the button on the sub's lines. */
+  ctaAlign: 'first' | 'middle' | 'last';
 }
 
-/** Position of a single title element (percentage of viewport) */
-export interface TitlePos {
-  left: number;
-  top: number;
+/** Where the copy sits. 'split': headline left, response + CTA right, at the
+ *  bottom (the original hero). 'centered': headline, sub and CTA in the
+ *  middle; the field fills the hero and flows round each text line (the
+ *  'full' edge, shaped by the same edge controls). A layout option on top of
+ *  any template, never a template of its own. */
+export type CompositionId = "split" | "centered";
+export interface DitherCompositionConfig {
+  mode: CompositionId;
 }
+export const defaultCompositionConfig: DitherCompositionConfig = { mode: "split" };
+/** The 'full' edge values Centered starts from: Full Bleed's line-hugging
+ *  look (8px clearance, a 2-row rim that moves). */
+export const centeredEdge = {
+  fullPadding: 8,
+  textRectMode: "lines",
+  dissolveDepth: 2,
+  textBlendMotion: 1,
+  textBlendSpeed: 0.33,
+} satisfies Partial<DitherEdgeConfig>;
+/** Size contrast Centered uses on a point field whose template authored none,
+ *  so dots swing between specks and full pieces round the copy. */
+export const CENTERED_SIZE_CONTRAST = 0.7;
+/** Centered's edge stops in the Design Panel (opinionated presets). Clearance
+ *  = edge.fullPadding (CSS px), rim = edge.dissolveDepth (tile rows), rim
+ *  motion = edge.textBlendMotion (GPU tile field only: the Paper clearance
+ *  mask is static). */
+export const clearanceStops = [
+  { value: 4, label: "Hug" },
+  { value: 8, label: "Tight" },
+  { value: 16, label: "Snug" },
+] as const;
+export const rimStops = [
+  { value: 1, label: "Crisp" },
+  { value: 2, label: "Soft" },
+  { value: 4, label: "Feathered" },
+] as const;
+export const rimMotionStops = [
+  { value: 0, label: "Still" },
+  { value: 0.5, label: "Calm" },
+  { value: 1, label: "Lively" },
+] as const;
 
-/** Absolute positions for WTF hero title elements */
-export interface WtfTitlePositions {
-  wtf: TitlePos;
-  did: TitlePos;
-  myApp: TitlePos;
-  rotating: TitlePos;
-}
-
-export const defaultWtfTitlePositions: WtfTitlePositions = {
-  wtf: { left: 48, top: 12 },
-  did: { left: 49, top: 31 },
-  myApp: { left: 52, top: 44 },
-  rotating: { left: 50, top: 60 },
-};
-
-export type HapticPresetId = "selection" | "light" | "medium" | "heavy" | "soft" | "rigid" | "nudge";
-
-export interface DitherHapticConfig {
-  enabled: boolean;
-  /** Haptic pattern triggered on hover enter */
-  hoverEnter: HapticPresetId;
-  /** Haptic pattern triggered on hover leave */
-  hoverLeave: HapticPresetId;
-  /** Pixels of mouse travel between haptic ticks — like dragging across a texture (0 = off) */
-  tickDistance: number;
-  /** Pattern for movement ticks */
-  tickPattern: HapticPresetId;
-  /** Scale tick intensity by mouse velocity — faster = lighter touch, slower = heavier */
-  velocityIntensity: boolean;
-  /** Haptic on dwell completion */
-  dwellComplete: HapticPresetId;
-  /** Dwell progress ticks — fire haptic every N% of dwell coverage (0 = off) */
-  dwellTickPercent: number;
-  /** Show debug audio (audible simulation of haptics on desktop) */
-  debug: boolean;
-}
-
-interface DitherState {
+export interface DitherState {
   headerBg: HeaderBgMode;
+  composition: DitherCompositionConfig;
   shader: DitherShaderConfig;
   edge: DitherEdgeConfig;
   hover: DitherHoverConfig;
-  multiColor: DitherMultiColorConfig;
   pixelGrid: DitherPixelGridConfig;
   animation: DitherAnimationConfig;
   layout: DitherLayoutConfig;
   button: DitherButtonConfig;
-  haptic: DitherHapticConfig;
   copyVariant: CopyVariantId;
   /** Which named state is shown at rest. The other becomes the hover reveal. */
   initialState: InitialStateId;
@@ -678,8 +565,10 @@ interface DitherState {
   activeTemplate: string | null;
   /** Active terminal theme ID (null = default colors) */
   terminalTheme: string | null;
-  /** Absolute positions for WTF hero title elements */
-  wtfTitlePositions: WtfTitlePositions;
+  /** Colour pair for both states (rest and reveal). See `palettes`. */
+  palette: PaletteId;
+  /** Tested type pair laid over the copy's own fonts; null = the copy's own. */
+  typePair: TypePairId | null;
   /** Layers-explorer only: hold the screen-blended Color/alpha layers at their
    *  authored opacity instead of running the per-frame emphasis swing. The swing
    *  pulses the composite under `screen` blend (a recurring blink); the Layers
@@ -695,7 +584,7 @@ interface DitherState {
  *  other becomes the hover reveal. */
 export type InitialStateId = "problem" | "fix";
 
-/** Pink/error layers — "something broke". Distinct shapes per layer. */
+/** Pink/error layers — the problem state. Distinct shapes per layer. */
 export const problemLayers: DitherAlphaLayer[] = [
   { color: "#E6307A", opacity: 0.9, shape: "simplex" },
   { color: "#FF6B2B", opacity: 0.7, shape: "warp" },
@@ -713,42 +602,24 @@ export const defaultAlphaLayers: DitherAlphaLayer[] = problemLayers.map((l) => (
 
 export const defaultShaderConfig: DitherShaderConfig = {
   colorBack: "#0A1714",
-  colorFront: "#E6307A",
-  shape: "simplex",
+  alphaLayers: defaultAlphaLayers.map((l) => ({ ...l })),
   type: "8x8",
   size: 16,
-  transparentBg: true,
-  alphaLayers: defaultAlphaLayers.map((l) => ({ ...l })),
   colorCycleSpeed: 0.15,
   alphaSpread: 0.04,
   speed: 0.12,
-  frame: 0,
-  fit: "cover",
   scale: 0.21,
   rotation: 8,
-  offsetX: 0,
-  offsetY: 0,
-  originX: 0.5,
-  originY: 0.5,
-  worldWidth: 1,
-  worldHeight: 1,
 };
 
 export const defaultEdgeConfig: DitherEdgeConfig = {
   mode: "dissolve",
   position: 62,
-  rippleAmplitude: 4,
-  rippleFrequency: 6,
-  rippleSpeed: 0.5,
-  ripplePixelate: true,
   dissolveDepth: 7,
   dissolveSeed: 1,
-  rippleDither: true,
-  textBlend: false,
   shaderExtend: 160,
   textBlendMotion: 0.35,
   textBlendSpeed: 0.08,
-  textPadding: 24,
   textRectMode: "lines",
   fullPadding: 28,
   topInset: 0,
@@ -780,45 +651,18 @@ export const warpFixSnippets: string[] = [
   "0 errors · last hour",
 ];
 
+// Warp reveal + error text is the hover story: the resting problem scene peels
+// back to the fix (or vice versa) with log fragments below.
 export const defaultHoverConfig: DitherHoverConfig = {
   enabled: true,
-  mode: "warp",
-  wholeTiles: true,
-  trigger: "instant",
-  hoverShape: "pixel-circle",
-  fixColor: "#E6307A",
-  overlayOpacity: 1,
-  overlayBlend: "normal",
-  fixShape: "swirl",
+  mode: "hover",
   hoverLayers: fixLayers.map((l) => ({ ...l })),
   radius: 100,
-  mouseInfluence: 1,
-  dynamicSize: false,
-  preview: false,
-  dwellSpeed: 175,
-  dwellFadeBack: 1.25,
   warpRotate: 35,
   warpRound: 1,
-  warpShrink: 0,
   warpScale: 1,
-  warpRecolor: 0.6,
-  // Reveal warp + error text is the default hover story: the resting problem
-  // scene peels back to the fix (or vice versa) with log fragments below.
-  warpRecolorEnabled: false,
-  warpOverlayEnabled: false,
-  warpRevealEnabled: true,
-  warpErrorText: true,
   warpJitter: 1.5,
-  fixType: "2x2",
-  fixSize: 18.5,
-  fixScale: 0.81,
-};
-
-export const defaultMultiColorConfig: DitherMultiColorConfig = {
-  enabled: false,
-  colors: ["#FF6B2B", "#FFB800", "#9B59B6"],
-  layerSpread: 0.25,
-  blend: "screen",
+  warpErrorText: true,
 };
 
 export const defaultPixelGridConfig: DitherPixelGridConfig = {
@@ -828,8 +672,6 @@ export const defaultPixelGridConfig: DitherPixelGridConfig = {
   gap: 6,
   radius: 40,
   snap: true,
-  alignX: 0,
-  alignY: 0,
 };
 
 export const defaultButtonConfig: DitherButtonConfig = {
@@ -842,25 +684,15 @@ export const defaultLayoutConfig: DitherLayoutConfig = {
   responseCols: 4,
   gutter: 55,
   showBaselines: false,
-};
-
-export const defaultHapticConfig: DitherHapticConfig = {
-  enabled: false,
-  hoverEnter: "light",
-  hoverLeave: "soft",
-  tickDistance: 40,
-  tickPattern: "selection",
-  velocityIntensity: true,
-  dwellComplete: "medium",
-  dwellTickPercent: 10,
-  debug: false,
+  showGuides: false,
+  showBoxes: false,
+  ctaAlign: 'first',
 };
 
 export const defaultAnimationConfig: DitherAnimationConfig = {
   playing: true,
-  fps: 0,
-  frameStep: 0.5,
-  // Texture lives here (pulse, gap breathing); the non-looping motion is the
+  speed: 1,
+  // Texture lives here (pulse); the non-looping motion is the
   // separate Loop Break overlay below so it can be picked independently.
   driftY: 0,
   driftX: 0,
@@ -874,14 +706,13 @@ export const defaultAnimationConfig: DitherAnimationConfig = {
   waveAmplitude: 0,
   waveSpeed: 0.08,
   waveAngle: 0,
-  gapPulse: 3,
-  gapPulseSpeed: 0.12,
   loopBreak: "orbit",
   loopBreakAmount: 0.5,
   tileDisplay: "color",
   tileSizeSpread: 0.55,
   tileSizeSpeed: 0.12,
   tileSizeNoise: 1.2,
+  tileSizeContrast: 0,
 };
 
 export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
@@ -895,7 +726,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       colorCycleSpeed: 0.32,
     },
     animation: {
-      fps: 0,
       driftY: 0.018,
       driftX: 0.025,
       rotationDrift: 4.0,
@@ -908,8 +738,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       waveAmplitude: 0,
       waveSpeed: 0.08,
       waveAngle: 0,
-      gapPulse: 3,
-      gapPulseSpeed: 0.14,
       tileSizeSpread: 0.52,
       tileSizeSpeed: 0.1,
       tileSizeNoise: 1.4,
@@ -923,7 +751,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       colorCycleSpeed: 0.28,
     },
     animation: {
-      fps: 0,
       driftY: 0,
       driftX: 0,
       rotationDrift: 0,
@@ -936,8 +763,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       waveAmplitude: 0,
       waveSpeed: 0.08,
       waveAngle: 0,
-      gapPulse: 6,
-      gapPulseSpeed: 0.16,
       tileSizeSpread: 0.82,
       tileSizeSpeed: 0.16,
       tileSizeNoise: 1.0,
@@ -951,7 +776,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       colorCycleSpeed: 0.45,
     },
     animation: {
-      fps: 0,
       driftY: 0,
       driftX: 0.04,
       rotationDrift: 0,
@@ -964,8 +788,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       waveAmplitude: 0,
       waveSpeed: 0.08,
       waveAngle: 0,
-      gapPulse: 2,
-      gapPulseSpeed: 0.12,
       tileSizeSpread: 0.5,
       tileSizeSpeed: 0.12,
       tileSizeNoise: 1.6,
@@ -979,7 +801,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       colorCycleSpeed: 0.15,
     },
     animation: {
-      fps: 0,
       // One panel Offset step is 0.05; the former 0.01/0.016 rates needed
       // several seconds to move even that far and looked frozen between alpha
       // pulses. Keep the motion gentle, but make every second visibly advance.
@@ -995,8 +816,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       waveAmplitude: 0,
       waveSpeed: 0.08,
       waveAngle: 0,
-      gapPulse: 1.5,
-      gapPulseSpeed: 0.08,
       tileSizeSpread: 0.42,
       tileSizeSpeed: 0.08,
       tileSizeNoise: 1.6,
@@ -1010,7 +829,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       colorCycleSpeed: 0.3,
     },
     animation: {
-      fps: 0,
       driftY: 0,
       driftX: 0,
       rotationDrift: 0.8,
@@ -1023,8 +841,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       waveAmplitude: 0,
       waveSpeed: 0.08,
       waveAngle: 0,
-      gapPulse: 5,
-      gapPulseSpeed: 0.15,
       tileSizeSpread: 0.72,
       tileSizeSpeed: 0.13,
       tileSizeNoise: 0.9,
@@ -1038,7 +854,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       colorCycleSpeed: 0.18,
     },
     animation: {
-      fps: 0,
       driftY: 0.05,
       driftX: 0,
       rotationDrift: 0,
@@ -1051,8 +866,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       waveAmplitude: 0,
       waveSpeed: 0.08,
       waveAngle: 0,
-      gapPulse: 2,
-      gapPulseSpeed: 0.13,
       tileSizeSpread: 0.52,
       tileSizeSpeed: 0.14,
       tileSizeNoise: 1.25,
@@ -1066,7 +879,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       colorCycleSpeed: 0.12,
     },
     animation: {
-      fps: 0,
       driftY: 0,
       driftX: 0.05,
       rotationDrift: 0.6,
@@ -1079,8 +891,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       waveAmplitude: 0,
       waveSpeed: 0.08,
       waveAngle: 0,
-      gapPulse: 2.5,
-      gapPulseSpeed: 0.11,
       tileSizeSpread: 0.5,
       tileSizeSpeed: 0.11,
       tileSizeNoise: 1.7,
@@ -1094,7 +904,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       colorCycleSpeed: 0.22,
     },
     animation: {
-      fps: 0,
       driftY: 0,
       driftX: 0,
       rotationDrift: 0,
@@ -1107,8 +916,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       waveAmplitude: 0.18,
       waveSpeed: 0.16,
       waveAngle: 0,
-      gapPulse: 3,
-      gapPulseSpeed: 0.14,
       tileSizeSpread: 0.65,
       tileSizeSpeed: 0.16,
       tileSizeNoise: 1.2,
@@ -1117,40 +924,41 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
   "error-sweep": {
     label: "Error Sweep",
     desc: "Diagonal scan with a vertical wave",
+    // 2026-11-22: was 3× the other scenes (speed 0.36, rotation 1.2, scan
+    // 0.85 @ 0.2 Hz, wave 0.42 @ 0.24 Hz). Under Problem's large square tiles
+    // (and its 1.8× rest boost) nearly every tile flipped within 0.3s, which
+    // read as flicker, not a sweep. These values keep the diagonal sweep and
+    // the wave but let shapes flow tile to tile.
     shader: {
-      speed: 0.36,
-      colorCycleSpeed: 0.4,
+      speed: 0.12,
+      colorCycleSpeed: 0.15,
     },
     animation: {
-      fps: 0,
       driftY: 0,
       driftX: 0,
-      rotationDrift: 1.2,
+      rotationDrift: 0.3,
       pulseAmount: 0.035,
       pulseSpeed: 0.18,
       scanMode: "oscillate" as const,
-      scanAmplitude: 0.85,
-      scanSpeed: 0.2,
+      scanAmplitude: 0.35,
+      scanSpeed: 0.08,
       scanAngle: 30,
-      waveAmplitude: 0.42,
-      waveSpeed: 0.24,
+      waveAmplitude: 0.18,
+      waveSpeed: 0.1,
       waveAngle: 90,
-      gapPulse: 3.5,
-      gapPulseSpeed: 0.2,
       tileSizeSpread: 0.6,
       tileSizeSpeed: 0.13,
       tileSizeNoise: 1.15,
     },
   },
   "deep-breath": {
-    label: "Breath",
+    label: "Deep Breath",
     desc: "Slow, deep meditative breathing",
     shader: {
       speed: 0.06,
       colorCycleSpeed: 0.32,
     },
     animation: {
-      fps: 0,
       driftY: 0,
       driftX: 0,
       rotationDrift: 0,
@@ -1163,8 +971,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       waveAmplitude: 0,
       waveSpeed: 0.08,
       waveAngle: 0,
-      gapPulse: 8,
-      gapPulseSpeed: 0.06,
       tileSizeSpread: 0.72,
       tileSizeSpeed: 0.05,
       tileSizeNoise: 1.4,
@@ -1181,7 +987,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       colorCycleSpeed: 0.0,
     },
     animation: {
-      fps: 0,
       driftY: 0,
       driftX: 0,
       rotationDrift: 0,
@@ -1194,8 +999,6 @@ export const sceneTemplates: Record<SceneTemplateId, SceneTemplate> = {
       waveAmplitude: 0,
       waveSpeed: 0.08,
       waveAngle: 0,
-      gapPulse: 0.25,
-      gapPulseSpeed: 0.04,
       tileSizeSpread: 0.28,
       tileSizeSpeed: 0.04,
       tileSizeNoise: 2.0,
@@ -1219,22 +1022,22 @@ export const sceneTemplateIds: SceneTemplateId[] = [
 
 const defaults: DitherState = {
   headerBg: "solid",
+  composition: { ...defaultCompositionConfig },
   shader: { ...defaultShaderConfig },
   edge: { ...defaultEdgeConfig },
   hover: { ...defaultHoverConfig },
-  multiColor: { ...defaultMultiColorConfig },
   pixelGrid: { ...defaultPixelGridConfig },
   animation: { ...defaultAnimationConfig },
   layout: { ...defaultLayoutConfig },
   button: { ...defaultButtonConfig },
-  haptic: { ...defaultHapticConfig },
   copyVariant: "broke-fixed",
   initialState: "problem",
   activeScene: null,
   activeTemplate: null,
   terminalTheme: null,
-  wtfTitlePositions: { ...defaultWtfTitlePositions },
   stableColorField: false,
+  palette: "signal",
+  typePair: null,
 };
 
 /* ─── Store ─── */
@@ -1247,13 +1050,17 @@ type DitherStoreWindow = Window & {
 const storeWindow = typeof window === "undefined" ? null : window as DitherStoreWindow;
 // Fast Refresh replaces this module but not `window`. Reuse the live snapshot
 // so editing store or scene code cannot flash the preview back to defaults.
-let state: DitherState = storeWindow?.__ditherState ?? structuredClone(defaults);
+// A hot update keeps the previous state on window; it may predate new keys.
+const kept = storeWindow?.__ditherState;
+let state: DitherState = kept
+  ? { ...kept, composition: { ...defaults.composition, ...kept.composition }, animation: { ...defaults.animation, ...kept.animation }, hover: { ...defaults.hover, ...kept.hover } }
+  : structuredClone(defaults);
 if (storeWindow) {
   storeWindow.__ditherState = state;
   storeWindow.__dither = () => state;
 }
 
-type DitherSyncMessage = { type: "state"; state: DitherState; copyVariants: typeof copyVariants; sourceId?: string };
+type DitherSyncMessage = { type: "state"; state: DitherState; sourceId?: string };
 interface DitherSyncBridge {
   started?: boolean;
   role?: "source" | "preview";
@@ -1261,7 +1068,7 @@ interface DitherSyncBridge {
   live?: boolean;
   lastAppliedJson?: string;
   sourceSend?: () => void;
-  snapshot?: () => { state: DitherState; copyVariants: typeof copyVariants };
+  snapshot?: () => { state: DitherState };
   applyMessage?: (message: DitherSyncMessage) => void;
   /** Stable per-tab id for the source in THIS window. Survives Fast Refresh
    *  because it lives on the window-level bridge, not the module. */
@@ -1286,7 +1093,7 @@ interface DitherSyncBridge {
 const syncBridge: DitherSyncBridge = storeWindow
   ? (storeWindow.__ditherSyncBridge ??= {})
   : {};
-syncBridge.snapshot = () => ({ state, copyVariants });
+syncBridge.snapshot = () => ({ state });
 // Mint this tab's source id once (kept on the surviving bridge across HMR).
 syncBridge.sourceId ??= (typeof crypto !== "undefined" && crypto.randomUUID)
   ? crypto.randomUUID()
@@ -1305,7 +1112,7 @@ export function getTabSourceId(): string {
  *  message and freeze. The BroadcastChannel object itself survives on the bridge. */
 function refreshSourceSend(): () => void {
   const send = () => {
-    const latest = syncBridge.snapshot?.() ?? { state, copyVariants };
+    const latest = syncBridge.snapshot?.() ?? { state };
     syncBridge.channel?.postMessage({ type: "state", sourceId: syncBridge.sourceId, ...latest });
   };
   syncBridge.sourceSend = send;
@@ -1361,6 +1168,9 @@ function getSnapshot() {
   return state;
 }
 
+/** The current state, outside React (e.g. to snapshot a template as applied). */
+export const getDitherState = getSnapshot;
+
 export function useDitherStore() {
   return useSyncExternalStore(subscribe, getSnapshot);
 }
@@ -1368,17 +1178,17 @@ export function useDitherStore() {
 /* ─── Actions ─── */
 
 /** Shader keys a scene may drive — MOTION ONLY. Scenes never touch look keys
- *  (scale, transparentBg, alphaSpread, shapes, colors, pixel grid). */
+ *  (scale, alphaSpread, shapes, colours, pixel grid). */
 const SCENE_SHADER_KEYS: (keyof DitherShaderConfig)[] = [
   "speed", "colorCycleSpeed",
 ];
 /** Animation keys a scene may drive (excludes 'playing' and — deliberately —
  *  'tileDisplay': the tile renderer is a look choice, not a motion one). */
 const SCENE_ANIM_KEYS: (keyof DitherAnimationConfig)[] = [
-  "driftY", "driftX", "rotationDrift", "pulseAmount", "pulseSpeed", "fps", "frameStep",
+  "driftY", "driftX", "rotationDrift", "pulseAmount", "pulseSpeed",
   "scanMode", "scanAmplitude", "scanSpeed", "scanAngle",
   "waveAmplitude", "waveSpeed", "waveAngle",
-  "gapPulse", "gapPulseSpeed", "loopBreak", "loopBreakAmount",
+  "loopBreak", "loopBreakAmount",
   "tileSizeSpread", "tileSizeSpeed", "tileSizeNoise",
 ];
 
@@ -1393,15 +1203,14 @@ const SCENE_LOOP_BREAK: Record<SceneTemplateId, LoopBreakMode> = {
   "falling-errors": "drift",
   "signal-sweep": "drift",
   "radar-scan": "wander",
-  "error-sweep": "orbit",
+  // Not "orbit": its pan wrapped ±2 units (×1.8 on Problem), pushing centred
+  // shapes off canvas and jumping the whole field on each wrap, and its
+  // 4°/s spin was ~13× the scene's own rotation. Scan 0.08 Hz, wave 0.1 Hz and
+  // pulse 0.18 Hz already never line up, so the scene does not visibly loop.
+  "error-sweep": "none",
   "deep-breath": "rotate",
   "solid-classic": "none",
 };
-
-export function setHeaderBg(mode: HeaderBgMode) {
-  state.headerBg = mode;
-  emit();
-}
 
 export function setShaderConfig(patch: Partial<DitherShaderConfig>) {
   state.shader = { ...state.shader, ...patch };
@@ -1432,8 +1241,8 @@ export function setHoverLayer(index: number, patch: Partial<DitherAlphaLayer>) {
  *  reveal. Only swaps colors/shapes; motion, scene, and per-layer opacities
  *  stay as the user left them. */
 export function setInitialState(id: InitialStateId) {
-  const base = id === "fix" ? fixLayers : problemLayers;
-  const reveal = id === "fix" ? problemLayers : fixLayers;
+  const base = paletteLayers(state.palette, id);
+  const reveal = paletteLayers(state.palette, id === "fix" ? "problem" : "fix");
   const baseOpacities = state.shader.alphaLayers.map((layer) => layer.opacity);
   const revealOpacities = state.hover.hoverLayers.map((layer) => layer.opacity);
   state.initialState = id;
@@ -1443,7 +1252,6 @@ export function setInitialState(id: InitialStateId) {
       ...l,
       opacity: baseOpacities[i] ?? l.opacity,
     })),
-    colorFront: base[0].color,
   };
   state.hover = {
     ...state.hover,
@@ -1451,26 +1259,12 @@ export function setInitialState(id: InitialStateId) {
       ...l,
       opacity: revealOpacities[i] ?? l.opacity,
     })),
-    fixColor: reveal[0].color,
-    fixShape: reveal[0].shape,
   };
-  emit();
-}
-
-export function setMultiColorConfig(patch: Partial<DitherMultiColorConfig>) {
-  state.multiColor = { ...state.multiColor, ...patch };
   emit();
 }
 
 export function setPixelGridConfig(patch: Partial<DitherPixelGridConfig>) {
   state.pixelGrid = { ...state.pixelGrid, ...patch };
-  emit();
-}
-
-export function setMultiColorAt(index: number, color: string) {
-  const colors = [...state.multiColor.colors];
-  colors[index] = color;
-  state.multiColor = { ...state.multiColor, colors };
   emit();
 }
 
@@ -1487,26 +1281,28 @@ export function setLayoutConfig(patch: Partial<DitherLayoutConfig>) {
   emit();
 }
 
+/** Switch the layout. Centered sets the line-hugging edge values and, when
+ *  the size contrast is 0, a lively one; Split puts back the active
+ *  template's authored values (the defaults without a template). */
+export function setComposition(mode: CompositionId) {
+  if (state.composition.mode === mode) return;
+  if (mode === "centered") {
+    state.edge = { ...state.edge, ...centeredEdge };
+    const points = state.pixelGrid.enabled && state.animation.tileDisplay === "points";
+    if (points && !state.animation.tileSizeContrast) state.animation = { ...state.animation, tileSizeContrast: CENTERED_SIZE_CONTRAST };
+  } else {
+    const tmpl = heroTemplates.find((t) => t.id === state.activeTemplate);
+    const authored = { ...defaultEdgeConfig, ...tmpl?.edge };
+    const keys = Object.keys(centeredEdge) as (keyof typeof centeredEdge)[];
+    state.edge = { ...state.edge, ...Object.fromEntries(keys.map((k) => [k, authored[k]])) };
+    state.animation = { ...state.animation, tileSizeContrast: tmpl?.animation?.tileSizeContrast ?? defaultAnimationConfig.tileSizeContrast };
+  }
+  state.composition = { mode };
+  emit();
+}
+
 export function setButtonConfig(patch: Partial<DitherButtonConfig>) {
   state.button = { ...state.button, ...patch };
-  emit();
-}
-
-export function setWtfTitlePos(key: keyof WtfTitlePositions, patch: Partial<TitlePos>) {
-  state.wtfTitlePositions = {
-    ...state.wtfTitlePositions,
-    [key]: { ...state.wtfTitlePositions[key], ...patch },
-  };
-  emit();
-}
-
-export function resetWtfTitlePositions() {
-  state.wtfTitlePositions = { ...defaultWtfTitlePositions };
-  emit();
-}
-
-export function setHapticConfig(patch: Partial<DitherHapticConfig>) {
-  state.haptic = { ...state.haptic, ...patch };
   emit();
 }
 
@@ -1524,19 +1320,11 @@ export function setStableColorField(on: boolean) {
   emit();
 }
 
-/** Change the loop-breaker WITHOUT detaching from the active scene. Plain
- *  setAnimationConfig() nulls activeScene for any scene-motion key (loopBreak is
- *  one), which would clear the scene highlight. This layers non-repeating motion
- *  ('wander' = organic/random) on top of the CURRENT scene and keeps it
- *  selected. Turning it on from a zero amount raises it to a visible default. */
-export function setLoopBreak(mode: LoopBreakMode) {
-  // Turning it on from the Layers picker uses a pronounced amount so the effect
-  // clearly reads as dynamic (scene defaults keep the subtler 0.5 for a gentle
-  // production anti-loop). Leave an already-strong amount alone.
-  const amount = mode === "none"
-    ? state.animation.loopBreakAmount
-    : Math.max(state.animation.loopBreakAmount, 1.3);
-  state.animation = { ...state.animation, loopBreak: mode, loopBreakAmount: amount };
+/** Layers-explorer only: set scene-motion keys (speeds) WITHOUT detaching
+ *  from the active scene, so a speed preset keeps the scene selected. */
+export function setSceneMotion(shader: Partial<DitherShaderConfig>, animation: Partial<DitherAnimationConfig>) {
+  state.shader = { ...state.shader, ...shader };
+  state.animation = { ...state.animation, ...animation };
   emit();
 }
 
@@ -1575,19 +1363,6 @@ export function setCopyVariant(id: CopyVariantId) {
   emit();
 }
 
-/** Live-tweak typography/color overrides for the current copy variant */
-export function setCopyFont(patch: Partial<Pick<DitherCopy,
-  'headlineFont' | 'headlineWeight' | 'headlineSize' | 'headlineTracking' | 'headlineLeading' |
-  'headlineColorMode' | 'responseFont' | 'responseSize' | 'responseLeading' | 'responseColorMode' |
-  'responseFontStyle' | 'responseWeight' | 'responseTracking' | 'responseBubble' | 'responseBubbleRadius' |
-  'responseBubbleColor' | 'responseSeparator' | 'responseFontMode'
->>) {
-  const id = state.copyVariant;
-  Object.assign(copyVariants[id], patch);
-  emit();
-}
-
-
 export function setTerminalTheme(id: string | null) {
   state.terminalTheme = id;
   if (id) {
@@ -1601,10 +1376,199 @@ export function setTerminalTheme(id: string | null) {
   emit();
 }
 
-export function resetDither() {
-  state = structuredClone(defaults);
+/* ─── Design Panel presets ───
+   The panel offers curated choices, not free values: each preset is checked to
+   keep the resting state and the hover intact (whole-pixel sizes, readable
+   text, a reveal that contrasts with the rest). */
+
+export type PaletteId = "signal" | "ember" | "ultra" | "mono" | "prism" | "aurora";
+type Trio = [string, string, string];
+export interface Palette {
+  label: string;
+  hint: string;
+  back: string;
+  problem: Trio;
+  fix: Trio;
+  /** CTA fill when it should not be the reveal colour fix[0]. */
+  cta?: string;
+}
+export const palettes: Record<PaletteId, Palette> = {
+  signal: { label: "Signal", hint: "pink → teal", back: "#0A1714",
+    problem: ["#E6307A", "#FF6B2B", "#FF3366"], fix: ["#2DD4A8", "#3ECF8E", "#1A8A70"], cta: "#1A8A70" },
+  ember: { label: "Ember", hint: "orange → blue", back: "#0B0F1A",
+    problem: ["#FF7A1A", "#FFB020", "#E8432E"], fix: ["#3BA4FF", "#6BC6FF", "#1F5FD1"] },
+  ultra: { label: "Ultra", hint: "violet → lime", back: "#0E0A16",
+    problem: ["#B04BFF", "#FF4FD8", "#7A2CFF"], fix: ["#C6F432", "#7FE06A", "#3FAF5A"] },
+  mono: { label: "Mono", hint: "grey → pink", back: "#0C0C0E",
+    problem: ["#F2F2F2", "#9A9AA2", "#5A5A62"], fix: ["#E6307A", "#FF6B2B", "#FF3366"] },
+  // Multi-colour pairs: one distinct hue per layer instead of three shades of
+  // one hue. This replaces the old separate multi-colour mode; the three
+  // resting layers already are the colour layers.
+  // Prism and Aurora were near twins (warm trio at rest, teal-led cool trio
+  // on hover, same #2DD4A8 CTA). Now: Prism is additive vs subtractive
+  // primaries on a neutral black, with its own violet accent; Aurora is a
+  // sunset over a night sky, revealing aurora greens, and keeps a mint CTA.
+  prism: { label: "Prism", hint: "RGB → CMY", back: "#0B0B0F",
+    problem: ["#FF3B5C", "#34E07A", "#3D7BFF"], fix: ["#2EE6E6", "#FF4FD8", "#FFE14D"], cta: "#6D5BFF" },
+  aurora: { label: "Aurora", hint: "sunset → aurora", back: "#070B1A",
+    problem: ["#FF5E7E", "#FF9F45", "#FFD36E"], fix: ["#3DFFB0", "#2BB8FF", "#9D7BFF"] },
+};
+export const paletteIds = Object.keys(palettes) as PaletteId[];
+
+/** CTA colours for the hero and its header. A terminal theme brings its own
+ *  accent; otherwise the CTA takes the palette's reveal colour, so the buttons
+ *  match the response line and the hover reveal instead of a fixed teal.
+ *  APCA nudges the fill until the label reads (Lc 60). */
+export function heroCtaColors(paletteId: PaletteId, terminalThemeId?: string | null) {
+  const theme = terminalThemeId ? getThemeById(terminalThemeId) : undefined;
+  const p = palettes[paletteId];
+  const pair = getAccessibleCtaPair(theme ? theme.accent2 : (p.cta ?? p.fix[0]), 60);
+  return {
+    bg: pair.backgroundHex,
+    text: pair.textHex,
+    hover: `oklch(from ${pair.backgroundHex} calc(l + 0.08) c h)`,
+  };
+}
+
+/** A state's authored layers (shapes, opacities) in a palette's colours. */
+function paletteLayers(palette: PaletteId, which: InitialStateId): DitherAlphaLayer[] {
+  const src = which === "fix" ? fixLayers : problemLayers;
+  return src.map((l, i) => ({ ...l, color: palettes[palette][which][i] }));
+}
+
+/** Recolour both states; shapes and opacities stay as they are. */
+export function setPalette(id: PaletteId) {
+  const p = palettes[id];
+  const rest = state.initialState;
+  const reveal = rest === "fix" ? "problem" : "fix";
+  state.palette = id;
+  state.terminalTheme = null;
+  state.shader = {
+    ...state.shader,
+    colorBack: p.back,
+    alphaLayers: state.shader.alphaLayers.map((l, i) => ({ ...l, color: p[rest][i] ?? l.color })),
+  };
+  state.hover = {
+    ...state.hover,
+    hoverLayers: state.hover.hoverLayers.map((l, i) => ({ ...l, color: p[reveal][i] ?? l.color })),
+  };
   emit();
 }
+
+export type TypePairId = "editorial" | "geometric" | "grotesk" | "quirky" | "soft" | "terminal";
+export interface TypePair {
+  label: string;
+  hint: string;
+  headlineFont: string;
+  bodyFont: string;
+  headlineWeight: number;
+  headlineLeading: string;
+  headlineTracking: string;
+  /** Only set where the face needs it (mono advances run wide). */
+  headlineSize?: string;
+}
+export const typePairs: Record<TypePairId, TypePair> = {
+  editorial: { label: "Editorial", hint: "Instrument", headlineFont: "'Instrument Serif', Georgia, serif", bodyFont: "'Instrument Sans', Inter, sans-serif", headlineWeight: 400, headlineLeading: "1.02", headlineTracking: "-0.01em" },
+  geometric: { label: "Geometric", hint: "Outfit", headlineFont: "'Outfit', Inter, sans-serif", bodyFont: "'Outfit', Inter, sans-serif", headlineWeight: 500, headlineLeading: "1.0", headlineTracking: "-0.02em" },
+  grotesk: { label: "Grotesk", hint: "Space Grotesk + Inter", headlineFont: "'Space Grotesk', Inter, sans-serif", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.0", headlineTracking: "-0.03em" },
+  quirky: { label: "Quirky", hint: "Bricolage + Inter", headlineFont: "'Bricolage Grotesque', Inter, sans-serif", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.0", headlineTracking: "-0.03em" },
+  soft: { label: "Soft serif", hint: "Fraunces + DM Sans", headlineFont: "'Fraunces', Georgia, serif", bodyFont: "'DM Sans', Inter, sans-serif", headlineWeight: 500, headlineLeading: "1.04", headlineTracking: "-0.02em" },
+  terminal: { label: "Terminal", hint: "Geist Mono + Inter", headlineFont: "'Geist Mono', ui-monospace, monospace", bodyFont: "'Inter', system-ui, sans-serif", headlineWeight: 500, headlineLeading: "1.08", headlineTracking: "-0.04em", headlineSize: "clamp(2.25rem, 3.4vw + 1rem, 3.875rem)" },
+};
+export const typePairIds = Object.keys(typePairs) as TypePairId[];
+
+/** The copy as rendered: the variant's words, with a type pair's faces laid
+ *  over its own when one is picked. */
+export function resolveCopy(id: CopyVariantId, pair: TypePairId | null): DitherCopy {
+  const copy = copyVariants[id];
+  // A state from an older tab can name a pair that no longer exists.
+  const p = pair ? typePairs[pair] : undefined;
+  if (!p) return copy;
+  return {
+    ...copy,
+    headlineFont: p.headlineFont,
+    headlineWeight: p.headlineWeight,
+    headlineLeading: p.headlineLeading,
+    headlineTracking: p.headlineTracking,
+    headlineSize: p.headlineSize ?? copy.headlineSize,
+    subFont: p.bodyFont,
+    ctaFont: p.bodyFont,
+    // A pair's body face is proportional: drop a mono copy's smaller sizes.
+    subSize: undefined,
+    ctaSize: undefined,
+    responseFontMode: "headline",
+    responseFontStyle: "normal",
+    tabletLayout: pair === "terminal" ? "stack" : copy.tabletLayout,
+  };
+}
+
+export function setTypePair(id: TypePairId | null) {
+  state.typePair = id;
+  emit();
+}
+
+export type GrainId = "fine" | "medium" | "coarse" | "chunky";
+/** Piece pitch in px when the pixel grid is on. */
+export const grainPitch: Record<GrainId, number> = { fine: 8, medium: 12, coarse: 24, chunky: 32 };
+/** Paper dot size in px when there is no grid (Fine Grain). */
+export const grainDot: Record<GrainId, number> = { fine: 1, medium: 2, coarse: 4, chunky: 6 };
+export const grainIds = Object.keys(grainPitch) as GrainId[];
+
+export type GapId = "none" | "tight" | "open";
+export const gapIds: GapId[] = ["none", "tight", "open"];
+/** Gap in whole px for a pitch: 0, a quarter, or two fifths of it. */
+export function gapFor(id: GapId, pitch: number): number {
+  if (id === "none") return 0;
+  return Math.min(pitch - 1, Math.max(1, Math.round(pitch * (id === "tight" ? 0.25 : 0.4))));
+}
+export function gridPitch(pg: DitherPixelGridConfig): number {
+  return Math.max(2, Math.round(pg.cell / Math.max(1, pg.divisions)));
+}
+
+/** Set the size. On a grid this keeps the gap preset and clamps the corner
+ *  radius, so the new pitch never yields a gap or radius that does not fit. */
+export function setGrain(id: GrainId) {
+  const pg = state.pixelGrid;
+  if (!pg.enabled) {
+    state.shader = { ...state.shader, size: grainDot[id] };
+    emit();
+    return;
+  }
+  const pitch = grainPitch[id];
+  const oldPitch = gridPitch(pg);
+  const gapId = gapIds.find((g) => gapFor(g, oldPitch) === pg.gap);
+  state.pixelGrid = {
+    ...pg,
+    cell: pitch * pg.divisions,
+    gap: gapId ? gapFor(gapId, pitch) : Math.min(pg.gap, pitch - 1),
+    radius: Math.min(pg.radius, Math.floor(pitch / 2)),
+  };
+  emit();
+}
+
+export function setGap(id: GapId) {
+  const pg = state.pixelGrid;
+  state.pixelGrid = { ...pg, gap: gapFor(id, gridPitch(pg)) };
+  emit();
+}
+
+export type WarpFeelId = "crisp" | "soft" | "twist" | "bubble";
+type WarpFeel = Pick<DitherHoverConfig, "warpRotate" | "warpRound" | "warpJitter">;
+export const warpFeels: Record<WarpFeelId, { label: string } & WarpFeel> = {
+  crisp: { label: "Crisp", warpRotate: 0, warpRound: 0, warpJitter: 0 },
+  soft: { label: "Soft", warpRotate: 0, warpRound: 0.5, warpJitter: 0.4 },
+  twist: { label: "Twist", warpRotate: 35, warpRound: 0.2, warpJitter: 0.6 },
+  bubble: { label: "Bubble", warpRotate: 35, warpRound: 1, warpJitter: 1.5 },
+};
+export const warpFeelIds = Object.keys(warpFeels) as WarpFeelId[];
+
+export const warpModeIds: WarpMode[] = ["hover", "roam", "both"];
+export const warpModeLabel: Record<WarpMode, string> = { hover: "Hover", roam: "Roam", both: "Both" };
+export const warpModeTitle: Record<WarpMode, string> = {
+  hover: "The pointer drives the warp",
+  roam: "One warp blob drifts by itself, breathing and morphing",
+  both: "Roams by itself; the pointer takes over while it is on the hero",
+};
 
 /* ─── Hero templates ─── */
 
@@ -1644,15 +1608,18 @@ export const heroTemplates: HeroTemplate[] = [
       textBlendMotion: 1,
       textBlendSpeed: 0.33,
     },
-    animation: { tileDisplay: "points" },
+    // Points now honours Break loop and colour cycling; pin both off so Full
+    // Bleed keeps the calm look it was designed with (they were no-ops here).
+    shader: { colorCycleSpeed: 0 },
+    animation: { tileDisplay: "points", loopBreak: "none" },
   },
   {
     id: "problem",
     name: "Problem",
-    desc: "Square error tiles on a 96px grid with wide gaps, pink problem state at rest; hover reveals the green fix. AI-native copy in Space Mono.",
+    desc: "Square 24px error tiles with open gaps, pink problem state at rest; hover reveals the green fix. AI-native copy in JetBrains Mono.",
     swatch: ["#E6307A", "#FF6B2B", "#FF3366"],
     initialState: "problem",
-    // AI-native headline baked in: "Your AI built the app. Who's watching it run?"
+    // AI headline baked in: "Your AI wrote the page. Who's art-directing it?"
     copyVariant: "ai",
     // Match the reveal layer's detailed sampling. The global 0.21 scale makes
     // Error Sweep read as a few broad, almost-static regions; 0.81 exposes the
@@ -1662,9 +1629,12 @@ export const heroTemplates: HeroTemplate[] = [
     // dither axis-aligns, so scene drift/scan/rotation can only flip tiles
     // on/off at the threshold — every scene looks the same. Snap off lets the
     // dither flow freely under the square tile mask, so scene motion reads.
-    pixelGrid: { cell: 96, divisions: 3, gap: 13, radius: 0, snap: false },
+    // 24px tiles (Coarse, 10px Open gap). 32px (Chunky) read as a zoomed-in
+    // crop: too few tiles across the hero to show a shape.
+    pixelGrid: { cell: 72, divisions: 3, gap: 10, radius: 0, snap: false },
     // The most expressive color/alpha scene: diagonal scan + vertical wave,
-    // slow rotation, color cycling, and an orbiting non-looping drift.
+    // slow rotation and color cycling. No loop-break pan, so the panel's
+    // shape picks stay on canvas.
     scene: "error-sweep",
     animation: { tileDisplay: "color" },
     // Square, uppercase CTA to echo the sharp pixel tiles.
@@ -1682,47 +1652,11 @@ export const heroTemplates: HeroTemplate[] = [
     swatch: ["#2DD4A8", "#3ECF8E", "#1A8A70"],
     initialState: "fix",
     copyVariant: "fine-grain",
-    shader: {
-      type: "8x8",
-      shape: "simplex",
-      size: 2,
-      scale: 0.6,
-      speed: 0.1,
-      colorCycleSpeed: 0.12,
-      rotation: 8,
-      transparentBg: true,
-      alphaSpread: 0.04,
-      fit: "cover",
-    },
-    edge: {
-      mode: "dissolve",
-      position: 62,
-      dissolveDepth: 7,
-      dissolveSeed: 1,
-      shaderExtend: 160,
-      ripplePixelate: true,
-      rippleDither: true,
-      rippleAmplitude: 4,
-      rippleFrequency: 6,
-      rippleSpeed: 0.5,
-      textBlend: false,
-    },
-    // Full hover story on top of the calm resting field: warp reveal to the pink
-    // problem with error-log fragments (defaults already enable reveal + text).
-    hover: {
-      enabled: true,
-      mode: "warp",
-      wholeTiles: true,
-      hoverShape: "pixel-circle",
-      warpRevealEnabled: true,
-      warpErrorText: true,
-      warpRotate: 35,
-      warpJitter: 1.5,
-      fixType: "2x2",
-      fixSize: 18.5,
-      fixScale: 0.81,
-      radius: 100,
-    },
+    // Only the look keys that differ from the defaults. The hover inherits the
+    // field's own dither (type, size, scale), so the warp reveals whole cells
+    // of the Fine Grain field instead of the coarse tiles of the gridded
+    // templates. Edge and hover are the defaults.
+    shader: { size: 2, scale: 0.6, speed: 0.1, colorCycleSpeed: 0.12 },
     // Color/alpha renderer — no pixel grid, so the dither reads as a fine
     // continuous field rather than discrete tiles.
     pixelGrid: { enabled: false, snap: false },
@@ -1741,18 +1675,42 @@ export const heroTemplates: HeroTemplate[] = [
       waveAmplitude: 0,
       waveSpeed: 0.08,
       waveAngle: 0,
-      gapPulse: 2.5,
-      gapPulseSpeed: 0.11,
       loopBreak: "rotate",
       loopBreakAmount: 1.3,
       tileSizeSpread: 0.5,
       tileSizeSpeed: 0.11,
       tileSizeNoise: 1.7,
-      frameStep: 0.5,
-      fps: 0,
     },
   },
 ];
+
+/** The Speed control's stops (animation.speed; 0 = paused). Design Panel and
+ *  Layers use the same four. */
+export const speedStops = [
+  { value: 0, label: "Pause" },
+  { value: 0.5, label: "Slow" },
+  { value: 1, label: "Normal" },
+  { value: 2, label: "Fast" },
+  // Full Bleed's noise field reads calm even at 2×, so it needs a faster stop.
+  { value: 4, label: "Rapid" },
+] as const;
+/** The stop for the current animation, or null for an off-stop speed. */
+export function speedStop(a: Pick<DitherAnimationConfig, "playing" | "speed">) {
+  const v = a.playing ? a.speed : 0;
+  return speedStops.find((s) => s.value === v) ?? null;
+}
+
+/** A copy of the whole state, to put back later with restoreDitherState. */
+export function snapshotDitherState(): DitherState {
+  return structuredClone(state);
+}
+
+/** Put back a state taken with snapshotDitherState (Layers uses it to return
+ *  the Design Panel look it took apart). */
+export function restoreDitherState(snap: DitherState) {
+  state = structuredClone(snap);
+  emit();
+}
 
 export function applyHeroTemplate(id: string) {
   const tmpl = heroTemplates.find((t) => t.id === id);
@@ -1762,11 +1720,13 @@ export function applyHeroTemplate(id: string) {
   const reveal = tmpl.initialState === "fix" ? problemLayers : fixLayers;
   state = {
     ...base,
+    // Debug overlays are a view setting, not part of a template's look: keep
+    // them on while the user flips between templates to compare alignment.
+    layout: { ...base.layout, showBaselines: state.layout.showBaselines, showGuides: state.layout.showGuides, showBoxes: state.layout.showBoxes },
     shader: {
       ...base.shader,
       ...tmpl.shader,
       alphaLayers: rest.map((l) => ({ ...l })),
-      colorFront: rest[0].color,
     },
     // topInset is viewport-specific (measured off the live header) — keep it.
     edge: { ...base.edge, ...tmpl.edge, topInset: state.edge.topInset },
@@ -1774,8 +1734,6 @@ export function applyHeroTemplate(id: string) {
       ...base.hover,
       ...tmpl.hover,
       hoverLayers: reveal.map((l) => ({ ...l })),
-      fixColor: reveal[0].color,
-      fixShape: reveal[0].shape,
     },
     animation: { ...base.animation, ...tmpl.animation },
     pixelGrid: { ...base.pixelGrid, ...tmpl.pixelGrid },
@@ -1784,6 +1742,8 @@ export function applyHeroTemplate(id: string) {
     initialState: tmpl.initialState,
     activeScene: tmpl.scene !== undefined ? tmpl.scene : base.activeScene,
     activeTemplate: id,
+    palette: "signal",
+    typePair: null,
   };
   // A baked-in scene contributes its motion overlay on top of the template's
   // look (same motion-only contract as picking the scene in the panel).
@@ -1839,14 +1799,17 @@ function configurePreviewSync(templateId: string | null, expectSourceId: string 
       }
       syncBridge.live = true;
     }
-    const json = JSON.stringify(message.state) + JSON.stringify(message.copyVariants);
+    const json = JSON.stringify(message.state);
     if (json === syncBridge.lastAppliedJson) return;
     syncBridge.lastAppliedJson = json;
-    for (const id of Object.keys(message.copyVariants) as CopyVariantId[]) {
-      Object.assign(copyVariants[id], message.copyVariants[id]);
-    }
+    // A tab still running older code can send state without keys added
+    // since (composition, animation.tileSizeContrast, hover.mode): fill them
+    // from the defaults so no reader meets undefined.
     state = {
       ...incoming,
+      composition: { ...defaults.composition, ...incoming.composition },
+      animation: { ...defaults.animation, ...incoming.animation },
+      hover: { ...defaults.hover, ...incoming.hover },
       edge: { ...incoming.edge, topInset: state.edge.topInset },
     };
     emit();

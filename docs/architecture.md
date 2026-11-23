@@ -20,12 +20,11 @@ src/
     dither/
       DitherHero.tsx        the scene (dot field, warp reveal, copy block)
       ditherStore.ts        state, hero + scene templates (useSyncExternalStore)
-      DitherPanel.tsx       the control panel body
+      DitherPanel.tsx       the Design Panel body (lab/DesignPanel.tsx is the docked shell)
       urlParams.ts          reads URL params into the store pre-mount
   components/
     BrandMark.tsx           the generative Hero Lab logo (lab toolbars only)
     SiteFooter.tsx          author / colophon footer (Live view only)
-    playground/             TextInspectorPanel, PaletteColorPicker, selection hooks
   content/presets.ts        header brand + nav, swappable
 ```
 

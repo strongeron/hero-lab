@@ -21,4 +21,11 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   base: process.env.BASE_PATH ?? '/hero-lab/',
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      // Second page: the copyable <DitherBackground> on its own, without the
+      // lab's fonts or CSS.
+      input: ['index.html', 'dither-background.html'],
+    },
+  },
 })

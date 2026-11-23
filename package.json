@@ -14,13 +14,17 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "smoke": "node scripts/smoke.mjs",
+    "check": "node scripts/check.mjs",
+    "check:fast": "node scripts/check.mjs --no-smoke",
+    "lint:tokens": "node scripts/lint-tokens.mjs"
   },
   "dependencies": {
-    "@paper-design/shaders-react": "^0.0.71",
+    "@paper-design/shaders-react": "^0.0.82",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "web-haptics": "^0.0.6"
+    "web-vitals": "^6.2.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.0",

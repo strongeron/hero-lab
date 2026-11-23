@@ -1,0 +1,528 @@
+{
+  "live-default": {
+    "path": "/hero-lab/",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+    "idle": {
+      "label": "idle",
+      "seconds": 3,
+      "frames": 4,
+      "fps_raf": 60,
+      "glDrawsPerSec": 419.9,
+      "uniformCallsPerSec": 7977.3,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 0,
+      "glContextsCreatedTotal": 5,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 4,
+      "domCanvases": 4,
+      "glBackingMPx": 10.21,
+      "canvasList": [
+        [
+          "webgl2:20x20"
+        ],
+        [
+          "webgl2:2880x1800"
+        ],
+        [
+          "webgl2:1668x2224"
+        ],
+        [
+          "webgl2:780x1688"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 14,
+        "task": 36,
+        "style": 0,
+        "layout": 0
+      }
+    },
+    "hover": {
+      "label": "hover-sweep",
+      "seconds": 3,
+      "frames": 4,
+      "fps_raf": 60.3,
+      "glDrawsPerSec": 421.9,
+      "uniformCallsPerSec": 8855.5,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 18,
+      "glContextsCreatedTotal": 5,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 4,
+      "domCanvases": 4,
+      "glBackingMPx": 10.21,
+      "canvasList": [
+        [
+          "webgl2:20x20"
+        ],
+        [
+          "webgl2:2880x1800"
+        ],
+        [
+          "webgl2:1668x2224"
+        ],
+        [
+          "webgl2:780x1688"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 27,
+        "task": 69,
+        "style": 1,
+        "layout": 3
+      }
+    }
+  },
+  "bare-free-color-problem": {
+    "path": "/hero-lab/?preview=1&tile=color&grid=0&state=problem",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+    "idle": {
+      "label": "idle",
+      "seconds": 3,
+      "frames": 1,
+      "fps_raf": 60.3,
+      "glDrawsPerSec": 180.9,
+      "uniformCallsPerSec": 1085.6,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 180.9,
+      "glContextsCreatedTotal": 5,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 3,
+      "domCanvases": 3,
+      "glBackingMPx": 1.5,
+      "canvasList": [
+        [
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 23,
+        "task": 48,
+        "style": 2,
+        "layout": 0
+      }
+    },
+    "hover": {
+      "label": "hover-sweep",
+      "seconds": 3.03,
+      "frames": 1,
+      "fps_raf": 60,
+      "glDrawsPerSec": 360.3,
+      "uniformCallsPerSec": 2310.1,
+      "canvas2dFillsPerSec": 5478.1,
+      "toBlobPerSec": 63.7,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 297.3,
+      "glContextsCreatedTotal": 8,
+      "ctx2dCreatedTotal": 3,
+      "glCanvasesInDom": 6,
+      "domCanvases": 6,
+      "glBackingMPx": 3,
+      "canvasList": [
+        [
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 172,
+        "task": 374,
+        "style": 16,
+        "layout": 2
+      }
+    }
+  },
+  "bare-free-color-fix": {
+    "path": "/hero-lab/?preview=1&tile=color&grid=0&state=fix",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+    "idle": {
+      "label": "idle",
+      "seconds": 3,
+      "frames": 1,
+      "fps_raf": 60,
+      "glDrawsPerSec": 180,
+      "uniformCallsPerSec": 1080,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 180,
+      "glContextsCreatedTotal": 5,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 3,
+      "domCanvases": 3,
+      "glBackingMPx": 1.5,
+      "canvasList": [
+        [
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 25,
+        "task": 55,
+        "style": 3,
+        "layout": 0
+      }
+    },
+    "hover": {
+      "label": "hover-sweep",
+      "seconds": 3.01,
+      "frames": 1,
+      "fps_raf": 60.1,
+      "glDrawsPerSec": 360.4,
+      "uniformCallsPerSec": 2304,
+      "canvas2dFillsPerSec": 5396.3,
+      "toBlobPerSec": 62.1,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 296.1,
+      "glContextsCreatedTotal": 8,
+      "ctx2dCreatedTotal": 3,
+      "glCanvasesInDom": 6,
+      "domCanvases": 6,
+      "glBackingMPx": 3,
+      "canvasList": [
+        [
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 167,
+        "task": 362,
+        "style": 15,
+        "layout": 2
+      }
+    }
+  },
+  "bare-points": {
+    "path": "/hero-lab/?preview=1&tile=points&grid=1",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+    "idle": {
+      "label": "idle",
+      "seconds": 3,
+      "frames": 1,
+      "fps_raf": 60,
+      "glDrawsPerSec": 120,
+      "uniformCallsPerSec": 2640,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 0,
+      "glContextsCreatedTotal": 2,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 1,
+      "domCanvases": 1,
+      "glBackingMPx": 5.18,
+      "canvasList": [
+        [
+          "webgl2:2880x1800"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 10,
+        "task": 24,
+        "style": 0,
+        "layout": 0
+      }
+    },
+    "hover": {
+      "label": "hover-sweep",
+      "seconds": 3.03,
+      "frames": 1,
+      "fps_raf": 60,
+      "glDrawsPerSec": 120.1,
+      "uniformCallsPerSec": 3238.1,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 21.4,
+      "glContextsCreatedTotal": 2,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 1,
+      "domCanvases": 1,
+      "glBackingMPx": 5.18,
+      "canvasList": [
+        [
+          "webgl2:2880x1800"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 19,
+        "task": 47,
+        "style": 1,
+        "layout": 1
+      }
+    }
+  },
+  "bare-snap-color": {
+    "path": "/hero-lab/?preview=1&tile=color&grid=1",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+    "idle": {
+      "label": "idle",
+      "seconds": 3,
+      "frames": 1,
+      "fps_raf": 60,
+      "glDrawsPerSec": 120,
+      "uniformCallsPerSec": 2640,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 0,
+      "glContextsCreatedTotal": 2,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 1,
+      "domCanvases": 1,
+      "glBackingMPx": 5.18,
+      "canvasList": [
+        [
+          "webgl2:2880x1800"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 8,
+        "task": 19,
+        "style": 0,
+        "layout": 0
+      }
+    },
+    "hover": {
+      "label": "hover-sweep",
+      "seconds": 3.03,
+      "frames": 1,
+      "fps_raf": 60.1,
+      "glDrawsPerSec": 120.2,
+      "uniformCallsPerSec": 3242.4,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 21.1,
+      "glContextsCreatedTotal": 2,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 1,
+      "domCanvases": 1,
+      "glBackingMPx": 5.18,
+      "canvasList": [
+        [
+          "webgl2:2880x1800"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 18,
+        "task": 44,
+        "style": 1,
+        "layout": 1
+      }
+    }
+  },
+  "tmpl-full-bleed": {
+    "path": "/hero-lab/?preview=1&template=full-bleed",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+    "idle": {
+      "label": "idle",
+      "seconds": 3,
+      "frames": 1,
+      "fps_raf": 60,
+      "glDrawsPerSec": 0,
+      "uniformCallsPerSec": 0,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 0,
+      "glContextsCreatedTotal": 2,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 1,
+      "domCanvases": 1,
+      "glBackingMPx": 5.18,
+      "canvasList": [
+        [
+          "webgl2:2880x1800"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 2,
+        "task": 12,
+        "style": 0,
+        "layout": 0
+      }
+    },
+    "hover": {
+      "label": "hover-sweep",
+      "seconds": 3.02,
+      "frames": 1,
+      "fps_raf": 60.2,
+      "glDrawsPerSec": 120.5,
+      "uniformCallsPerSec": 3249.9,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 24.2,
+      "glContextsCreatedTotal": 2,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 1,
+      "domCanvases": 1,
+      "glBackingMPx": 5.18,
+      "canvasList": [
+        [
+          "webgl2:2880x1800"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 16,
+        "task": 42,
+        "style": 1,
+        "layout": 4
+      }
+    }
+  },
+  "tmpl-fine-grain": {
+    "path": "/hero-lab/?preview=1&template=fine-grain",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+    "idle": {
+      "label": "idle",
+      "seconds": 3,
+      "frames": 1,
+      "fps_raf": 0,
+      "glDrawsPerSec": 0,
+      "uniformCallsPerSec": 0,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 0,
+      "glContextsCreatedTotal": 5,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 3,
+      "domCanvases": 3,
+      "glBackingMPx": 1.5,
+      "canvasList": [
+        [
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 0,
+        "task": 0,
+        "style": 0,
+        "layout": 0
+      }
+    },
+    "hover": {
+      "label": "hover-sweep",
+      "seconds": 3.03,
+      "frames": 1,
+      "fps_raf": 60,
+      "glDrawsPerSec": 459.9,
+      "uniformCallsPerSec": 750.7,
+      "canvas2dFillsPerSec": 5836.5,
+      "toBlobPerSec": 64,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 120.3,
+      "glContextsCreatedTotal": 8,
+      "ctx2dCreatedTotal": 3,
+      "glCanvasesInDom": 6,
+      "domCanvases": 6,
+      "glBackingMPx": 3,
+      "canvasList": [
+        [
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 183,
+        "task": 382,
+        "style": 14,
+        "layout": 2
+      }
+    }
+  },
+  "tmpl-problem": {
+    "path": "/hero-lab/?preview=1&template=problem",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+    "idle": {
+      "label": "idle",
+      "seconds": 3,
+      "frames": 1,
+      "fps_raf": 0,
+      "glDrawsPerSec": 0,
+      "uniformCallsPerSec": 0,
+      "canvas2dFillsPerSec": 0,
+      "toBlobPerSec": 0,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 0,
+      "glContextsCreatedTotal": 5,
+      "ctx2dCreatedTotal": 0,
+      "glCanvasesInDom": 3,
+      "domCanvases": 3,
+      "glBackingMPx": 1.5,
+      "canvasList": [
+        [
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 0,
+        "task": 0,
+        "style": 0,
+        "layout": 0
+      }
+    },
+    "hover": {
+      "label": "hover-sweep",
+      "seconds": 3.02,
+      "frames": 1,
+      "fps_raf": 45.7,
+      "glDrawsPerSec": 307.8,
+      "uniformCallsPerSec": 520.4,
+      "canvas2dFillsPerSec": 1678.6,
+      "toBlobPerSec": 37.4,
+      "toDataURLPerSec": 0,
+      "styleMutationsPerSec": 73.5,
+      "glContextsCreatedTotal": 8,
+      "ctx2dCreatedTotal": 3,
+      "glCanvasesInDom": 6,
+      "domCanvases": 6,
+      "glBackingMPx": 3,
+      "canvasList": [
+        [
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559",
+          "webgl2:894x559"
+        ]
+      ],
+      "mainThread_ms_per_s": {
+        "script": 220,
+        "task": 582,
+        "style": 19,
+        "layout": 1
+      }
+    }
+  }
+}

@@ -1,20 +1,5 @@
-/* ─── Google Fonts (must precede all other @import) ─── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Satoshi:wght@400;500;700;900&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;0,9..144,900;1,9..144,400;1,9..144,600;1,9..144,700;1,9..144,800;1,9..144,900&family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,700;0,6..96,800;0,6..96,900&family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Outfit:wght@300;400;500;600;700;800&family=Source+Sans+3:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Nunito+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Literata:ital,opsz,wght@0,7..72,300;0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;0,7..72,800;1,7..72,400;1,7..72,500;1,7..72,700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Special+Gothic+Expanded+One&family=Anybody:ital,wdth,wght@0,50..150,100..900;1,50..150,100..900&family=Georama:ital,wdth,wght@0,62.5..150,100..900;1,62.5..150,100..900&family=Science+Gothic:slnt,wdth,wght@-10..0,50..200,100..900&display=swap');
-
-/* ─── Google Fonts — Handwritten (Founder Letter) ─── */
-@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap');
-
-/* ─── Google Fonts — New research picks (hero font pairing) ─── */
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500;1,6..72,600;1,6..72,700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Piazzolla:ital,opsz,wght@0,8..30,400;0,8..30,500;0,8..30,600;0,8..30,700;1,8..30,400;1,8..30,500;1,8..30,600;1,8..30,700&family=Geist+Mono:wght@400;500;600;700;800;900&family=Martian+Mono:wght@400;500;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,500;1,8..60,600;1,8..60,700&display=swap');
-
-/* ─── Google Fonts — V4 panel extras ─── */
-@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Syne:wght@400;500;600;700;800&family=Chakra+Petch:wght@400;500;600;700&family=Dela+Gothic+One&family=Orbitron:wght@400;500;600;700;800;900&family=Lexend:wght@400;500;600;700;800&family=Familjen+Grotesk:wght@400;500;600;700&family=Fira+Mono:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inconsolata:wght@400;500;600;700&display=swap');
-
-/* ─── Google Fonts — V4 handwriting panel extras ─── */
-@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Kalam:wght@300;400;700&family=Indie+Flower&family=Shadows+Into+Light&family=Gloria+Hallelujah&family=Architects+Daughter&family=Permanent+Marker&family=Rock+Salt&family=Reenie+Beanie&family=Dancing+Script:wght@400;500;600;700&family=Pacifico&family=Sacramento&family=Great+Vibes&family=Satisfy&display=swap');
-
-/* ─── Fontshare (General Sans, Cabinet Grotesk, Switzer) ─── */
-@import url('https://api.fontshare.com/v2/css?f[]=general-sans@200,300,400,500,600,700&f[]=cabinet-grotesk@400,500,700,800,900&f[]=switzer@300,400,500,600,700&display=swap');
+/* Web fonts load from index.html, not from @import here: an @import in the
+   bundled CSS is found late and blocks render (slow-connection audit, fix 2). */
 @import "tailwindcss";
 
 /* ─── Design Tokens ─── */
@@ -54,6 +39,56 @@
   --color-indigo: #4F46E5;
   --color-indigo-hover: #4338CA;
 
+  /* ── Lab UI (chrome, toolbars, Design Panel) — see DESIGN.md ──
+     Text never goes below --color-lab-fg-subtle: 0.5 white is 5.4:1 on the
+     lab canvas (AA); 0.4 was 3.8:1 and 0.25 was 2.2:1.
+     Neutral and fixed: the chrome never follows the hero's colorBack, which
+     tinted the whole lab maroon or blue per palette. A faint hint of the
+     site's hue 178 (chroma ≤ 0.007) keeps it from reading cold next to the
+     default green-black hero. Three steps: canvas < toolbar/panel < surface. */
+  --color-lab-canvas: oklch(0.145 0.004 178);
+  /* Black behind each artboard: the hero's own dark base shows before it paints. */
+  --color-lab-artboard: #000;
+  --color-lab-toolbar: oklch(0.175 0.006 178);
+  --color-lab-surface: oklch(0.215 0.007 178 / 0.95);
+  --color-lab-panel: oklch(0.175 0.006 178);
+  /* One height for every top bar: the demo site header, lab view toolbars and
+     the Design Panel header, so their bottom lines meet across the page. */
+  --spacing-lab-bar: 56px;
+  --color-lab-fg: rgb(255 255 255 / 0.9);
+  --color-lab-fg-muted: rgb(255 255 255 / 0.65);
+  --color-lab-fg-subtle: rgb(255 255 255 / 0.5);
+  --color-lab-fill: rgb(255 255 255 / 0.04);
+  --color-lab-fill-hover: rgb(255 255 255 / 0.08);
+  --color-lab-fill-selected: rgb(255 255 255 / 0.14);
+  --color-lab-border: rgb(255 255 255 / 0.1);
+  --color-lab-border-strong: rgb(255 255 255 / 0.2);
+  --color-lab-focus: rgb(255 255 255 / 0.75);
+  --color-lab-accent: #6EE7B7;
+  /* Destructive actions only (Reset, Clear, Remove). 7.7:1 on the panel. */
+  --color-lab-danger: #F87171;
+  /* Measured status only (perf strip): good / needs improvement / poor. */
+  --color-lab-good: #34D399;
+  --color-lab-warn: #FCD34D;
+  --color-lab-poor: #FB7185;
+  --text-lab-2xs: 10px;
+  --text-lab-xs: 11px;
+  --text-lab-sm: 12px;
+  --text-lab-md: 13px;
+  /* Hero type scale (the product surface, not the lab). The headline size is
+     fitted per copy variant (useHeadlineFit); these are the fixed steps.
+     No --line-height pair: each use sets its own leading or inherits it. */
+  --text-hero-sub: 17px;
+  --text-hero-sub-lg: 20px;
+  --text-hero-cta: 16px;
+  --text-hero-cta-lg: 18px;
+  --text-hero-nav: 14px;
+  --text-hero-brand: 18px;
+  --text-hero-footer: 15px;
+  /* Black at 50 % lifts lab UI off any hero palette underneath. */
+  --shadow-lab-float: 0 8px 32px rgb(0 0 0 / 0.5);
+  --shadow-lab-raised: 0 16px 48px rgb(0 0 0 / 0.5);
+
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --font-display: 'Satoshi', 'Inter', sans-serif;
@@ -79,14 +114,27 @@
 
 /* ─── Base (Tailwind v4 preflight handles reset) ─── */
 @layer base {
+  /* No double-tap zoom on repeated taps (Segmented, Shuffle, +/-). */
+  button, a, input, select, [role="button"] {
+    touch-action: manipulation;
+  }
   html {
-    scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* A weight or italic that was never loaded shows as a plain regression,
+       not a browser-faked bold or slant. */
+    font-synthesis: none;
   }
 
   html.lenis-active {
     scroll-behavior: auto;
+  }
+
+  /* Default rings take the control's own (often 40% white) color and vanish on
+     dim buttons; one solid ring for keyboard focus everywhere. */
+  :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid oklch(0.78 0.12 250);
+    outline-offset: 2px;
   }
 
   body {
@@ -253,22 +301,27 @@
   --ill-filter: saturate(0) brightness(1.2);
 }
 
-/* ── Inspector slider styling ── */
-[data-inspector-panel] input[type="range"] {
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+/* ── Lab range input (SliderRow, Design Panel) ── */
+input.lab-range {
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
-  height: 20px;
+  /* 24px: the DESIGN.md minimum hit area; the 14px thumb stays centred. */
+  height: 24px;
   cursor: pointer;
 }
 
-[data-inspector-panel] input[type="range"]::-webkit-slider-runnable-track {
+input.lab-range::-webkit-slider-runnable-track {
   height: 3px;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.08);
 }
 
-[data-inspector-panel] input[type="range"]::-webkit-slider-thumb {
+input.lab-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
@@ -280,19 +333,22 @@
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
-[data-inspector-panel] input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+/* Gated: on touch a :hover scale sticks after the tap. */
+@media (hover: hover) and (pointer: fine) {
+  input.lab-range::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  }
 }
 
-[data-inspector-panel] input[type="range"]::-moz-range-track {
+input.lab-range::-moz-range-track {
   height: 3px;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.08);
   border: none;
 }
 
-[data-inspector-panel] input[type="range"]::-moz-range-thumb {
+input.lab-range::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -355,4 +411,36 @@
   --color-t-tube: #B8B8B8;
   --color-t-tube-text: #5C7A00;
   --ill-filter: saturate(1.2) hue-rotate(30deg);
+}
+
+/* Hero Lab mark (BrandMark): one shape morphing through circle, soft square,
+   diamond and blob. Radius and rotate only; the element is 16px, so the radius
+   repaint is negligible. */
+@keyframes brand-morph {
+  0%, 100% { border-radius: 50%; rotate: 0deg; }
+  25% { border-radius: 28%; rotate: 90deg; }
+  50% { border-radius: 14%; rotate: 225deg; scale: 0.86; }
+  75% { border-radius: 62% 38% 54% 46% / 44% 60% 40% 56%; rotate: 300deg; }
+}
+.brand-morph { animation: brand-morph 8s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .brand-morph { animation: none; border-radius: 28%; }
+}
+
+/* Keyboard focus ring for every lab control (DESIGN.md: required). */
+@utility lab-focus {
+  &:focus-visible {
+    outline: 2px solid var(--color-lab-focus);
+    outline-offset: 1px;
+    /* transition-colors also animates outline-color, so the ring would start
+       in the text colour; keep colour transitions, drop the outline one. */
+    transition-property: color, background-color, border-color, opacity;
+  }
+}
+
+/* Paper canvases render at a whole-number scale (see DitherHero paperScale);
+   on a 2× screen the browser scales them up. Nearest-neighbour keeps every
+   dither cell on whole device pixels instead of blurring its edges. */
+[data-pk] canvas {
+  image-rendering: pixelated;
 }

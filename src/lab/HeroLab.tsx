@@ -1,16 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
-import { TextInspectorProvider, useTextInspector } from '../components/playground/TextInspectorContext'
-import TextInspectorPanel, { PANEL_WIDTH } from '../components/playground/TextInspectorPanel'
-import { useTextSelection } from '../components/playground/useTextSelection'
-import { useApplyOverrides } from '../components/playground/useApplyOverrides'
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react'
 import { fontPairs } from '../themes/fonts'
 import { useDitherStore, setEdgeConfig, initDitherSync, applySceneTemplate, setPixelGridConfig, setAnimationConfig, setInitialState, applyHeroTemplate, heroTemplates } from '../heroes/dither/ditherStore'
 import { heroes, getHero } from './registry'
 import { getContentPreset } from '../content/presets'
 import SiteFooter from '../components/SiteFooter'
+import { prefersLessData } from '../utils/network'
 import PreviewCanvas from './PreviewCanvas'
 import TemplateGallery from './TemplateGallery'
-import LayerExplorer from './LayerExplorer'
+import DesignToggle from './ui/DesignToggle'
+import PerfStrip, { PERF_STRIP_HEIGHT } from './PerfStrip'
+import Segmented from './ui/Segmented'
+
+// Split out of the first chunk (slow-connection audit, fix 3): the Design Panel
+// (with DitherPanel, about 90 KB raw) and the Layers view are not needed to
+// paint the hero. Canvas and Breakpoints stay in the main chunk: Canvas is
+// the first-visit view, and a lazy chunk there would add a round trip.
+const DesignPanel = lazy(() => import('./DesignPanel'))
+const LayerExplorer = lazy(() => import('./LayerExplorer'))
 
 const params = new URLSearchParams(window.location.search)
 const activeHero = getHero(params.get('hero'))
@@ -18,14 +24,15 @@ const preset = getContentPreset(params.get('preset'))
 /** True when this window is a breakpoint-preview iframe: bare hero, no lab
  *  chrome, store mirrored from the main window. */
 const isPreviewFrame = params.get('preview') === '1'
-/** Template a preview frame is pinned to (Templates gallery artboards). */
+/** Template a preview frame is pinned to (Canvas view artboards). */
 const previewTemplate = params.get('template')
 /** Independent config pins for a preview frame (docs real-preview gallery):
- *  ?preview=1&scene=<id>&grid=0|1&tile=color|size|points&state=problem|fix.
+ *  ?preview=1&scene=<id>&grid=0|1&tile=color|points&state=problem|fix.
  *  When any is present the frame applies them locally and does NOT sync. */
 const pinScene = params.get('scene')
 const pinGrid = params.get('grid')
-const pinTile = params.get('tile') as 'color' | 'size' | 'points' | null
+const pinTileParam = params.get('tile')
+const pinTile = pinTileParam === 'color' || pinTileParam === 'points' ? pinTileParam : null
 const pinState = params.get('state') as 'problem' | 'fix' | null
 const isPinnedPreview = isPreviewFrame && !!(pinScene || pinGrid || pinTile || pinState)
 /** Source tab this preview binds to. Set by same-tab previews (Layers) so the
@@ -35,14 +42,15 @@ const previewSourceId = params.get('sid')
 // Mutate the active hero's store from the URL before React mounts.
 activeHero.applyUrlParams?.(params)
 
-function ActiveHero() {
-  const heroRef = useRef<HTMLDivElement>(null)
-  useTextSelection(heroRef)
-  useApplyOverrides(heroRef)
-  const Hero = activeHero.component
+/** Docked Design Panel width (DesignPanel is `sm:w-80`): the layout offsets
+ *  the hero by this much so the panel pushes content instead of covering it. */
+const PANEL_WIDTH = 320
+const PANEL_OPEN_KEY = 'design-panel:open'
 
+function ActiveHero() {
+  const Hero = activeHero.component
   return (
-    <div ref={heroRef} className="min-h-screen">
+    <div className="min-h-svh">
       <Hero />
     </div>
   )
@@ -51,6 +59,7 @@ function ActiveHero() {
 function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' | 'solid'; rightOffset: number; button: { radius: number; uppercase: boolean } }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const bgClass = headerBg === 'solid'
+    // ds-exception: --color-t-border is only themed for terminal themes, so on a dark palette it would draw a dark line.
     ? 'bg-t-bg border-b border-white/10'
     : 'bg-transparent'
   // Header buttons follow the shared CTA styling (corner radius + caps) and
@@ -65,10 +74,10 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
 
   return (
     <header
-      className={`fixed top-0 left-0 z-40 transition-colors duration-300 ${bgClass}`}
+      className={`fixed top-0 left-0 z-40 h-lab-bar transition-colors duration-300 ${bgClass}`}
       style={{ right: rightOffset }}
     >
-      <div className="max-w-[1440px] mx-auto px-5 sm:px-8 xl:px-16 py-4 flex items-center justify-between">
+      <div className="max-w-[1440px] h-full mx-auto px-5 sm:px-8 xl:px-16 flex items-center justify-between">
         <a href="#" className="flex items-center gap-3 shrink-0 no-underline text-t-headline">
           {/* Fixed, not the generative BrandMark. ACME is a demo *brand*: a
               mark that redraws itself per visit isn't one, and it left the
@@ -80,7 +89,7 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
             }} />
             <span className="relative block size-2.5 rounded-sm bg-current rotate-45" />
           </span>
-          <span className="text-[18px] font-semibold tracking-[-0.03em]" style={{ fontFamily: brandFont }}>
+          <span className="text-hero-brand font-semibold tracking-[-0.03em]" style={{ fontFamily: brandFont }}>
             {preset.brand}
           </span>
         </a>
@@ -130,14 +139,14 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
           <a
             href="#"
             style={btnStyle}
-            className="hidden md:block text-[14px] no-underline px-4 py-1.5 border transition-colors whitespace-nowrap text-t-cta2-text border-t-border-strong bg-transparent hover:bg-t-bg-surface"
+            className="hidden md:block text-hero-nav no-underline px-4 py-1.5 border transition-colors whitespace-nowrap text-t-cta2-text border-t-border-strong bg-transparent hover:bg-t-bg-surface"
           >
             {preset.signIn}
           </a>
           <a
             href="#"
             style={btnStyle}
-            className="text-[14px] no-underline px-4 py-1.5 border transition-colors whitespace-nowrap text-t-cta-text bg-t-cta-bg border-t-cta-bg hover:opacity-90"
+            className="text-hero-nav no-underline px-4 py-1.5 border transition-colors whitespace-nowrap text-t-cta-text bg-t-cta-bg border-t-cta-bg hover:opacity-90"
           >
             {preset.cta}
           </a>
@@ -159,12 +168,14 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
       {/* Dropdown menu — absolutely positioned below the bar so the header's
           measured height (which drives the dot field's Top start) never moves. */}
       {menuOpen && (
+        // ds-exception: hero menu sheet; t-border is not themed for palettes, and there is no hero shadow token.
         <div className="xl:hidden absolute top-full left-0 right-0 bg-t-bg border-b border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
           <nav className="max-w-[1440px] mx-auto px-5 sm:px-8 py-2 flex flex-col">
             {preset.navLinks.map((link) => (
               <a
                 key={link.label}
                 href="#"
+                /* ds-exception: menu row divider, same reason as the sheet border above. */
                 className="text-base no-underline py-3 text-t-body hover:text-t-headline border-b border-white/5 transition-colors"
               >
                 {link.label}
@@ -183,10 +194,10 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
 /** Switch heroes by navigating to `?hero=<id>`. Renders only when there is more
  *  than one hero — a one-item switcher is noise. Adding a second registry entry
  *  lights this up automatically. */
-function HeroSwitcher() {
+function HeroSwitcher({ bottom }: { bottom: number }) {
   if (heroes.length < 2) return null
   return (
-    <div className="fixed bottom-4 left-4 z-[1002] flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+    <div style={{ bottom }} className={`fixed left-4 z-[1002] flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-lab-surface border-lab-border shadow-lab-float`}>
       {heroes.map((h) => {
         const active = h.id === activeHero.id
         const url = new URL(window.location.href)
@@ -196,8 +207,9 @@ function HeroSwitcher() {
             key={h.id}
             href={url.pathname + url.search}
             title={h.tagline}
-            className={`text-[12px] font-semibold px-3 py-1.5 rounded-full no-underline transition-all ${
-              active ? 'bg-white/15 text-white' : 'text-white/60 hover:text-white/90 hover:bg-white/5'
+            aria-current={active ? 'page' : undefined}
+            className={`text-lab-sm font-medium px-3 py-1.5 rounded-full no-underline transition-colors lab-focus ${
+              active ? 'bg-lab-fill-selected text-lab-fg' : 'text-lab-fg-muted hover:text-lab-fg hover:bg-lab-fill-hover'
             }`}
           >
             {h.name}
@@ -210,28 +222,38 @@ function HeroSwitcher() {
 
 type ViewMode = 'live' | 'breakpoints' | 'templates' | 'layers'
 
-function LabLayout() {
+const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
+  { value: 'live', label: 'Live' },
+  { value: 'breakpoints', label: 'Breakpoints' },
+  { value: 'templates', label: 'Canvas' },
+  { value: 'layers', label: 'Recipe' },
+]
+
+export default function HeroLab() {
   const fontPair = fontPairs['jakarta-dm']
   const heroState = useDitherStore()
-  const { enabled: panelOpen, setEnabled } = useTextInspector()
-  const themedRef = useRef<HTMLDivElement>(null)
-  const [themedNode, setThemedNode] = useState<HTMLDivElement | null>(null)
+  // Open by default; the choice persists per browser.
+  const [panelOpen, setPanelOpen] = useState(() => {
+    try { return localStorage.getItem(PANEL_OPEN_KEY) !== '0' } catch { return true }
+  })
+  useEffect(() => {
+    try { localStorage.setItem(PANEL_OPEN_KEY, panelOpen ? '1' : '0') } catch { /* private mode */ }
+  }, [panelOpen])
   // Read on first render, not in the effect: initialising to false gives a
   // phone one frame with the 320px desktop offset applied.
   const [isNarrow, setIsNarrow] = useState(() => window.matchMedia('(max-width: 639px)').matches)
-  // Templates is the starter page: a first-time visitor lands on the gallery of
+  // Canvas is the starter page: a first-time visitor lands on the gallery of
   // artboards, which shows what the lab is (many looks, three breakpoints each)
   // rather than dropping them into one hero with no context for it. A returning
   // visitor keeps whatever view they last used.
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     try {
       const saved = localStorage.getItem('hero-lab-view-mode')
-      return saved === 'breakpoints' || saved === 'templates' || saved === 'layers' || saved === 'live'
-        ? saved
-        : 'templates'
-    } catch {
-      return 'templates'
-    }
+      if (saved === 'breakpoints' || saved === 'templates' || saved === 'layers' || saved === 'live') return saved
+    } catch { /* storage blocked: fall through to the default */ }
+    // Canvas loads 3 live iframes and the poster grid (about 0.8 MB more
+    // than Live). With Save-Data or a slow connection, start on Live instead.
+    return prefersLessData() ? 'live' : 'templates'
   })
   // The Layers tab is a single stack-only surface: the progressive stack IS the
   // interface there, so the Design Panel would be a redundant second control
@@ -242,6 +264,8 @@ function LabLayout() {
   // the content, so no offset — shifting the canvas by 320px there would push
   // the thing being edited off-screen behind the panel.
   const panelOffset = showPanel && !isNarrow ? PANEL_WIDTH : 0
+  // The perf strip is always shown; the bottom chrome sits above it.
+  const chromeBottom = 16 + PERF_STRIP_HEIGHT
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)')
@@ -250,8 +274,11 @@ function LabLayout() {
     mq.addEventListener('change', sync)
     return () => mq.removeEventListener('change', sync)
   }, [])
-  useEffect(() => { setThemedNode(themedRef.current) }, [])
-  useEffect(() => {
+  // A layout effect so the store is set up before any child view's effects
+  // run. As a plain effect it ran after them (parent effects run last), so a
+  // page that loaded straight into Layers reset to the bare scene and then
+  // had the first template laid over it.
+  useLayoutEffect(() => {
     if (isPinnedPreview) {
       // Independent real preview — apply pinned config, no cross-window sync.
       if (pinState) setInitialState(pinState)
@@ -294,12 +321,12 @@ function LabLayout() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'E' || e.key === 'e')) {
         e.preventDefault()
-        setEnabled(!panelOpen)
+        setPanelOpen((open) => !open)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [panelOpen, setEnabled])
+  }, [])
 
   const themedVars = {
     '--font-display': fontPair.headline,
@@ -314,32 +341,35 @@ function LabLayout() {
   // toggles. The store mirrors the main window via initDitherSync above.
   if (isPreviewFrame) {
     return (
-      <div ref={themedRef} data-palette="glass" className="min-h-screen" style={themedVars}>
+      <div data-palette="glass" className="min-h-svh" style={themedVars}>
         <LabHeader headerBg={heroState.headerBg} rightOffset={0} button={heroState.button} />
         <ActiveHero />
       </div>
     )
   }
 
+  // The Design toggle sits in each view's own toolbar, only where the panel
+  // edits that view. Layers has none: its stack is the control surface.
+  const designToggle = <DesignToggle open={panelOpen} onToggle={() => setPanelOpen((o) => !o)} />
+
   return (
     <>
       {viewMode === 'templates' ? (
         <div style={{ marginRight: panelOffset }}>
-          <TemplateGallery />
+          <TemplateGallery actions={designToggle} />
         </div>
       ) : viewMode === 'layers' ? (
         <div style={{ marginRight: panelOffset }}>
-          <LayerExplorer />
+          <Suspense fallback={<div className="h-dvh bg-lab-canvas" />}><LayerExplorer onHome={() => setViewMode('templates')} /></Suspense>
         </div>
       ) : viewMode === 'breakpoints' ? (
         <div style={{ marginRight: panelOffset }}>
-          <PreviewCanvas />
+          <PreviewCanvas onHome={() => setViewMode('templates')} actions={designToggle} />
         </div>
       ) : (
         <div
-          ref={themedRef}
           data-palette="glass"
-          className="min-h-screen"
+          className="min-h-svh"
           style={{ ...themedVars, marginRight: panelOffset }}
         >
           <LabHeader headerBg={heroState.headerBg} rightOffset={panelOffset} button={heroState.button} />
@@ -350,9 +380,19 @@ function LabLayout() {
         </div>
       )}
 
-      {showPanel && <TextInspectorPanel themedRoot={themedNode} paletteName="glass" />}
+      {/* Live has no lab toolbar, so a closed panel leaves an edge tab. */}
+      {viewMode === 'live' && !panelOpen && <DesignToggle variant="edge" open={false} onToggle={() => setPanelOpen(true)} />}
 
-      <HeroSwitcher />
+      {/* Sized fallback: the panel column paints at once instead of an empty
+          320px gap while its chunk loads. */}
+      {showPanel && <Suspense fallback={<aside aria-label="Design Panel" aria-busy="true" className="fixed top-0 right-0 bottom-0 z-[1000] w-full sm:w-80 border-l bg-lab-panel border-lab-border" />}><DesignPanel onClose={() => setPanelOpen(false)} /></Suspense>}
+
+      <HeroSwitcher bottom={chromeBottom} />
+
+      <PerfStrip
+        rightOffset={panelOffset}
+        inIframeView={viewMode === 'breakpoints' || viewMode === 'templates'}
+      />
 
       {/* View toggle — anchored to the VIEWPORT centre, not the content area.
           It used to sit inside the panel-narrowed column (`right: panelOffset`),
@@ -360,33 +400,15 @@ function LabLayout() {
           most visibly on Layers, where the panel is hidden entirely, so the one
           control that is present on every view was the one that moved between
           them. It is global chrome; it should be in the same place everywhere.
-          At 1440 the pill spans roughly 505–935px and the panel starts at
-          1040px, so viewport-centring does not put it under the panel. */}
-      <div className="fixed bottom-4 left-0 right-0 z-[1002] flex justify-center pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-1 p-1 rounded-full border backdrop-blur-xl bg-[rgba(20,21,35,0.92)] border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
-          {([['live', 'Live'], ['breakpoints', 'Breakpoints'], ['templates', 'Templates'], ['layers', 'Layers']] as const).map(([mode, label]) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className={`text-[12px] font-semibold px-3 py-1.5 rounded-full cursor-pointer border-0 transition-all ${
-                viewMode === mode
-                  ? 'bg-white/15 text-white'
-                  : 'bg-transparent text-white/60 hover:text-white/90 hover:bg-white/5'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          The Design toggle moved to each view's own toolbar (and an edge tab
+          in Live), so this bar only switches views. At 1440 it spans
+          roughly 440–1000px and the panel starts at 1040px, so viewport-centring
+          does not put it under the panel. */}
+      <div style={{ bottom: chromeBottom }} className="fixed left-0 right-0 z-[1002] flex justify-center pointer-events-none px-2">
+        <div className="pointer-events-auto flex items-center rounded-full border bg-lab-surface border-lab-border shadow-lab-float max-w-full overflow-x-auto">
+          <Segmented shape="pill" label="View" options={VIEW_OPTIONS} value={viewMode} onChange={setViewMode} />
         </div>
       </div>
     </>
-  )
-}
-
-export default function HeroLab() {
-  return (
-    <TextInspectorProvider activeVariant={activeHero.id}>
-      <LabLayout />
-    </TextInspectorProvider>
   )
 }

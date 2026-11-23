@@ -16,7 +16,7 @@ export default function SiteFooter() {
     <footer className="border-t border-t-border bg-t-bg">
       <div className="max-w-[1440px] mx-auto px-5 sm:px-8 xl:px-16 py-16 sm:py-20">
         <div className="max-w-[68ch] flex flex-col gap-5">
-          <p className="text-[15px] sm:text-base leading-relaxed text-t-body">
+          <p className="text-hero-footer sm:text-base leading-relaxed text-t-body">
             Built by{' '}
             <a
               href="https://glebstroganov.com"
@@ -34,7 +34,7 @@ export default function SiteFooter() {
             .
           </p>
 
-          <p className="text-[15px] sm:text-base leading-relaxed text-t-body">
+          <p className="text-hero-footer sm:text-base leading-relaxed text-t-body">
             <span className="text-t-headline">Hero Lab</span> is a playground for hero
             sections — a WebGL dithering shader with every parameter wired to a live
             control, breakpoint previews, and template artboards. Built to answer a narrow
@@ -43,7 +43,7 @@ export default function SiteFooter() {
             code.
           </p>
 
-          <p className="text-[15px] sm:text-base leading-relaxed text-t-body">
+          <p className="text-hero-footer sm:text-base leading-relaxed text-t-body">
             The shader itself is{' '}
             <a
               href="https://github.com/paper-design/shaders"
@@ -69,7 +69,7 @@ export default function SiteFooter() {
                 href={link.href}
                 target="_blank"
                 rel="noreferrer"
-                className="text-[15px] text-t-body underline underline-offset-4 decoration-t-border-strong hover:text-t-headline hover:decoration-current transition-colors"
+                className="text-hero-footer text-t-body underline underline-offset-4 decoration-t-border-strong hover:text-t-headline hover:decoration-current transition-colors"
               >
                 {link.label}
               </a>

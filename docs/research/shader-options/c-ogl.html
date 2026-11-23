@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C · OGL single pass</title>
+<style id="base"></style>
+</head>
+<body>
+<!--
+  C — the same single-pass fragment shader as B, mounted through OGL 1.0.11
+  (Unlicense, https://github.com/oframe/ogl) instead of hand-written WebGL.
+  Shows what a small library buys: resize/DPR, uniform plumbing, a fullscreen
+  Triangle. It does not change the GPU cost — one context, one draw.
+-->
+<div class="hero" id="hero"></div>
+<script type="module">
+import { Renderer, Program, Mesh, Triangle } from 'https://cdn.jsdelivr.net/npm/ogl@1.0.11/+esm'
+import { SCENE, BASE_CSS, COPY_HTML, hexToVec, makeHud, backingSize, frozenT, fakeMouse } from './common.js'
+import { FRAG } from './single-pass.js'
+
+document.getElementById('base').textContent = BASE_CSS
+const hero = document.getElementById('hero')
+
+const renderer = new Renderer({ webgl: 2, antialias: false })
+const gl = renderer.gl
+Object.assign(gl.canvas.style, { position: 'absolute', inset: 0, width: '100%', height: '100%' })
+hero.append(gl.canvas)
+hero.insertAdjacentHTML('beforeend', COPY_HTML)
+
+const VERT = `#version 300 es
+in vec2 position; void main() { gl_Position = vec4(position, 0., 1.); }`
+const uniforms = {
+  u_resolution: { value: [1, 1] }, u_pixelRatio: { value: 1 }, u_time: { value: 0 }, u_tileT: { value: 0 },
+  u_mode: { value: 0 }, u_grid: { value: true }, u_fadeFix: { value: false },
+  u_colorBack: { value: hexToVec(SCENE.colorBack) },
+  u_problem: { value: SCENE.problem.map((l) => hexToVec(l.color)) },
+  u_fix: { value: SCENE.fix.map((l) => hexToVec(l.color)) },
+  u_opacity: { value: SCENE.problem.map((l) => l.opacity) },
+  u_shapeP: { value: SCENE.problem.map((l) => l.shape) },
+  u_shapeF: { value: SCENE.fix.map((l) => l.shape) },
+  u_drift: { value: [0, 0] }, u_spread: { value: SCENE.alphaSpread },
+  u_pxSize: { value: SCENE.pxSize }, u_type: { value: SCENE.type }, u_scale: { value: SCENE.scale },
+  u_rotation: { value: SCENE.rotation }, u_fit: { value: SCENE.fit },
+  u_pitch: { value: SCENE.grid.pitch }, u_gap: { value: SCENE.grid.gap }, u_radius: { value: SCENE.grid.radius },
+  u_mouse: { value: [-1e4, -1e4, 0] }, u_nRects: { value: 0 }, u_pad: { value: 8 }, u_rim: { value: 48 },
+}
+const program = new Program(gl, { vertex: VERT, fragment: FRAG, uniforms })
+const mesh = new Mesh(gl, { geometry: new Triangle(gl), program })
+
+function resize() {
+  const w = hero.clientWidth, h = hero.clientHeight
+  const b = backingSize(w, h)
+  renderer.dpr = b.renderScale
+  renderer.setSize(w, h)
+  uniforms.u_resolution.value = [gl.canvas.width, gl.canvas.height]
+  uniforms.u_pixelRatio.value = gl.canvas.width / w
+}
+new ResizeObserver(resize).observe(hero)
+resize()
+
+const mouse = { x: -1e4, y: -1e4, r: 0, target: 0 }
+hero.addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.target = SCENE.hoverRadius })
+hero.addEventListener('pointerleave', () => { mouse.target = 0 })
+if (fakeMouse) Object.assign(mouse, { x: fakeMouse.x, y: fakeMouse.y, r: SCENE.hoverRadius, target: SCENE.hoverRadius })
+
+let draws = 0
+const stats = makeHud('C · OGL single pass', () => ({ contexts: 1, draws }))
+let start = null
+requestAnimationFrame(function frame(now) {
+  const t0 = performance.now()
+  start ??= now
+  const s = (now - start) / 1000
+  stats.frames++
+  uniforms.u_time.value = frozenT ?? s * SCENE.speed
+  if (frozenT == null) {
+    const k = now * 0.00015 * Math.PI * 2
+    uniforms.u_opacity.value = SCENE.problem.map((l, i) => l.opacity * (1 + 0.25 * Math.sin(k + i * 2.1)))
+    uniforms.u_drift.value = [Math.sin(now * 0.00035) * 0.05, Math.cos(now * 0.0005) * 0.05]
+    mouse.r += (mouse.target - mouse.r) * 0.18
+  }
+  uniforms.u_mouse.value = [mouse.x, mouse.y, mouse.r]
+  renderer.render({ scene: mesh })
+  draws++
+  stats.jsMs += performance.now() - t0
+  requestAnimationFrame(frame)
+})
+</script>
+</body>
+</html>

@@ -1,159 +1,289 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   useDitherStore,
-  setAlphaLayer,
   setShaderConfig,
   setPixelGridConfig,
-  setMultiColorConfig,
   setHoverConfig,
   setAnimationConfig,
   setEdgeConfig,
+  setComposition,
   applyHeroTemplate,
   applySceneTemplate,
   batchDitherUpdates,
   setStableColorField,
-  setLoopBreak,
   getTabSourceId,
-  type LoopBreakMode,
+  getDitherState,
+  defaultEdgeConfig,
+  centeredEdge,
+  heroTemplates,
+  CENTERED_SIZE_CONTRAST,
   sceneTemplates,
-  sceneTemplateIds,
-  type TileDisplayMode,
+  grainIds,
+  grainPitch,
+  gapIds,
+  gapFor,
+  gridPitch,
+  warpFeels,
+  warpModeLabel,
+  warpFeelIds,
+  type DitherState,
+  type WarpMode,
+  type DitherAnimationConfig,
+  type SceneTemplateId,
+  snapshotDitherState,
+  speedStops,
+  speedStop,
+  restoreDitherState,
 } from '../heroes/dither/ditherStore'
+import { pickTile } from './ui/pickTile'
 import LabToolbarTitle from './LabToolbarTitle'
+import Segmented from './ui/Segmented'
+import SectionLabel from './ui/SectionLabel'
+import LivePreview from './ui/LivePreview'
+import { ALL_STEPS, drawStep, stepLook, templateSource, type StepId } from './layerSketch'
 
-/** Real-shader layer taxonomy, composed as a progressive STACK.
+/** One template, taken apart as a progressive STACK.
  *
- *  Opens on the bare scene — the original Paper dithering shader animating with
- *  nothing else applied — then adds one setting at a time so you can read how
- *  each layer changes the final output. Everything drives the real store, so
- *  the live desktop hero (a synced ?preview iframe, actual WebGL) is the truth.
- *  On leaving the view the active template is restored. */
+ *  Opens on the selected template's bare scene — its own colours, shader and
+ *  motion with every layer removed — then adds the template's layers back one
+ *  at a time, with the template's own values. The last step is the template
+ *  exactly. Layers a template does not use are not shown as steps. Everything
+ *  drives the real store, so the live desktop hero (a synced ?preview iframe,
+ *  actual WebGL) is the truth. On leaving the view the template is restored. */
 
 const DESK = { width: 1440, height: 900 }
 const PAD = 40
 const TOGGLE_COL = 400
 
-type Verdict = 'core' | 'signature' | 'situational' | 'redundant'
+type Verdict = 'core' | 'signature' | 'situational'
+// Scoped exception to "tokens only" (DESIGN.md): each badge hue names a verdict
+// category, and the lab has no category tokens.
 const verdictStyle: Record<Verdict, string> = {
-  core: 'text-emerald-300/80 border-emerald-400/30 bg-emerald-400/10',
-  signature: 'text-amber-300/80 border-amber-400/30 bg-amber-400/10',
-  situational: 'text-sky-300/80 border-sky-400/30 bg-sky-400/10',
-  redundant: 'text-rose-300/80 border-rose-400/30 bg-rose-400/10',
+  core: 'text-emerald-300/80 border-emerald-400/30 bg-emerald-400/10', // ds-exception: verdict hue
+  signature: 'text-amber-300/80 border-amber-400/30 bg-amber-400/10', // ds-exception: verdict hue
+  situational: 'text-sky-300/80 border-sky-400/30 bg-sky-400/10', // ds-exception: verdict hue
 }
 
-export default function LayerExplorer() {
+/** Scenes that look different on the bare base. The store has 11; on this
+ *  base the other six repeat one of these: Color Flow, Falling and Sweep are
+ *  pans like Gentle Drift; Breath and Breathe spin and pulse like Living;
+ *  Error Sweep is a faster Radar. Their extra parts (gap pulse, tile size,
+ *  colour cycling) only show with the pixel grid or outside this view, where
+ *  stableColorField holds the colour still. */
+const LAYER_SCENES: SceneTemplateId[] = ['solid-classic', 'gentle-drift', 'living-texture', 'orbit', 'radar-scan']
+
+/** The Panel's Grain and Gap words, used when a step's value matches a preset. */
+const GRAIN_LABELS = { fine: 'Fine', medium: 'Medium', coarse: 'Coarse', chunky: 'Chunky' }
+const GAP_LABELS = { none: 'No gap', tight: 'Tight gap', open: 'Open gap' }
+/** Pick tile, shared with the Design Panel. */
+const card = `${pickTile} p-1`
+/** Step thumbnails: a 16:10 mini hero (the artboard is 1440 × 900). */
+const thumb = 'w-20 sm:w-28 aspect-[16/10] rounded-md border border-lab-border'
+const NO_STEPS: ReadonlySet<StepId> = new Set()
+
+/** What the motion visibly does, read from the same values DitherHero uses. */
+function describeMotion(a: DitherAnimationConfig, speed: number) {
+  const lb = a.loopBreakAmount > 0 ? a.loopBreak : 'none'
+  const pans = a.driftX !== 0 || a.driftY !== 0 || lb === 'drift' || lb === 'orbit' || lb === 'wander'
+  const spins = a.rotationDrift !== 0 || lb === 'rotate' || lb === 'orbit' || lb === 'wander'
+  const scans = a.scanMode === 'oscillate' && a.scanAmplitude > 0
+  const parts = [speed < 0.05 ? 'shape changes slowly' : 'shape changes']
+  if (scans) parts.push('scans back and forth')
+  if (pans || spins) parts.push(`field ${pans && spins ? 'pans and spins' : pans ? 'pans' : 'spins'}`)
+  if (a.waveAmplitude > 0) parts.push('wave sweeps')
+  if (a.pulseAmount >= 0.03) parts.push('pulses')
+  if (!pans && !spins && !scans) parts.push('nothing pans or spins')
+  return parts.join(' · ')
+}
+
+export default function LayerExplorer({ onHome }: { onHome?: () => void }) {
   const s = useDitherStore()
   const wrapRef = useRef<HTMLDivElement>(null)
-  // Sticky Break-loop preference for this Layers session. null = follow each
-  // scene's own default; once the user picks a mode it persists across scene
-  // switches (re-applied atomically after the scene loads). Resets on unmount.
-  const stickyLoopBreak = useRef<LoopBreakMode | null>(null)
   const [availW, setAvailW] = useState(0)
-  const savedOpacity = useRef<number[]>(s.shader.alphaLayers.map((l) => l.opacity || 0.7))
-  s.shader.alphaLayers.forEach((l, i) => { if (l.opacity > 0) savedOpacity.current[i] = l.opacity })
+  // The template being taken apart, as applied (a store snapshot), so every
+  // step can restore that template's own value for its setting.
+  const target = useRef<DitherState | null>(null)
+  /** Centered was applied when Recipe opened (see `centered`). */
+  const centeredRef = useRef(false)
+  /** The warp mode when Recipe opened (Hover / Roam / Both). */
+  const warpModeRef = useRef<WarpMode>('hover')
+  const t = target.current ?? s
+  // Speed stops shared with the Design Panel; animation.speed scales every loop.
+  const speed = speedStop(s.animation)?.value ?? null
+  /** Preview clock rate, as in the Design Panel: the hero's speed, 0 while still. */
+  const tempo = s.animation.playing ? s.animation.speed : 0
 
-  // ── The additive stack: each step adds one layer. `on` reads the REAL store
-  //    so the UI stays truthful even when a renderer auto-enables the grid. ──
-  const STACK: { name: string; value: string; verdict: Verdict; vlabel: string; on: boolean; set: (on: boolean) => void }[] = [
+  // Without the grid, the shader's own cell size shows. A gridded template
+  // keeps a large size (16) that only reads through the grid, so the bare step
+  // uses the grid's tile size instead: step 1 then adds the mask and nothing else.
+  const bareSize = t.pixelGrid.enabled ? t.pixelGrid.cell / t.pixelGrid.divisions : t.shader.size
+  const { topInset: _ti, ...bareEdge } = defaultEdgeConfig
+  void _ti
+  const textFlow = t.edge.mode === 'full'
+  // Centered is a Layout option, not part of a template: it is a step only
+  // when it was applied in the Design Panel before opening Recipe, and the
+  // target stays the template as authored (Split).
+  const centered = centeredRef.current
+  /** The look the step thumbnails draw: the target, with Centered if applied. */
+  // The warp mode is a live pick (Design Panel), carried in on open.
+  const warpMode = t.hover.mode ?? 'hover'
+  const lookSrc: typeof t = centered ? { ...t, composition: { mode: 'centered' } } : t
+  const pointsLook = t.pixelGrid.enabled && t.animation.tileDisplay === 'points'
+
+  // ── The additive stack. `used` = the template has this layer; only used
+  //    layers are steps. `on` reads the REAL store so the UI stays truthful. ──
+  const pitch = gridPitch(t.pixelGrid)
+  const grainId = grainIds.find((g) => grainPitch[g] === pitch)
+  const gapId = gapIds.find((g) => gapFor(g, pitch) === t.pixelGrid.gap)
+  const feel = warpFeelIds.find((f) => {
+    const w = warpFeels[f]
+    return w.warpRotate === t.hover.warpRotate && w.warpRound === t.hover.warpRound && w.warpJitter === t.hover.warpJitter
+  })
+  const ALL: { id: StepId; name: string; value: string; verdict: Verdict; vlabel: string; used: boolean; on: boolean; set: (on: boolean) => void }[] = [
     {
-      name: 'Pixel grid', verdict: 'core', vlabel: 'Core',
-      value: `${s.pixelGrid.cell}px tile ÷ ${s.pixelGrid.divisions} · gap ${s.pixelGrid.gap} · radius ${s.pixelGrid.radius}`,
+      id: 'grid', name: 'Tile grid', verdict: 'core', vlabel: 'Core',
+      value: `${[grainId && `${GRAIN_LABELS[grainId]} grain`, gapId && GAP_LABELS[gapId]].filter(Boolean).join(' · ') || 'Custom'} — ${pitch}px tiles, ${t.pixelGrid.gap}px gap, ${t.pixelGrid.radius}px radius`,
+      used: t.pixelGrid.enabled,
       on: s.pixelGrid.enabled,
-      set: (on) => setPixelGridConfig(on ? { enabled: true } : { enabled: false, snap: false }),
+      // Off also drops the tile renderer, which draws nothing without the grid.
+      set: (on) => {
+        if (on) {
+          setPixelGridConfig({ ...t.pixelGrid, snap: s.pixelGrid.snap })
+          setShaderConfig({ size: t.shader.size })
+        } else {
+          setPixelGridConfig({ enabled: false, snap: false })
+          setShaderConfig({ size: bareSize })
+          setAnimationConfig({ tileDisplay: 'color' })
+        }
+      },
     },
     {
-      name: 'Snap to grid', verdict: 'situational', vlabel: 'Situational',
-      value: s.pixelGrid.snap ? 'locked — one dot per tile' : 'free — dither flows',
-      on: s.pixelGrid.snap,
-      // Snap needs the grid — enabling it turns the grid on too.
+      id: 'snap', name: 'Snapped colour', verdict: 'situational', vlabel: 'Situational',
+      value: 'one flat colour per tile',
+      used: t.pixelGrid.enabled && t.pixelGrid.snap,
+      on: s.pixelGrid.enabled && s.pixelGrid.snap,
       set: (on) => setPixelGridConfig(on ? { enabled: true, snap: true } : { snap: false }),
     },
     {
-      name: 'Multi-color', verdict: 'redundant', vlabel: 'Redundant',
-      value: `${s.multiColor.colors.length} extra colors · ${s.multiColor.blend}`,
-      on: s.multiColor.enabled,
-      set: (on) => setMultiColorConfig({ enabled: on }),
+      id: 'points', name: 'Point sizes', verdict: 'core', vlabel: 'Core',
+      value: `dots grow and shrink with the field · spread ${t.animation.tileSizeSpread} · size contrast ${t.animation.tileSizeContrast ?? 0}`,
+      used: t.pixelGrid.enabled && t.animation.tileDisplay !== 'color',
+      on: s.pixelGrid.enabled && s.animation.tileDisplay === t.animation.tileDisplay,
+      // Size contrast acts on Point sizes only, so this step owns it too.
+      set: (on) => {
+        if (on && !s.pixelGrid.enabled) setPixelGridConfig({ ...t.pixelGrid })
+        setAnimationConfig(on
+          ? { tileDisplay: t.animation.tileDisplay, tileSizeContrast: t.animation.tileSizeContrast ?? 0 }
+          : { tileDisplay: 'color', tileSizeContrast: 0 })
+      },
     },
     {
-      name: 'Scene behind text', verdict: 'core', vlabel: 'Core',
-      value: `flows around copy · clearance ${s.edge.textPadding}px`,
-      on: s.edge.textBlend,
-      set: (on) => setEdgeConfig({ textBlend: on }),
+      id: 'edge', name: 'Full edge', verdict: 'core', vlabel: 'Core',
+      value: `fills the hero · ${t.edge.fullPadding}px clearance as ${t.edge.textRectMode === 'lines' ? 'one shape that hugs each line' : 'one block'}`,
+      used: textFlow,
+      on: s.edge.mode === t.edge.mode,
+      set: (on) => {
+        const { topInset: _keep, ...edge } = t.edge
+        void _keep
+        setEdgeConfig(on ? edge : bareEdge)
+      },
     },
     {
-      name: 'Hover reveal', verdict: 'signature', vlabel: 'Signature',
-      value: `${s.hover.mode} · reveals the ${s.initialState === 'problem' ? 'fix (green)' : 'problem (pink)'} · hover the preview`,
+      // After Full edge: Centered lays its line-hugging edge values over the
+      // edge below it, and Split (off) puts back the template's own.
+      id: 'layout', name: 'Layout · Centered', verdict: 'signature', vlabel: 'Signature',
+      value: `copy in the middle · field flows round each line · ${centeredEdge.fullPadding}px clearance, ${centeredEdge.dissolveDepth}-row rim${pointsLook ? ` · size contrast ${t.animation.tileSizeContrast || CENTERED_SIZE_CONTRAST}` : ''}`,
+      used: centered,
+      on: s.composition.mode === 'centered',
+      set: (on) => setComposition(on ? 'centered' : 'split'),
+    },
+    {
+      id: 'hover', name: 'Hover · warp', verdict: 'signature', vlabel: 'Signature',
+      value: `${warpModeLabel[warpMode]} · ${feel ? warpFeels[feel].label : 'Custom'} warp · ${t.hover.radius}px · ${warpMode === 'roam' ? 'a roaming blob' : warpMode === 'both' ? 'a roaming blob, or the pointer,' : 'hover'} reveals ${t.initialState === 'problem' ? 'fix' : 'problem'}`,
+      used: t.hover.enabled,
       on: s.hover.enabled,
-      // Warp reveal warps pixel-grid tiles — it needs the grid on to do anything.
-      set: (on) => { if (on && !s.pixelGrid.enabled) setPixelGridConfig({ enabled: true }); setHoverConfig({ enabled: on }) },
+      set: (on) => setHoverConfig({ enabled: on }),
     },
   ]
+  const STACK = ALL.filter((L) => L.used)
+  // Layout is not a template part, so it is never listed as unused.
+  const unused = ALL.filter((L) => !L.used && L.id !== 'layout').map((L) => L.name)
   // Level = how many leading stack layers are on (for the stepper display).
   const level = (() => { let n = 0; for (const L of STACK) { if (L.on) n++; else break } return n })()
 
-  // Strip every "overflow" setting down to a clean, fine, animated Paper dither.
-  // Cell Size (px) is the key: large size + no grid = coarse checkerboard, so we
-  // pin a small size and a mid scale for a proper fine dither at rest.
-  function toBaseline() {
-    batchDitherUpdates(() => {
-      s.shader.alphaLayers.forEach((l, i) => { if (l.opacity <= 0) setAlphaLayer(i, { opacity: savedOpacity.current[i] }) })
-      setShaderConfig({ size: 2, scale: 0.6 })
-      setPixelGridConfig({ enabled: false, snap: false })
-      setMultiColorConfig({ enabled: false })
-      setHoverConfig({ enabled: false })
-      setEdgeConfig({ textBlend: false })
-      setAnimationConfig({ playing: true, tileDisplay: 'color' })
-      if (!s.activeScene) applySceneTemplate('gentle-drift')
-    })
-  }
+  /** Steps 1…lv on, the rest off. Off runs top-down first, so a step that
+   *  restores values (Layout) does so before the steps under it reset theirs. */
   function applyLevel(lv: number) {
-    batchDitherUpdates(() => STACK.forEach((L, i) => L.set(i < lv)))
-  }
-  // Full reset to the clean bare scene: re-pins the fine dither + a scene AND
-  // strips every stack layer, so it can never land on the broken coarse state.
-  function resetBare() {
     batchDitherUpdates(() => {
-      setShaderConfig({ size: 2, scale: 0.6 })
+      for (let i = STACK.length - 1; i >= lv; i--) STACK[i].set(false)
+      for (let i = 0; i < lv; i++) STACK[i].set(true)
+    })
+  }
+  /** Step 0: a scene (null = the template's own motion). Speed and play state
+   *  are kept unless `speed` is given (the "Template motion" reset passes 1). */
+  function applyMotion(scene: SceneTemplateId | null, speed?: number) {
+    const tg = target.current
+    if (!tg) return
+    const { playing, speed: current, tileDisplay, tileSizeContrast } = getDitherState().animation
+    batchDitherUpdates(() => {
+      if (scene) applySceneTemplate(scene)
+      else {
+        setShaderConfig({ speed: tg.shader.speed, colorCycleSpeed: tg.shader.colorCycleSpeed })
+        // tileDisplay and Size contrast belong to a step (Point sizes), not
+        // motion: keep the current ones.
+        setAnimationConfig({ ...tg.animation, tileDisplay, tileSizeContrast })
+      }
+      setAnimationConfig(speed == null ? { playing, speed: current } : { playing: true, speed })
+    })
+  }
+  function applySpeed(v: number) {
+    setAnimationConfig(v === 0 ? { playing: false } : { playing: true, speed: v })
+  }
+  // Load a template and strip it to its bare scene.
+  function explore(id: string) {
+    applyHeroTemplate(id)
+    // The warp mode is a live pick like Centered: carry it into the template.
+    setHoverConfig({ mode: warpModeRef.current })
+    target.current = structuredClone(getDitherState())
+    restoreId.current = id
+    // Calm the screen-blended Color/alpha base while exploring layers — see
+    // DitherState.stableColorField. applyHeroTemplate resets it, so set it after.
+    setStableColorField(true)
+    setAnimationConfig({ playing: true })
+    // Steps are rebuilt from the new target on the next render; strip now
+    // with the same rules, all layers off.
+    const tg = target.current
+    batchDitherUpdates(() => {
       setPixelGridConfig({ enabled: false, snap: false })
-      setMultiColorConfig({ enabled: false })
+      setShaderConfig({ size: tg.pixelGrid.enabled ? tg.pixelGrid.cell / tg.pixelGrid.divisions : tg.shader.size })
+      setAnimationConfig({ tileDisplay: 'color', tileSizeContrast: 0 })
+      if (tg.edge.mode === 'full') setEdgeConfig(bareEdge)
       setHoverConfig({ enabled: false })
-      setEdgeConfig({ textBlend: false })
-      setAnimationConfig({ playing: true, tileDisplay: 'color' })
-      if (!s.activeScene) applySceneTemplate('gentle-drift')
     })
   }
-  // Renderer switch — Mask/Points require the grid, so pick them WITH the grid on.
-  function setRenderer(id: TileDisplayMode) {
-    batchDitherUpdates(() => {
-      if (id !== 'color' && !s.pixelGrid.enabled) setPixelGridConfig({ enabled: true })
-      setAnimationConfig({ tileDisplay: id })
-    })
-  }
-
-  // On mount: capture the template to restore, drop to bare scene.
+  // On mount: take apart the selected template (Full Bleed if none).
+  // On exit: the Design Panel look from before the visit comes back, unless
+  // another template was picked here; then that template opens as authored.
   const restoreId = useRef<string | null>(null)
   useEffect(() => {
-    restoreId.current = s.activeTemplate
-    // Always explore from Fine Grain, whatever template is selected elsewhere.
-    // The stack is meant to read as "one setting at a time"; Full Bleed and
-    // Problem already ship a pixel grid, wide gaps and a tile renderer, so
-    // starting there means the first few steps toggle settings that are
-    // visually already on and the progression stops teaching anything. Fine
-    // Grain is the bare shader, so each step is the only thing that changes.
-    applyHeroTemplate('fine-grain')
-    // Calm the screen-blended Color/alpha base while exploring layers — see
-    // DitherState.stableColorField. Scoped to this view: cleared on leaving so
-    // Live and Templates keep their colour shimmer.
-    setStableColorField(true)
-    toBaseline()
+    const entry = snapshotDitherState()
+    const entryId = s.activeTemplate ?? heroTemplates[0].id
+    centeredRef.current = entry.composition.mode === 'centered'
+    warpModeRef.current = entry.hover.mode ?? 'hover'
+    explore(entryId)
     return () => {
-      setStableColorField(false)
-      if (restoreId.current) applyHeroTemplate(restoreId.current)
+      if (restoreId.current && restoreId.current !== entryId) {
+        setStableColorField(false)
+        applyHeroTemplate(restoreId.current)
+        if (centeredRef.current) setComposition('centered')
+        setHoverConfig({ mode: warpModeRef.current })
+      } else restoreDitherState(entry)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
+  // Layout effect: measure before first paint (no jump from the fallback scale).
+  useLayoutEffect(() => {
     const el = wrapRef.current
     if (!el) return
     const apply = () => setAvailW(el.clientWidth)
@@ -182,34 +312,25 @@ export default function LayerExplorer() {
     return `${window.location.pathname}?${p.toString()}`
   }, [])
 
-  // Two clear renderers for exploration: the flat dither field vs size-modulated
-  // dots. 'Mask size' is intentionally omitted here — it produces the same
-  // size-modulated-dot look as Point sizes but the expensive, flicker-prone way
-  // (a 12fps async blob mask over the screen-blended WebGL layers). It stays
-  // available in the Design Panel on the Live tab for anyone who wants it.
-  const loopBreakModes: { id: LoopBreakMode; label: string; hint: string }[] = [
-    { id: 'none', label: 'Off', hint: 'Scene loops as authored' },
-    { id: 'drift', label: 'Drift', hint: 'Pans continuously' },
-    { id: 'rotate', label: 'Rotate', hint: 'Spins the field — never repeats' },
-    { id: 'orbit', label: 'Orbit', hint: 'Pan + spin' },
-    { id: 'wander', label: 'Wander', hint: 'Organic, slowly-turning drift — random feel' },
-  ]
-  const tileModes: { id: TileDisplayMode; label: string }[] = [
-    { id: 'color', label: 'Color / alpha' },
-    { id: 'points', label: 'Point sizes' },
-  ]
-  const activeSceneLabel = s.activeScene ? sceneTemplates[s.activeScene].label : 'none'
+  const ownMotion = s.activeScene === t.activeScene
+  const sceneName = s.activeScene ? sceneTemplates[s.activeScene].label : 'Template motion'
+  const activeSceneHint = `${sceneName}${ownMotion && s.activeScene ? ' (template)' : ''} · ${describeMotion(s.animation, s.shader.speed)}`
+  // Shared by the Layers buttons: 150ms colour, and a press scale only when
+  // the viewer allows motion and the button is enabled.
+  const pressable = 'cursor-pointer transition-[color,background-color,border-color,scale] duration-150 ease-out motion-safe:enabled:active:scale-[0.96] disabled:opacity-40 disabled:cursor-not-allowed lab-focus'
+  const smallBtn = `grid place-items-center rounded-md border border-lab-border bg-transparent text-lab-fg-muted enabled:hover:text-lab-fg enabled:hover:border-lab-border-strong ${pressable}`
+  const topBtn = `text-lab-xs font-medium px-3 py-1.5 rounded-lg border border-lab-border text-lab-fg-muted hover:text-lab-fg hover:border-lab-border-strong bg-lab-fill ${pressable}`
 
   return (
-    <div className="h-screen flex flex-col bg-[#0b0c14]">
-      <div className="shrink-0 z-10 flex items-center justify-between px-6 py-3 border-b border-white/6 bg-[rgba(11,12,20,0.9)] backdrop-blur-xl">
+    <div className="h-dvh flex flex-col bg-lab-canvas">
+      <div className="shrink-0 z-10 h-lab-bar flex items-center justify-between px-6 border-b border-lab-border bg-lab-toolbar">
         <LabToolbarTitle
-          view="Layers"
-          strap="bare scene first — stack one setting at a time on the real shader"
+          onHome={onHome}
+          view="Recipe"
         />
         <div className="flex items-center gap-1.5">
-          <button onClick={resetBare} className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/25 bg-white/[0.03] cursor-pointer transition-colors">Bare scene</button>
-          <button onClick={() => applyLevel(STACK.length)} className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/25 bg-white/[0.03] cursor-pointer transition-colors">Full stack</button>
+          <button onClick={() => applyLevel(0)} disabled={level === 0} className={topBtn}>Bare scene</button>
+          <button onClick={() => applyLevel(STACK.length)} disabled={level === STACK.length} className={topBtn}>Full stack</button>
         </div>
       </div>
 
@@ -221,129 +342,125 @@ export default function LayerExplorer() {
         <div className="flex flex-col xl:flex-row gap-6 items-start" style={{ padding: PAD }}>
           {/* Live real-shader hero */}
           <div className="shrink-0">
-            <div className="rounded-xl border border-white/10 overflow-hidden bg-black shadow-[0_16px_48px_rgba(0,0,0,0.5)]" style={{ width: DESK.width * scale, height: DESK.height * scale }}>
+            <div className="rounded-xl border border-lab-border overflow-hidden bg-lab-artboard shadow-lab-raised" style={{ width: DESK.width * scale, height: DESK.height * scale }}>
               <iframe
                 src={frameSrc}
                 title="Layer explorer — live hero"
                 style={{ width: DESK.width, height: DESK.height, transform: `scale(${scale})`, transformOrigin: 'top left', border: 0, display: 'block' }}
               />
             </div>
-            <p className="mt-2.5 text-[11px] font-mono text-white/30">
-              Live desktop hero · real WebGL · {level === 0 ? 'bare scene (Paper dither + motion)' : `${level} of ${STACK.length} layers stacked`}
+            <p className="mt-2.5 text-lab-xs font-mono text-lab-fg-subtle" aria-live="polite">
+              Live desktop hero · real WebGL · {level === 0
+                ? 'bare scene: Paper dither, scene motion, Split layout, default edge'
+                : `step ${level} of ${STACK.length} · ${STACK[level - 1].name} added`}
             </p>
           </div>
 
-          {/* Controls */}
+          {/* Controls — one numbered list: step 0 is the scene, every later
+              step adds one setting on top of the steps above it. */}
           <div className="w-full xl:flex-1 xl:min-w-[300px] xl:max-w-[440px] flex flex-col gap-4">
-
-            {/* Base: scene picker (the animated dither is the foundation) */}
-            <div>
-              <h3 className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/40 mb-2">Base · animated Paper dither</h3>
-              <div className="p-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[0.05]">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[12.5px] text-white/90">Scene motion</span>
-                  <span className="font-mono text-[11px] text-emerald-300/80">{activeSceneLabel}</span>
-                </div>
-                <div className="flex flex-wrap gap-1 mt-2.5">
-                  {sceneTemplateIds.map((id) => (
-                    <button
-                      key={id}
-                      onClick={() => batchDitherUpdates(() => {
-                        applySceneTemplate(id)
-                        // Re-apply the user's Break-loop preference so it sticks
-                        // across scene switches (one atomic update → no flash).
-                        if (stickyLoopBreak.current !== null) setLoopBreak(stickyLoopBreak.current)
-                      })}
-                      className={`text-[10px] font-mono py-1 px-1.5 rounded-md border cursor-pointer transition-all ${
-                        s.activeScene === id ? 'bg-white/12 border-white/20 text-white/90' : 'bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/70'
-                      }`}
-                    >{sceneTemplates[id].label}</button>
-                  ))}
-                </div>
-
-                {/* Break loop — non-repeating motion layered on the scene, so
-                    the initial movement never settles into an obvious cycle.
-                    Wander is the organic/random one. Keeps the scene selected. */}
-                <div className="mt-3 pt-3 border-t border-white/[0.06]">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[11.5px] text-white/70">Break loop</span>
-                    <span className="font-mono text-[10px] text-white/30">keeps motion from repeating</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {loopBreakModes.map((m) => (
-                      <button
-                        key={m.id}
-                        onClick={() => { stickyLoopBreak.current = m.id; setLoopBreak(m.id) }}
-                        title={m.hint}
-                        className={`text-[10px] font-mono py-1 px-1.5 rounded-md border cursor-pointer transition-all ${
-                          s.animation.loopBreak === m.id ? 'bg-white/12 border-white/20 text-white/90' : 'bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/70'
-                        }`}
-                      >{m.label}</button>
-                    ))}
-                  </div>
-                </div>
+            <section>
+              <SectionLabel className="mb-2">Start from</SectionLabel>
+              {/* Same pick tiles as the Design Panel's "Start from"; each draws
+                  its template's full stack from the template's own values. */}
+              <div role="group" aria-label="Template to take apart" className="grid grid-cols-3 gap-1.5">
+                {heroTemplates.map((tp) => {
+                  const look = stepLook(templateSource(tp), ALL_STEPS)
+                  return (
+                    <button key={tp.id} type="button" aria-pressed={t.activeTemplate === tp.id} onClick={() => explore(tp.id)} className={`${card} grid gap-1`}>
+                      <LivePreview className="w-full aspect-[16/10] rounded-sm" rate={0.6} draw={(ctx, time, W, H, dpr) => drawStep(ctx, time, W, H, dpr, look)} />
+                      <span className="truncate px-0.5 text-lab-xs font-medium">{tp.name}</span>
+                    </button>
+                  )
+                })}
               </div>
-            </div>
-
-            {/* Tile renderer (swaps the base renderer, not additive) */}
-            <div className="p-3 rounded-xl border border-white/[0.06] bg-white/[0.02]">
-              <span className="flex items-center gap-2">
-                <span className="font-mono text-[12.5px] text-white/90">Base renderer</span>
-                <span className={`font-mono text-[9px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded-full border ${verdictStyle.core}`}>Core</span>
-              </span>
-              <span className="block text-[12px] text-white/45 mt-1 mb-2 leading-snug">Color/alpha is the real Paper shader. Points is our own dot renderer (needs grid).</span>
-              <div className="flex gap-1">
-                {tileModes.map((m) => (
-                  <button key={m.id} onClick={() => setRenderer(m.id)}
-                    className={`flex-1 text-[10.5px] font-mono py-1.5 px-2 rounded-md border cursor-pointer transition-all ${
-                      s.animation.tileDisplay === m.id ? 'bg-white/12 border-white/20 text-white/90' : 'bg-white/[0.03] border-white/[0.05] text-white/40 hover:text-white/70'
-                    }`}>{m.label}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* The additive stack */}
+            </section>
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/40">Stack — each adds to the output</h3>
+              <SectionLabel className="mb-2" action={
                 <div className="flex items-center gap-1">
-                  <button onClick={() => applyLevel(Math.max(0, level - 1))} className="w-6 h-6 grid place-items-center rounded-md border border-white/10 text-white/60 hover:text-white hover:border-white/25 cursor-pointer text-[13px]" title="Remove top layer">◀</button>
-                  <span className="font-mono text-[11px] text-white/50 w-9 text-center">{level}/{STACK.length}</span>
-                  <button onClick={() => applyLevel(Math.min(STACK.length, level + 1))} className="w-6 h-6 grid place-items-center rounded-md border border-white/10 text-white/60 hover:text-white hover:border-white/25 cursor-pointer text-[13px]" title="Add next layer">▶</button>
+                  <button onClick={() => applyLevel(level - 1)} disabled={level === 0} className={`w-6 h-6 text-lab-md ${smallBtn}`} title="Remove top layer" aria-label="Remove top layer">◀</button>
+                  <span className="font-mono tabular-nums text-lab-xs text-lab-fg-subtle w-9 text-center">{level}/{STACK.length}</span>
+                  <button onClick={() => applyLevel(level + 1)} disabled={level === STACK.length} className={`w-6 h-6 text-lab-md ${smallBtn}`} title="Add next layer" aria-label="Add next layer">▶</button>
                 </div>
-              </div>
+              }>Steps — each adds to the output</SectionLabel>
               <div className="flex flex-col gap-2">
-                {/* base row — always present */}
-                <div className="grid grid-cols-[28px_1fr] gap-3 items-start p-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[0.05]">
-                  <span className="mt-0.5 w-6 h-6 grid place-items-center rounded-md bg-emerald-400/15 text-emerald-300 font-mono text-[11px]">0</span>
-                  <span>
-                    <span className="font-mono text-[12.5px] text-white/90">Bare dither + scene</span>
-                    <span className="block text-[12px] text-white/45 mt-1 leading-snug">Paper shader, {s.shader.type} · speed {s.shader.speed} · the foundation everything stacks on.</span>
+                {/* Step 0 — the scene. Always on: the animated Paper dither.
+                    Every step's thumbnail is the hero after that step. */}
+                <div className="grid grid-cols-[28px_1fr_auto] gap-x-3 items-start p-3 rounded-xl border border-lab-accent/25 bg-lab-accent/5">
+                  <span className="mt-0.5 w-6 h-6 grid place-items-center rounded-md bg-lab-accent/15 text-lab-accent font-mono text-lab-xs">0</span>
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2 flex-wrap min-h-6">
+                      <span className="font-mono text-lab-md text-lab-fg">Scene motion</span>
+                      {(!ownMotion || speed !== 1) && (
+                        <button onClick={() => applyMotion(t.activeScene, 1)} className={`h-6 px-2 text-lab-xs ${smallBtn}`} title="Back to the template's own motion at Live speed">
+                          Template motion
+                        </button>
+                      )}
+                    </span>
+                    <span className="block text-lab-sm text-lab-fg-subtle mt-1 leading-snug font-mono">{activeSceneHint}</span>
+                  </span>
+                  <LivePreview className={thumb} rate={tempo} draw={(ctx, time, W, H, dpr) => drawStep(ctx, time, W, H, dpr, stepLook(lookSrc, NO_STEPS))} />
+                  <span className="col-start-2 col-span-2 flex flex-col gap-2 mt-2.5 min-w-0">
+                    {/* Scrolls on a phone instead of pushing past the card;
+                        the padding keeps the focus ring inside the clip. */}
+                    <span className="max-w-full overflow-x-auto p-0.5 -m-0.5">
+                      <Segmented
+                        size="xs"
+                        label="Scene"
+                        value={s.activeScene}
+                        onChange={(id) => applyMotion(id)}
+                        options={LAYER_SCENES.map((id) => ({ value: id, label: sceneTemplates[id].label }))}
+                      />
+                    </span>
+                    {/* The Design Panel's Speed control: same stops, labels and field. */}
+                    <Segmented
+                      size="xs"
+                      stretch
+                      label="Speed"
+                      value={speed}
+                      onChange={applySpeed}
+                      options={speedStops.map((x) => ({ value: x.value, label: x.label }))}
+                    />
                   </span>
                 </div>
                 {STACK.map((L, i) => {
                   const on = L.on
+                  // The newest step in the stack: what the last ◀ ▶ changed.
+                  const top = i === level - 1
+                  const look = stepLook(lookSrc, new Set(STACK.slice(0, i + 1).map((x) => x.id)))
                   return (
-                    <button key={L.name} onClick={() => batchDitherUpdates(() => L.set(!on))}
-                      className={`grid grid-cols-[28px_1fr] gap-3 items-start text-left p-3 rounded-xl border cursor-pointer transition-all ${
-                        on ? 'border-emerald-400/25 bg-emerald-400/[0.05]' : 'border-white/[0.06] bg-white/[0.02] hover:border-white/15'
+                    <div key={L.id}
+                      className={`rounded-xl border transition-colors duration-150 ease-out ${
+                        top ? 'border-lab-accent/60 bg-lab-accent/5'
+                          : on ? 'border-lab-accent/25 bg-lab-accent/5'
+                          : 'border-lab-border bg-lab-fill hover:border-lab-border-strong'
                       }`}>
-                      <span className={`mt-0.5 w-6 h-6 grid place-items-center rounded-md font-mono text-[11px] ${on ? 'bg-emerald-400/15 text-emerald-300' : 'bg-white/[0.06] text-white/40'}`}>{i + 1}</span>
-                      <span>
-                        <span className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-[12.5px] text-white/90">{L.name}</span>
-                          <span className={`font-mono text-[9px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded-full border ${verdictStyle[L.verdict]}`}>{L.vlabel}</span>
+                      {/* A click goes to this step: steps 1…i on, later ones off.
+                          Clicking the top step removes it. */}
+                      <button onClick={() => applyLevel(top ? i : i + 1)} aria-pressed={on}
+                        title={top ? `Remove step ${i + 1}` : `Show steps 0–${i + 1}`}
+                        className="w-full grid grid-cols-[28px_1fr_auto] gap-3 items-start text-left p-3 rounded-xl cursor-pointer lab-focus">
+                        <span className={`mt-0.5 w-6 h-6 grid place-items-center rounded-md font-mono text-lab-xs transition-colors duration-150 ease-out ${on ? 'bg-lab-accent/15 text-lab-accent' : 'bg-lab-fill text-lab-fg-subtle'}`}>{i + 1}</span>
+                        <span className="min-w-0">
+                          <span className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-lab-md text-lab-fg">{L.name}</span>
+                            <span className={`font-mono text-lab-2xs uppercase tracking-[0.1em] px-1.5 py-0.5 rounded-full border ${verdictStyle[L.verdict]}`}>{L.vlabel}</span>
+                          </span>
+                          <span className="block text-lab-sm text-lab-fg-subtle mt-1 leading-snug font-mono">{L.value}</span>
                         </span>
-                        <span className="block text-[12px] text-white/45 mt-1 leading-snug font-mono">{L.value}</span>
-                      </span>
-                    </button>
+                        <LivePreview className={thumb} rate={tempo} draw={(ctx, time, W, H, dpr) => drawStep(ctx, time, W, H, dpr, look)} />
+                      </button>
+                    </div>
                   )
                 })}
               </div>
             </div>
 
-            <p className="text-[11px] text-white/25 leading-relaxed">
-              Step the stack with ◀ ▶ (or click a row) to watch each setting compose the final image. Leaving the Layers view restores your template.
+            {unused.length > 0 && (
+              <p className="text-lab-xs font-mono text-lab-fg-subtle leading-relaxed">Not used by this template: {unused.join(' · ')}</p>
+            )}
+            <p className="text-lab-xs text-lab-fg-subtle leading-relaxed">
+              Step the stack with ◀ ▶ (or click a row) to watch each setting compose the final image. Leaving Recipe brings back the Design Panel look, or opens the template picked here as authored (Centered stays on if it was applied).
             </p>
           </div>
         </div>

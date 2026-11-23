@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shader options</title>
+<style>
+  :root { color-scheme: dark; --bg: #07110e; --fg: #e8f2ee; --muted: #9fb7af; --line: #1e3a32; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  header { padding: 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p { margin: 0; color: var(--muted); max-width: 80ch; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 12px; padding: 0 16px 16px; }
+  figure { margin: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  figcaption { padding: 8px 10px; font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
+  figcaption a { color: #2DD4A8; }
+  iframe { display: block; width: 100%; aspect-ratio: 16 / 10; border: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hero Lab — shader background options</h1>
+  <p>Same scene in each frame. Hover a frame to flip problem → fix under the cursor. The HUD shows WebGL contexts, draws per second and JS time per frame. Write-up: <code>docs/research/2026-11-21-shader-background-review.md</code>. Serve this folder over HTTP: <code>python3 -m http.server 8090</code>.</p>
+</header>
+<div class="grid">
+  <figure><iframe src="a-paper-stack.html" title="A Paper stack"></iframe><figcaption><span>A · current architecture: 3 Paper mounts + 3 on hover, CSS screen blend, CSS masks</span><a href="a-paper-stack.html">open</a></figcaption></figure>
+  <figure><iframe src="b-single-pass.html" title="B single pass colour"></iframe><figcaption><span>B · one shader, one context, Color/alpha</span><a href="b-single-pass.html">open</a></figcaption></figure>
+  <figure><iframe src="b-single-pass.html?mode=points" title="B single pass points"></iframe><figcaption><span>B · one shader, Point sizes (replaces the 2D canvas)</span><a href="b-single-pass.html?mode=points">open</a></figcaption></figure>
+  <figure><iframe src="c-ogl.html" title="C OGL"></iframe><figcaption><span>C · B's shader mounted through OGL 1.0.11</span><a href="c-ogl.html">open</a></figcaption></figure>
+</div>
+</body>
+</html>

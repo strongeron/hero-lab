@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A · Paper stack</title>
+<style id="base"></style>
+<style>
+  .layer, .stack { position: absolute; inset: 0; }
+  .layer > canvas { width: 100%; height: 100%; display: block; }
+  .stack { background: #0A1714; }
+</style>
+</head>
+<body>
+<!--
+  A — replica of the lab's current free Color/alpha architecture:
+  one Paper <Dithering> ShaderMount (= one WebGL2 context, one full-screen
+  draw) per colour layer, composited by the browser with CSS opacity +
+  mix-blend-mode: screen; a repeating SVG tile mask on the container; and on
+  hover a second stack of three mounts for the fix state, revealed through a
+  canvas-drawn mask exported with toBlob (the perf/canvas-hot-paths version).
+  Drift uniforms are pushed at 24 fps through setUniforms() and wrapper
+  opacities are written every frame, as React does in DitherHero.
+  Paper Shaders 0.0.82 is Apache-2.0 (https://github.com/paper-design/shaders).
+-->
+<div class="hero" id="hero"></div>
+<script type="module">
+import { ShaderMount, ditheringFragmentShader } from 'https://cdn.jsdelivr.net/npm/@paper-design/shaders@0.0.82/+esm'
+import { SCENE, BASE_CSS, COPY_HTML, hexToVec, makeHud, frozenT, fakeMouse, params } from './common.js'
+
+document.getElementById('base').textContent = BASE_CSS
+const hero = document.getElementById('hero')
+const useGrid = params.get('grid') !== '0'
+
+// Count WebGL work so the HUD and the measurement script see the same numbers.
+let draws = 0, contexts = 0
+const gc = HTMLCanvasElement.prototype.getContext
+HTMLCanvasElement.prototype.getContext = function (t, ...a) { const c = gc.call(this, t, ...a); if (c && /webgl/.test(t) && !this.__counted) { this.__counted = 1; contexts++ } return c }
+const da = WebGL2RenderingContext.prototype.drawArrays
+WebGL2RenderingContext.prototype.drawArrays = function (...a) { draws++; return da.apply(this, a) }
+
+const { pitch, gap, radius } = SCENE.grid
+const piece = pitch - gap
+const tileSvg = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='${pitch}' height='${pitch}'><rect x='${gap / 2}' y='${gap / 2}' width='${piece}' height='${piece}' rx='${radius}' fill='#000'/></svg>`)}")`
+
+const container = document.createElement('div')
+container.className = 'stack'
+if (useGrid) Object.assign(container.style, { maskImage: tileSvg, webkitMaskImage: tileSvg, maskSize: `${pitch}px ${pitch}px`, maskRepeat: 'repeat' })
+hero.append(container)
+hero.insertAdjacentHTML('beforeend', COPY_HTML)
+
+const time0 = frozenT == null ? 0 : frozenT * 1000
+function mountLayer(parent, layer, i) {
+  const wrap = document.createElement('div')
+  wrap.className = 'layer'
+  wrap.style.opacity = layer.opacity
+  wrap.style.mixBlendMode = 'screen'
+  parent.append(wrap)
+  const spread = SCENE.alphaSpread * i
+  const mount = new ShaderMount(wrap, ditheringFragmentShader, {
+    u_colorBack: [0, 0, 0, 1], u_colorFront: [...hexToVec(layer.color), 1],
+    u_shape: layer.shape, u_type: SCENE.type, u_pxSize: SCENE.pxSize,
+    u_originX: 0.5 + spread * 0.8, u_originY: 0.5 + spread * 0.6,
+    u_worldWidth: 0, u_worldHeight: 0, u_fit: SCENE.fit, u_scale: SCENE.scale, u_rotation: SCENE.rotation,
+    u_offsetX: spread * 2, u_offsetY: spread * 1.5,
+  }, undefined, frozenT == null ? SCENE.speed : 0, time0, 1, SCENE.maxPixelCount)
+  return { wrap, mount, layer, spread }
+}
+const base = SCENE.problem.map((l, i) => mountLayer(container, l, i))
+
+// Hover stack: lazy-mounted on first hover, like the lab.
+let fix = null, fixWrap = null
+const maskCanvas = document.createElement('canvas')
+let maskUrl = null, maskPending = false
+const mouse = { x: -1e4, y: -1e4, r: 0, target: 0 }
+function ensureFix() {
+  if (fix) return
+  fixWrap = document.createElement('div')
+  fixWrap.className = 'layer'
+  fixWrap.style.background = SCENE.colorBack
+  container.append(fixWrap)
+  fix = SCENE.fix.map((l, i) => mountLayer(fixWrap, l, i))
+}
+let lastKey = null
+function rebuildMask() {
+  // Tile-quantised circle: whole tiles whose centre is inside the radius.
+  // Rebuilt only when the cursor or radius moved ≥ 2 px, as the lab does.
+  if (maskPending) return
+  if (lastKey && Math.abs(lastKey.x - mouse.x) < 2 && Math.abs(lastKey.y - mouse.y) < 2 && Math.abs(lastKey.r - mouse.r) < 2) return
+  lastKey = { x: mouse.x, y: mouse.y, r: mouse.r }
+  const w = innerWidth, h = innerHeight, dpr = Math.min(2, devicePixelRatio)
+  if (maskCanvas.width !== w * dpr) { maskCanvas.width = w * dpr; maskCanvas.height = h * dpr }
+  const ctx = maskCanvas.getContext('2d')
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, w, h)
+  ctx.fillStyle = '#000'
+  const r = mouse.r
+  const c0 = Math.floor((mouse.x - r) / pitch) - 1, c1 = Math.ceil((mouse.x + r) / pitch) + 1
+  const r0 = Math.floor((mouse.y - r) / pitch) - 1, r1 = Math.ceil((mouse.y + r) / pitch) + 1
+  for (let row = r0; row <= r1; row++) for (let col = c0; col <= c1; col++) {
+    const cx = (col + 0.5) * pitch, cy = (row + 0.5) * pitch
+    if (Math.hypot(cx - mouse.x, cy - mouse.y) > r) continue
+    ctx.beginPath(); ctx.roundRect(cx - piece / 2, cy - piece / 2, piece, piece, radius); ctx.fill()
+  }
+  maskPending = true
+  maskCanvas.toBlob((blob) => {
+    maskPending = false
+    if (!blob) return
+    const old = maskUrl
+    maskUrl = URL.createObjectURL(blob)
+    fixWrap.style.maskImage = fixWrap.style.webkitMaskImage = `url(${maskUrl})`
+    fixWrap.style.maskSize = fixWrap.style.webkitMaskSize = '100% 100%'
+    if (old) setTimeout(() => URL.revokeObjectURL(old), 100)
+  })
+}
+function setMouse(x, y) { ensureFix(); mouse.x = x; mouse.y = y; mouse.target = SCENE.hoverRadius }
+hero.addEventListener('pointermove', (e) => setMouse(e.clientX, e.clientY))
+hero.addEventListener('pointerleave', () => { mouse.target = 0 })
+if (fakeMouse) { setMouse(fakeMouse.x, fakeMouse.y); mouse.r = SCENE.hoverRadius }
+
+const stats = makeHud('A · Paper stack (current)', () => ({ contexts, draws, extra: `mask      toBlob` }))
+let lastDrift = 0
+function frame(now) {
+  const t0 = performance.now()
+  stats.frames++
+  if (frozenT == null) {
+    // Drift at 24 fps through setUniforms (each call also triggers an immediate draw, as in the lab).
+    if (now - lastDrift > 1000 / 24) {
+      lastDrift = now
+      const dx = Math.sin(now * 0.00035) * 0.05, dy = Math.cos(now * 0.0005) * 0.05
+      for (const L of [...base, ...(fix ?? [])]) L.mount.setUniforms({ u_offsetX: L.spread * 2 + dx, u_offsetY: L.spread * 1.5 + dy })
+    }
+    // Colour-cycle opacities written every frame, normalised to the authored total.
+    const k = now * 0.00015 * Math.PI * 2
+    base.forEach((L, i) => { L.wrap.style.opacity = (L.layer.opacity * (1 + 0.25 * Math.sin(k + i * 2.1))).toFixed(3) })
+    mouse.r += (mouse.target - mouse.r) * 0.18
+  }
+  if (fix && mouse.r > 1) rebuildMask()
+  else if (fixWrap && mouse.r <= 1 && lastKey) { lastKey = null; fixWrap.style.maskImage = fixWrap.style.webkitMaskImage = 'linear-gradient(transparent, transparent)' }
+  stats.jsMs += performance.now() - t0
+  requestAnimationFrame(frame)
+}
+requestAnimationFrame(frame)
+</script>
+</body>
+</html>
