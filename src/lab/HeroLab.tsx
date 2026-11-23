@@ -59,6 +59,7 @@ function ActiveHero() {
 function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' | 'solid'; rightOffset: number; button: { radius: number; uppercase: boolean } }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const bgClass = headerBg === 'solid'
+    // ds-exception: --color-t-border is only themed for terminal themes, so on a dark palette it would draw a dark line.
     ? 'bg-t-bg border-b border-white/10'
     : 'bg-transparent'
   // Header buttons follow the shared CTA styling (corner radius + caps) and
@@ -88,7 +89,7 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
             }} />
             <span className="relative block size-2.5 rounded-sm bg-current rotate-45" />
           </span>
-          <span className="text-[18px] font-semibold tracking-[-0.03em]" style={{ fontFamily: brandFont }}>
+          <span className="text-hero-brand font-semibold tracking-[-0.03em]" style={{ fontFamily: brandFont }}>
             {preset.brand}
           </span>
         </a>
@@ -138,14 +139,14 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
           <a
             href="#"
             style={btnStyle}
-            className="hidden md:block text-[14px] no-underline px-4 py-1.5 border transition-colors whitespace-nowrap text-t-cta2-text border-t-border-strong bg-transparent hover:bg-t-bg-surface"
+            className="hidden md:block text-hero-nav no-underline px-4 py-1.5 border transition-colors whitespace-nowrap text-t-cta2-text border-t-border-strong bg-transparent hover:bg-t-bg-surface"
           >
             {preset.signIn}
           </a>
           <a
             href="#"
             style={btnStyle}
-            className="text-[14px] no-underline px-4 py-1.5 border transition-colors whitespace-nowrap text-t-cta-text bg-t-cta-bg border-t-cta-bg hover:opacity-90"
+            className="text-hero-nav no-underline px-4 py-1.5 border transition-colors whitespace-nowrap text-t-cta-text bg-t-cta-bg border-t-cta-bg hover:opacity-90"
           >
             {preset.cta}
           </a>
@@ -167,12 +168,14 @@ function LabHeader({ headerBg, rightOffset, button }: { headerBg: 'transparent' 
       {/* Dropdown menu — absolutely positioned below the bar so the header's
           measured height (which drives the dot field's Top start) never moves. */}
       {menuOpen && (
+        // ds-exception: hero menu sheet; t-border is not themed for palettes, and there is no hero shadow token.
         <div className="xl:hidden absolute top-full left-0 right-0 bg-t-bg border-b border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
           <nav className="max-w-[1440px] mx-auto px-5 sm:px-8 py-2 flex flex-col">
             {preset.navLinks.map((link) => (
               <a
                 key={link.label}
                 href="#"
+                /* ds-exception: menu row divider, same reason as the sheet border above. */
                 className="text-base no-underline py-3 text-t-body hover:text-t-headline border-b border-white/5 transition-colors"
               >
                 {link.label}

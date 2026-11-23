@@ -16,7 +16,9 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "smoke": "node scripts/smoke.mjs",
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "check:fast": "node scripts/check.mjs --no-smoke",
+    "lint:tokens": "node scripts/lint-tokens.mjs"
   },
   "dependencies": {
     "@paper-design/shaders-react": "^0.0.82",

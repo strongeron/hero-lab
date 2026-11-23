@@ -1737,7 +1737,7 @@ export default function DitherHero() {
   const heroCta = (className: string) => (
     <a
       href="#"
-      className={`inline-flex items-center justify-center whitespace-nowrap px-7 py-3 text-[16px] xl:px-10 xl:py-4 xl:text-[18px] font-semibold tracking-wide transition-colors ${className}`}
+      className={`inline-flex items-center justify-center whitespace-nowrap px-7 py-3 text-hero-cta xl:px-10 xl:py-4 xl:text-hero-cta-lg font-semibold tracking-wide transition-colors ${className}`}
       style={{
         backgroundColor: CTA_BG,
         color: ctaTextColor,
@@ -1893,7 +1893,7 @@ export default function DitherHero() {
           </div>
           {edgeGuides.map((g) => (
             <div key={g.label} data-guide="edge" data-label={g.label} data-y={g.y} className="absolute left-0 right-0" style={{ top: g.y, height: 1, background: 'rgba(255, 184, 0, 0.8)' }}>
-              <span className="absolute right-1 -top-[14px] text-[10px] leading-none font-mono" style={{ color: 'rgba(255, 184, 0, 0.95)' }}>{g.label}</span>
+              <span className="absolute right-1 -top-[14px] text-lab-2xs leading-none font-mono" style={{ color: 'rgba(255, 184, 0, 0.95)' }}>{g.label}</span>
             </div>
           ))}
         </div>
@@ -1915,7 +1915,7 @@ export default function DitherHero() {
               className="absolute"
               style={{ left: b.x, top: b.y, width: b.w, height: b.h, boxShadow: `inset 0 0 0 1px ${b.check && !b.check.pass ? 'rgba(255, 70, 70, 0.95)' : b.name === 'copy' ? 'rgba(160, 255, 60, 0.45)' : 'rgba(160, 255, 60, 0.9)'}` }}
             >
-              <span className="absolute left-0 -top-[13px] text-[10px] leading-none font-mono whitespace-nowrap" style={{ color: b.check && !b.check.pass ? 'rgba(255, 90, 90, 1)' : 'rgba(160, 255, 60, 0.95)' }}>
+              <span className="absolute left-0 -top-[13px] text-lab-2xs leading-none font-mono whitespace-nowrap" style={{ color: b.check && !b.check.pass ? 'rgba(255, 90, 90, 1)' : 'rgba(160, 255, 60, 0.95)' }}>
                 {b.name} {b.w}×{b.h}{b.check ? ` · Lc ${Math.round(b.check.lc)}/${b.check.need} ${b.check.pass ? 'pass' : 'FAIL'}` : ''}
               </span>
             </div>
@@ -1962,7 +1962,7 @@ export default function DitherHero() {
                     {copy.headline}
                   </h1>
                   {copy.sub && (
-                    <p ref={lockSubRef} className="mt-3 md:mt-6 text-[17px] md:text-[20px] max-w-[65ch] text-pretty leading-[1.55] break-words [overflow-wrap:anywhere]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(copy.subSize ? { fontSize: copy.subSize } : {}), ...(baselineNudge.subGap > 0 ? { marginTop: 24 + baselineNudge.subGap } : {}), ...textReadabilityStyle }}>
+                    <p ref={lockSubRef} className="mt-3 md:mt-6 text-hero-sub md:text-hero-sub-lg max-w-[65ch] text-pretty leading-[1.55] break-words [overflow-wrap:anywhere]" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(copy.subSize ? { fontSize: copy.subSize } : {}), ...(baselineNudge.subGap > 0 ? { marginTop: 24 + baselineNudge.subGap } : {}), ...textReadabilityStyle }}>
                       {copy.sub}
                     </p>
                   )}
@@ -2025,7 +2025,7 @@ export default function DitherHero() {
                   <a
                     ref={lockCtaRef}
                     href="#"
-                    className="inline-flex items-center justify-center whitespace-nowrap px-7 py-3 text-[16px] xl:px-10 xl:py-4 xl:text-[18px] font-semibold tracking-wide transition-colors"
+                    className="inline-flex items-center justify-center whitespace-nowrap px-7 py-3 text-hero-cta xl:px-10 xl:py-4 xl:text-hero-cta-lg font-semibold tracking-wide transition-colors"
                     style={{
                       backgroundColor: CTA_BG,
                       color: ctaTextColor,
@@ -2055,7 +2055,7 @@ export default function DitherHero() {
                   {copy.headline}
                 </h1>
                 {copy.sub && (
-                  <p className="mt-4 md:mt-6 text-[17px] md:text-[20px] max-w-[52ch] text-balance leading-[1.55] break-words" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(copy.subSize ? { fontSize: copy.subSize } : {}), ...textReadabilityStyle }}>
+                  <p className="mt-4 md:mt-6 text-hero-sub md:text-hero-sub-lg max-w-[52ch] text-balance leading-[1.55] break-words" style={{ color: sublineColor, ...(copy.subFont ? { fontFamily: copy.subFont } : {}), ...(copy.subSize ? { fontSize: copy.subSize } : {}), ...textReadabilityStyle }}>
                     {copy.sub}
                   </p>
                 )}

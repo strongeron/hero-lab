@@ -24,10 +24,28 @@ jobs:
 
       - run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
+      # Typecheck, build, token lint, design-system contracts and their
+      # indexes: the same steps as `npm run check`, without the browser.
+      - name: Check (no browser)
+        run: npm run check:fast
 
-      # Build last: it is the slowest step and the one most likely to be fixed
-      # by fixing a type error above.
-      - name: Build
-        run: npm run build
+  smoke:
+    runs-on: ubuntu-latest
+    # ponytail: non-blocking until the smoke suite has a green week on CI
+    # runners (headless WebGL and rAF timing differ from a laptop). Then
+    # remove continue-on-error so a failing smoke check blocks the PR.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # ubuntu-latest ships Google Chrome at /usr/bin/google-chrome, which
+      # scripts/smoke.mjs finds on its own.
+      - name: Smoke (headless Chrome)
+        run: npm run smoke

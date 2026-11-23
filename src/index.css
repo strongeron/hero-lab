@@ -75,6 +75,16 @@
   --text-lab-xs: 11px;
   --text-lab-sm: 12px;
   --text-lab-md: 13px;
+  /* Hero type scale (the product surface, not the lab). The headline size is
+     fitted per copy variant (useHeadlineFit); these are the fixed steps.
+     No --line-height pair: each use sets its own leading or inherits it. */
+  --text-hero-sub: 17px;
+  --text-hero-sub-lg: 20px;
+  --text-hero-cta: 16px;
+  --text-hero-cta-lg: 18px;
+  --text-hero-nav: 14px;
+  --text-hero-brand: 18px;
+  --text-hero-footer: 15px;
   /* Black at 50 % lifts lab UI off any hero palette underneath. */
   --shadow-lab-float: 0 8px 32px rgb(0 0 0 / 0.5);
   --shadow-lab-raised: 0 16px 48px rgb(0 0 0 / 0.5);

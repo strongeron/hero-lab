@@ -5,26 +5,38 @@
 
 import { spawn } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join, dirname, delimiter } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const env = { ...process.env, PATH: `${join(ROOT, 'node_modules/.bin')}${delimiter}${process.env.PATH}`, FORCE_COLOR: '0', NO_COLOR: '1' }
 
-const contractScript = join(homedir(), '.claude/skills/ai-design-system/scripts/check-contract.mjs')
-const contractFiles = () => readdirSync(join(ROOT, 'design-system/components'))
-  .filter((f) => f.endsWith('.md')).sort().map((f) => `design-system/components/${f}`)
+// Vendored from the ai-design-system skill (scripts/design-system/), so the
+// contract checks run in CI and on any machine.
+const contractScript = join(ROOT, 'scripts/design-system/check-contract.mjs')
+const indexScript = join(ROOT, 'scripts/design-system/generate-indexes.mjs')
+const contractFiles = (dirName) => {
+  const dir = join(ROOT, 'design-system', dirName)
+  return existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.md')).sort().map((f) => `design-system/${dirName}/${f}`) : []
+}
+// One step per contract kind: the checker validates location and inventory
+// against the kind it is given.
+const contractSteps = [['component', 'components', 'COMPONENTS'], ['layout', 'layouts', 'LAYOUTS'], ['pattern', 'patterns', 'PATTERNS']]
+  .filter(([, dirName]) => contractFiles(dirName).length)
+  .map(([kind, dirName, index]) => ({
+    name: `design-system ${dirName}`,
+    cmd: process.execPath,
+    args: [contractScript, '--kind', kind, '--inventory', `design-system/${index}.md`, ...contractFiles(dirName)],
+  }))
+const noSmoke = process.argv.includes('--no-smoke') ? [] : null
 
 const steps = [
   { name: 'typecheck (tsc -b)', cmd: 'tsc', args: ['-b'] },
   { name: 'build (vite build)', cmd: 'vite', args: ['build'] },
-  {
-    name: 'design-system contracts',
-    skip: !existsSync(contractScript) && `${contractScript} not found (it lives in the ai-design-system skill, outside the repo)`,
-    cmd: process.execPath, args: [contractScript, '--inventory', 'design-system/COMPONENTS.md', ...(existsSync(contractScript) ? contractFiles() : [])],
-  },
-  { name: 'smoke (headless browser)', cmd: process.execPath, args: [join(ROOT, 'scripts/smoke.mjs')] },
+  { name: 'token lint', cmd: process.execPath, args: [join(ROOT, 'scripts/lint-tokens.mjs')] },
+  ...contractSteps,
+  { name: 'design-system indexes', cmd: process.execPath, args: [indexScript, '--check', '.'] },
+  ...(noSmoke ?? [{ name: 'smoke (headless browser)', cmd: process.execPath, args: [join(ROOT, 'scripts/smoke.mjs')] }]),
 ]
 
 /** Run a command, echo its output, resolve with its exit code and output. */

@@ -5,7 +5,10 @@ the dither background, headline and CTA that a visitor of the demo site sees. Th
 **lab UI** is the tool around it: the bottom view bar, view toolbars, the Design
 Panel, Recipe, Canvas, Breakpoints and the perf strip. This file governs the lab
 UI. The hero keeps its own palette tokens (`--color-t-*`, `[data-palette]` in
-`src/index.css`) and is out of scope here.
+`src/index.css`) and its own type scale (`--text-hero-*`). Its rules live in the
+[hero copy block pattern](design-system/patterns/hero-copy-block.md) and the
+[Split](design-system/layouts/hero-split.md) and
+[Centered](design-system/layouts/hero-centered.md) layouts.
 
 ## Intent and shared rules
 
@@ -17,8 +20,10 @@ destructive action).
 Required:
 
 - **Tokens only.** Lab UI colour, surface, border, fill, shadow and font size come from the
-  `lab-*` tokens below. No raw `white/NN`, `rgba(...)`, hex or `text-[Npx]` in lab
-  UI code. A scoped exception needs a comment naming why.
+  `lab-*` tokens below; the hero uses `t-*` and `text-hero-*`. No raw `white/NN`,
+  Tailwind palette colours, arbitrary colours or `text-[Npx]` in class names. A
+  scoped exception needs a `ds-exception: <why>` comment on the line or the line
+  above. `scripts/lint-tokens.mjs` enforces this (check, CI and an edit hook).
 - **Text contrast.** Text is `text-lab-fg`, `text-lab-fg-muted` or
   `text-lab-fg-subtle`. Nothing dimmer: `lab-fg-subtle` (0.5 white) is 5.4:1 on the
   lab canvas, the AA floor for small text.
@@ -79,17 +84,31 @@ Component internals and business logic (store, handlers, effects) stay project-o
 
 ## Verification
 
-- Types: `npm run typecheck`. Build: `npm run build`.
+- All gates: `npm run check` (typecheck, build, token lint, contracts, indexes,
+  smoke). Without the browser: `npm run check:fast`. CI runs `check:fast` as a
+  blocking job and smoke as a separate job.
+- Edit-time: `.claude/settings.json` runs `scripts/lint-tokens.mjs --hook` after
+  every Write/Edit of a `.tsx` file under `src/`, so an agent sees a raw value at
+  once.
 - Preview: `npm run dev -- --port 5174`, open `http://localhost:5174/hero-lab/`.
-- Contract checks: `node ~/.claude/skills/ai-design-system/scripts/check-contract.mjs`
-  and `generate-indexes.mjs --check .` from the repo root.
+  Overlays: `?guides=1`, `?baselines=1`, `?boxes=1`. `window.__heroA11y()` returns
+  the APCA contrast of every hero copy line.
+- Contract checks: `scripts/design-system/check-contract.mjs` and
+  `generate-indexes.mjs --check .`, vendored from the `ai-design-system` skill.
 - Accessibility: WCAG 2.2 AA for the lab UI (contrast, focus visible, names,
   target size). Browsers: current Chromium, Safari, Firefox.
 - Verification choice for the 2026-11-21 connection and polish: run.
 
 ## Gaps and decisions
 
-No open gaps. Decisions taken 2026-11-21 with the user: connect the design system,
+2026-11-23, enforcement: added the token lint (check, CI, PostToolUse hook), a
+`CLAUDE.md` that imports `AGENTS.md`, the hero type scale (`--text-hero-*`), hero
+contracts (copy block, Split, Centered) and vendored contract scripts. Open gaps:
+no stored screenshot baselines; no pre-PR design review gate; `--color-t-border`
+is themed only for terminal themes, so the hero header keeps raw white borders as
+a `ds-exception`.
+
+Decisions taken 2026-11-21 with the user: connect the design system,
 then align the lab chrome and the Design Panel on it. No Storybook in this repo.
 
 2026-11-22, Design toggle: the bottom view bar only switches views. `DesignToggle`

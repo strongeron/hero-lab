@@ -539,6 +539,7 @@ export default function DitherPanel() {
               // at display size in the pair's own face, not lab UI text.
               return (
                 <button key={id ?? 'auto'} type="button" aria-pressed={state.typePair === id} onClick={() => setTypePair(id)} className={`${card} grid gap-0.5`}>
+                  {/* ds-exception: a type specimen shows the face at display size, above the lab scale. */}
                   <span className="text-[22px] leading-none text-lab-fg" style={{ fontFamily: p?.headlineFont ?? copyFace, fontWeight: p?.headlineWeight, letterSpacing: p?.headlineTracking }}>Aa</span>
                   <span className="truncate text-lab-xs">{p?.label ?? 'Auto'}</span>
                 </button>

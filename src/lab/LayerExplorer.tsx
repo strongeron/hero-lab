@@ -59,9 +59,9 @@ type Verdict = 'core' | 'signature' | 'situational'
 // Scoped exception to "tokens only" (DESIGN.md): each badge hue names a verdict
 // category, and the lab has no category tokens.
 const verdictStyle: Record<Verdict, string> = {
-  core: 'text-emerald-300/80 border-emerald-400/30 bg-emerald-400/10',
-  signature: 'text-amber-300/80 border-amber-400/30 bg-amber-400/10',
-  situational: 'text-sky-300/80 border-sky-400/30 bg-sky-400/10',
+  core: 'text-emerald-300/80 border-emerald-400/30 bg-emerald-400/10', // ds-exception: verdict hue
+  signature: 'text-amber-300/80 border-amber-400/30 bg-amber-400/10', // ds-exception: verdict hue
+  situational: 'text-sky-300/80 border-sky-400/30 bg-sky-400/10', // ds-exception: verdict hue
 }
 
 /** Scenes that look different on the bare base. The store has 11; on this
